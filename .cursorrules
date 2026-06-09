@@ -1,8 +1,23 @@
-﻿# UNIVERSAL AGENT RULES (ALWAYS ACTIVE)
+---
+description: 
+alwaysApply: true
+---
+
+---
+description: 
+alwaysApply: true
+---
+
+---
+description: 
+alwaysApply: true
+---
+
+# UNIVERSAL AGENT RULES (ALWAYS ACTIVE)
 
 ## 1. Isolation 
 - **Read-Only**: The `docs/`  directory are STRICTLY READ-ONLY.
-- **Write Access**: Allowed in `agent_docs/`, `src/`, `tests/`, `alembic/`, and `config/`.
+- **Write Access**: Allowed in `agent_docs/`, `src/`, `tests/`, `alembic/`, `manual/` , `config/` and `README.md`
 
 ## 2. Honesty
 - **Blockers**: If a task is blocked, requirements are contradictory, or data is missing, IMMEDIATELY create `agent_docs/reports/BLOCKED.md` with the issue and proposed solutions. Silently simplifying logic, skipping complex parts, or hallucinating contracts is STRICTLY FORBIDDEN.
@@ -18,3 +33,9 @@
 ## 5. Language
 - ALL generated instructions, reports, code comments, and commit messages MUST be in **English** if user dont specify other
 
+## 📚 DOCUMENTATION BOUNDARIES
+- `docs/` = IMMUTABLE SPECS. Agents NEVER create or modify files here.
+- `agent_docs/` = AGENT WORKFLOW ARTIFACTS. Only for plans, contracts, instructions, reports, progress logs.
+- `manual/` = HUMAN-FACING TECHNICAL DOCS. Updated ONLY by `/docs-git-sync` or `/polish`. Contains architecture, DB reference, API guides.
+
+- ONE TOPIC, ONE FILE: Never dump all docs into a single file. Use relative links `[DB Schema](manual/DB_REFERENCE.md)` instead of copy-pasting.
