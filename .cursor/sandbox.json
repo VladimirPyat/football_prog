@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "type": "workspace_readwrite",
+  "disableTmpWrite": true,
+  "additionalReadonlyPaths": [".env", "credentials*.*", ".aws/", ".ssh/"],
+  "networkPolicy": { "default": "deny", "allow": ["github.com", "registry.npmjs.org", "pypi.org"] }
+}
+{
+  "version": 1,
+  "type": "workspace_readwrite",
+  "additionalReadonlyPaths": ["docs/"],
+  "networkPolicy": { "default": "deny", "allow": ["github.com", "registry.npmjs.org", "pypi.org"] }
+}

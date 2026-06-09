@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Football Predictions API
+  version: 1.0.0
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+  
+  /api/v1/rounds/{id}/predictions:
+    post:
+      summary: Submit predictions for a round (Batch-only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                predictions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      match_id:
+                        type: integer
+                      score1:
+                        type: integer
+                        minimum: 0
+                        maximum: 20
+                      score2:
+                        type: integer
+                        minimum: 0
+                        maximum: 20
+      responses:
+        '200':
+          description: Predictions saved
+        '400':
+          description: Validation error (e.g., not all matches provided)
+        '403':
+          description: Deadline passed or unauthorized
+
+  /api/v1/rounds/{id}/leaderboard:
+    get:
+      summary: Get public leaderboard for a round
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Leaderboard data
+
+  /api/v1/admin/rounds:
+    post:
+      summary: Create a new round (Supervisor only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                number:
+                  type: integer
+                deadline:
+                  type: string
+                  format: date-time
+                matches:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      team1_id:
+                        type: integer
+                      team2_id:
+                        type: integer
+                      date_time:
+                        type: string
+                        format: date-time
+      responses:
+        '200':
+          description: Round created
+
+  /api/v1/admin/matches/{id}/result:
+    put:
+      summary: Apply match results and trigger scoring (Supervisor only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                score1:
+                  type: integer
+                score2:
+                  type: integer
+                status:
+                  type: string
+                  enum: [FINISHED]
+      responses:
+        '200':
+          description: Results applied and calculation triggered
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

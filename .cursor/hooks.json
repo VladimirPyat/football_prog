@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "bash -c 'CMD=\"$*\"; echo \"$CMD\" | grep -qiE \"(rm\\s+-rf|\\bDROP\\b|DELETE\\s+FROM|push\\s+--force|^\\s*format\\b)\" && { echo \"⛔ BLOCKED: Destructive command detected. Require explicit human confirmation.\"; exit 1; } || exit 0' --"
+      }
+    ]
+  }
+}

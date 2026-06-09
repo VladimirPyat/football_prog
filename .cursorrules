@@ -1,0 +1,20 @@
+﻿# UNIVERSAL AGENT RULES (ALWAYS ACTIVE)
+
+## 1. Isolation 
+- **Read-Only**: The `docs/`  directory are STRICTLY READ-ONLY.
+- **Write Access**: Allowed in `agent_docs/`, `src/`, `tests/`, `alembic/`, and `config/`.
+
+## 2. Honesty
+- **Blockers**: If a task is blocked, requirements are contradictory, or data is missing, IMMEDIATELY create `agent_docs/reports/BLOCKED.md` with the issue and proposed solutions. Silently simplifying logic, skipping complex parts, or hallucinating contracts is STRICTLY FORBIDDEN.
+
+
+## 3. Tooling & Dependencies
+- **Package Management**: ALWAYS use `uv add <package_name>` to install new libraries. Using `pip install` or `poetry add` is FORBIDDEN.
+- **Version Pinning**: All dependencies must be pinned in `pyproject.toml`.
+
+## 4. Artifacts & Progress
+- Files in `agent_docs/progress/` are **append-only**. Deleting or overwriting old progress entries is forbidden.
+
+## 5. Language
+- ALL generated instructions, reports, code comments, and commit messages MUST be in **English** if user dont specify other
+

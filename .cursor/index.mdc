@@ -1,0 +1,15 @@
+---
+type: Always
+applyTo: "*"
+---
+# CORE INVARIANTS
+1. LANGUAGE: All code comments, commit messages, and documentation must be in English.
+2. SECRETS: Never read, reference, or output content from `.env`, `.credentials`, `.aws/`, `.ssh/`, or any file containing secrets. Request explicit values if needed.
+3. DESTRUCTIVE COMMANDS: Never execute `rm -rf`, `DROP`, `DELETE` without scope, or `git push --force` without explicit human confirmation. Propose `dry-run` or `.trash/` staging first.
+4. DEPENDENCIES: Never modify `package.json`, `requirements.txt`, `lockfiles`, or run install commands without explicit approval. Reuse existing utilities.
+5. CONTEXT INJECTION: Use targeted context (`@Files`, `@Code`, `@Folders`). Avoid `@Codebase` for localized tasks. Respect `.cursorignore` strictly.
+6. FILE DELETION POLICY: CRITICAL: Never use the `delete_file` tool, `rm`, `unlink`, or direct deletion. To remove files/directories, ALWAYS use: `mkdir -p .trash && mv <target> .trash/`. Add `.trash/` to `.gitignore` and `.cursorignore`.
+
+## DOCUMENTATION WORKFLOW:
+- CRITICAL: The `docs/` directory is READ-ONLY and contains approved source material. NEVER write, modify, or delete files in `docs/`.
+- ALL agent-generated plans, specs, drafts, and analysis MUST be saved to `agent_docs/`.
