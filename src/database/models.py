@@ -147,6 +147,10 @@ class Score(Base):
     total_without_bonus3: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_with_bonus3: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     correct_outcomes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    count_exact_high: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    count_exact: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    count_diff: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    count_outcome: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class ContestSettings(Base):

@@ -1,0 +1,12 @@
+{
+  "data_dir": "docs/test_data/contracted",
+  "files": {
+    "teams":       {"name": "teams.csv",       "delimiter": ","},
+    "users":       {"name": "users.csv",        "delimiter": ";"},
+    "matches":     {"name": "matches.csv",      "delimiter": ";"},
+    "predictions": {"name": "predictions.csv",  "delimiter": ";"}
+  },
+  "user_name_split": {"strategy": "last_name_only"},
+  "datetime": {"format": "%d.%m.%Y|%H:%M", "timezone": "UTC"},
+  "default_user_role": "USER"
+}

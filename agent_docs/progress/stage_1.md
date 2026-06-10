@@ -36,3 +36,52 @@
   canary (edit reference ⇒ Script 2 must fail). `coder_1.3.md` notes endpoints must be
   HTTP-drivable with no test backdoors.
 - Recommended execution order: per sub-stage code→test, sequential 1.1 → 1.2 → 1.3.
+
+## 2026-06-11 — Coder (1.1)
+- STATUS: READY_FOR_TEST
+- Files: src/scoring/__init__.py, src/scoring/types.py, src/scoring/rules.py, src/scoring/engine.py, src/scoring/standings.py, tests/unit/test_scoring_engine.py
+- Verified: uv run pytest tests/unit/test_scoring_engine.py -v -> 35 passed
+
+## 2026-06-11 — Planner hotfix (1.1)
+- Fixed round_rank: competition ranking (1,2,2,4) → dense ranking (1,2,2,3).
+  Coder followed a contradictory example in the prompt; dense is what expected_scores.csv uses (verified 90/90).
+  engine.py: rank = 1 + count of DISTINCT totals strictly higher.
+  test updated accordingly. 35 passed after fix.
+
+## 2026-06-11 — Tester (1.1)
+- STATUS: TEST_PASS
+- Tests: tests/scoring/__init__.py, tests/scoring/conftest.py, tests/scoring/test_contracted_scores.py
+- Executed: uv run pytest tests/scoring/ -v → 18 passed, 0 failed (0.09s)
+- Verified: [SC-BASE] 90/90, [SC-B1B2] 90/90, [SC-B3] 90/90, [SC-TOTAL] 90/90, [SC-RANK] 90/90, [SC-COUNTS] 90/90, [LB-COUNT] 10/10, [LB-TOTALS] 10/10, [LB-RANK] 10/10, edge cases: PASS
+- Report: agent_docs/reports/test_1.1.md
+
+## 2026-06-11 — Coder (1.2)
+- STATUS: READY_FOR_TEST
+- Files:
+  - config/test_data_loader.json (loader format/mapping config — all in config, nothing hardcoded)
+  - src/scripts/load_test_data.py (CSV→DB loader; --reset flag; idempotent)
+  - src/services/__init__.py (empty module init)
+  - src/services/round_service.py (DRAFT→ACTIVE→CLOSED→CALCULATED→PUBLISHED machine; 24h deadline rule)
+  - src/services/match_service.py (set_result; change_status with VOID→recalculate trigger)
+  - src/services/prediction_service.py (submit_batch batch-only; visible_predictions privacy filter)
+  - src/services/scoring_persistence.py (calculate_round; recalculate_round; atomic upsert)
+  - src/database/models.py (Score extended: count_exact_high, count_exact, count_diff, count_outcome added)
+  - alembic/versions/a2b3c4d5e6f7_scores_counts.py (additive migration; server_default=0)
+  - tests/unit/test_services_1_2.py (34 unit tests, ~80% edge cases)
+- Verified:
+  - uv run alembic upgrade head → exit 0 (migration applied: 0992bb744cc8 → a2b3c4d5e6f7)
+  - uv run alembic downgrade -1 → exit 0 (drops 4 count columns cleanly)
+  - uv run alembic upgrade head → exit 0 (re-applied)
+  - uv run python src/scripts/load_test_data.py --reset → "✅ Data loaded successfully", exit 0
+    (16 teams, 10 users, 80 matches, 712 predictions)
+  - uv run pytest tests/unit/test_services_1_2.py -v → 34 passed, 0 failed
+- Note for Planner: scores schema extended with count_* columns (additive, backward-compatible).
+  Please sync contracts/db_schema.md.
+- Next: agent_docs/instructions/tester_1.2.md
+
+## 2026-06-11 — Tester (1.2)
+- STATUS: TEST_PASS
+- Tests: tests/integration/conftest.py, tests/integration/test_loader_1_2.py, tests/integration/test_deadline_batch_1_2.py, tests/integration/test_calculate_persistence_1_2.py
+- Executed: uv run alembic upgrade head → exit 0; uv run pytest tests/integration/ -v → 36 passed, 0 failed (5.27s)
+- Verified: [LD-COUNT/NULL/ABSENCE/MAP/IDEMPOTENT] PASS, [DL-24H-FAIL/OK] PASS, [ST-ILLEGAL/LOCK] PASS, [BT-PARTIAL/FULL/ZERO/DEADLINE] PASS, [CALC-ROUND] 90/90, [CALC-COUNTS] 10/10, [CALC-COUNTS-ROW] 90/90, [CALC-ATOMIC/VOID] PASS
+- Report: agent_docs/reports/test_1.2.md
