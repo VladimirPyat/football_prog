@@ -1,6 +1,6 @@
 # Database Reference
 
-Overview of the Stage 0 database layer: SQLAlchemy models, enums, constraints, and Alembic migrations.
+Overview of the database layer: SQLAlchemy models, enums, constraints, and Alembic migrations.
 
 ## Table of Contents
 
@@ -12,14 +12,15 @@ Overview of the Stage 0 database layer: SQLAlchemy models, enums, constraints, a
 - [Migrations](#migrations)
 - [Entity Relationships](#entity-relationships)
 
-## Architecture [NEW]
+## Architecture [UPDATED]
 
 | Component | Path | Role |
 |-----------|------|------|
 | Declarative base | `src/database/base.py` | `Base` metadata for ORM + Alembic |
 | Models | `src/database/models.py` | 8 tables, enums, CHECK/UNIQUE |
 | Engine | `src/database/engine.py` | Async engine + session factory |
-| Migrations | `alembic/versions/0992bb744cc8_initial_schema.py` | Initial schema revision |
+| Initial migration | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates all 8 tables |
+| Scores extension | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds `count_*` columns to `scores` |
 | Alembic runner | `alembic/env.py` | Async migrations; URL from [CONFIG.md](CONFIG.md) |
 
 **Stack:** SQLAlchemy 2.0+ async, `DateTime(timezone=True)` (TIMESTAMPTZ), JSON column for `rules_json`.
@@ -139,8 +140,14 @@ Defined in `src/database/models.py` as `StrEnum` values stored as `VARCHAR`.
 | `total_without_bonus3` | INTEGER | NOT NULL, default `0` |
 | `total_with_bonus3` | INTEGER | NOT NULL, default `0` |
 | `correct_outcomes` | INTEGER | NOT NULL, default `0` |
+| `count_exact_high` | INTEGER | NOT NULL, default `0` [UPDATED] |
+| `count_exact` | INTEGER | NOT NULL, default `0` [UPDATED] |
+| `count_diff` | INTEGER | NOT NULL, default `0` [UPDATED] |
+| `count_outcome` | INTEGER | NOT NULL, default `0` [UPDATED] |
 
-> Score aggregation fields default to `0` because they store **computed totals**, not raw match predictions. See [Data Rules](#data-rules).
+**Before → After:** `count_*` columns were added by migration `a2b3c4d5e6f7`. They store the **frequency of hits** per exclusive category (not points) and are required for leaderboard tie-breaking (see [SCORING_LOGIC.md](SCORING_LOGIC.md#tie-breakers)) and display.
+
+> All aggregation fields default to `0` because they store **computed totals**, not raw match predictions. See [Data Rules](#data-rules).
 
 ### `contest_settings`
 
@@ -199,17 +206,18 @@ Critical distinction enforced at schema and test level:
 
 **Before → After:** No database layer existed. Stage 0 introduces nullable score columns with CHECK `0..20 OR NULL`, and tests confirm `0:0` succeeds while absence is modeled as missing rows.
 
-## Migrations [NEW]
+## Migrations [UPDATED]
 
 ```bash
-uv run alembic upgrade head      # apply
-uv run alembic downgrade base    # rollback
-uv run alembic upgrade head      # re-apply
+uv run alembic upgrade head      # apply all pending
+uv run alembic downgrade -1      # roll back one revision
+uv run alembic downgrade base    # roll back all
 ```
 
 | Revision | File | Description |
 |----------|------|-------------|
 | `0992bb744cc8` | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates all 8 tables |
+| `a2b3c4d5e6f7` | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds 4 `count_*` columns to `scores` [NEW] |
 
 Alembic uses async engine (`alembic init -t async`). Database URL resolved from `config/settings.py` — see [CONFIG.md](CONFIG.md).
 

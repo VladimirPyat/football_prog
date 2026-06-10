@@ -120,6 +120,53 @@ flowchart TD
 
 Both Alembic (`alembic/env.py`) and the seed script resolve URL via `get_settings().database_url` unless overridden by CLI.
 
+## Test Data Loader [NEW]
+
+Loads contracted CSV test data into the database for development and integration testing.
+
+### Loader config: `config/test_data_loader.json`
+
+All format/mapping rules live in config, not in code:
+
+```json
+{
+  "data_dir": "docs/test_data/contracted",
+  "files": {
+    "teams":       {"name": "teams.csv",       "delimiter": ","},
+    "users":       {"name": "users.csv",        "delimiter": ";"},
+    "matches":     {"name": "matches.csv",      "delimiter": ";"},
+    "predictions": {"name": "predictions.csv",  "delimiter": ";"}
+  },
+  "user_name_split": {"strategy": "last_name_only"},
+  "datetime": {"format": "%d.%m.%Y|%H:%M", "timezone": "UTC"},
+  "default_user_role": "USER"
+}
+```
+
+`last_name_only` strategy: `last_name = full_name`, `first_name = ""`.
+
+### Loader script: `src/scripts/load_test_data.py`
+
+```bash
+uv run python src/scripts/load_test_data.py [--reset] [--database-url URL]
+```
+
+| Flag | Effect |
+|------|--------|
+| `--reset` | DELETE all loaded tables in FK-safe order before reloading (idempotent reruns) |
+| `--database-url` | Override database URL (default: from `config/settings.py`) |
+
+**What it loads:**
+- 16 teams (from `teams.csv`, comma-delimited; no id column — auto-assigned)
+- 10 users (role assigned from config `default_user_role`; password is a placeholder hash)
+- 10 rounds (1–9 set `CLOSED`; round 10 set `ACTIVE` — open for prediction tests)
+- 80 matches (72 `FINISHED` with scores + 8 `SCHEDULED` with NULL scores for round 10)
+- 712 predictions (one DB row per CSV line; serov/round4 has 0 rows — absence honored)
+- `ContestSettings` from `contest_defaults.json`
+
+**On success:** prints `✅ Data loaded successfully`, exits 0.  
+**On error:** fails with the offending row — no silent skips.
+
 ## Project Dependencies [NEW]
 
 Managed with `uv`. Key packages from `pyproject.toml`:
