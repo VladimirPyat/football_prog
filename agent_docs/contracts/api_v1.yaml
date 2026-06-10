@@ -2,149 +2,336 @@ openapi: 3.0.3
 info:
   title: Football Predictions API
   version: 1.0.0
+  description: >-
+    Stage 1 (Backend Core) contract. DRAFT for review.
+    Auth via JWT (Bearer). All score fields are integers in [0, max_score_value];
+    a MISSING prediction is represented by the ABSENCE of a row, never by 0.
+    CSV import delimiter is ';' (exception: teams.csv uses ',').
+    Timestamps are TIMESTAMPTZ (UTC, ISO 8601).
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: auth
+  - name: predictions
+  - name: rounds (public)
+  - name: admin (supervisor)
+  - name: admin (system)
+
 paths:
   /api/v1/auth/login:
     post:
-      summary: User login
+      tags: [auth]
+      summary: Login, returns JWT
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                login:
-                  type: string
-                password:
-                  type: string
+            schema: { $ref: '#/components/schemas/LoginRequest' }
       responses:
         '200':
-          description: Successful login
+          description: OK (if is_temp_password=true, client must call change-password)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/auth/change-password:
+    post:
+      tags: [auth]
+      summary: Change password (mandatory on first login, UC-4)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200': { description: Password changed; is_temp_password set to false }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      summary: Current authenticated user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserOut' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/rounds:
+    get:
+      tags: [rounds (public)]
+      summary: List rounds (number, status, deadline)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RoundOut' }
+
+  /api/v1/rounds/{id}/predictions:
+    get:
+      tags: [predictions]
+      summary: >-
+        Get predictions for a round. Pre-deadline: only own scores are visible,
+        others show "submitted" flag without scores. Post-deadline: full table.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK (visibility depends on deadline + role)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoundPredictionsView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [predictions]
+      summary: Submit predictions for a round (BATCH-ONLY, all-or-nothing, atomic)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PredictionBatchRequest' }
+      responses:
+        '200':
+          description: Saved
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  access_token:
-                    type: string
-                  token_type:
-                    type: string
-  
-  /api/v1/rounds/{id}/predictions:
-    post:
-      summary: Submit predictions for a round (Batch-only)
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                predictions:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      match_id:
-                        type: integer
-                      score1:
-                        type: integer
-                        minimum: 0
-                        maximum: 20
-                      score2:
-                        type: integer
-                        minimum: 0
-                        maximum: 20
-      responses:
-        '200':
-          description: Predictions saved
-        '400':
-          description: Validation error (e.g., not all matches provided)
-        '403':
-          description: Deadline passed or unauthorized
+                  success: { type: boolean }
+                  saved_count: { type: integer }
+        '400': { description: Not all matches provided / partial save rejected }
+        '403': { description: Deadline passed or round not ACTIVE }
+        '422': { $ref: '#/components/responses/ValidationError' }
 
   /api/v1/rounds/{id}/leaderboard:
     get:
-      summary: Get public leaderboard for a round
+      tags: [rounds (public)]
+      summary: Public per-round leaderboard
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+        - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: Leaderboard data
+          description: OK
+          headers:
+            Cache-Control: { schema: { type: string }, description: 'public, max-age=300, stale-while-revalidate=60' }
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Leaderboard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/rounds/{id}/results:
+    get:
+      tags: [rounds (public)]
+      summary: Public per-round results matrix (matches + per-user points)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: OK (only after CALCULATED/PUBLISHED)
+          headers:
+            Cache-Control: { schema: { type: string } }
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoundResults' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/leaderboard:
+    get:
+      tags: [rounds (public)]
+      summary: Global aggregated leaderboard (with tie-breaking order)
+      responses:
+        '200':
+          description: OK
+          headers:
+            Cache-Control: { schema: { type: string } }
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Leaderboard' }
 
   /api/v1/admin/rounds:
     post:
-      summary: Create a new round (Supervisor only)
-      security:
-        - bearerAuth: []
+      tags: [admin (supervisor)]
+      summary: Create round with matches (max matches_per_round, unique teams, 24h rule)
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              properties:
-                number:
-                  type: integer
-                deadline:
-                  type: string
-                  format: date-time
-                matches:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      team1_id:
-                        type: integer
-                      team2_id:
-                        type: integer
-                      date_time:
-                        type: string
-                        format: date-time
+            schema: { $ref: '#/components/schemas/CreateRoundRequest' }
       responses:
         '200':
-          description: Round created
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  round_id: { type: integer }
+                  status: { type: string, enum: [DRAFT, ACTIVE] }
+        '400': { description: Validation (max matches, duplicate team, 24h rule) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/rounds/{id}:
+    patch:
+      tags: [admin (supervisor)]
+      summary: Edit ACTIVE round before deadline (teams/date/status; NOT matches count, NOT deadline <24h)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateRoundRequest' }
+      responses:
+        '200': { description: Updated }
+        '400': { description: 24h rule / forbidden change }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/rounds/{id}/activate:
+    post:
+      tags: [admin (supervisor)]
+      summary: Activate round (DRAFT -> ACTIVE). First activation locks contest_settings.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Activated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/rounds/{id}/calculate:
+    post:
+      tags: [admin (supervisor)]
+      summary: Trigger atomic scoring for the round (CLOSED -> CALCULATED)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Calculated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  round_id: { type: integer }
+                  status: { type: string, enum: [CALCULATED] }
+                  users_scored: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/rounds/{id}/publish:
+    post:
+      tags: [admin (supervisor)]
+      summary: Publish round results (CALCULATED -> PUBLISHED, immutable)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Published }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /api/v1/admin/matches/{id}/result:
     put:
-      summary: Apply match results and trigger scoring (Supervisor only)
-      security:
-        - bearerAuth: []
+      tags: [admin (supervisor)]
+      summary: Apply match result, set FINISHED (score 0..max_score_value)
+      security: [{ bearerAuth: [] }]
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MatchResultRequest' }
+      responses:
+        '200':
+          description: Result applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  round_id: { type: integer }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/matches/{id}/status:
+    patch:
+      tags: [admin (supervisor)]
+      summary: Change match status (VOID/POSTPONED/CANCELED). VOID triggers atomic recalculation.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required: [status]
               properties:
-                score1:
-                  type: integer
-                score2:
-                  type: integer
-                status:
-                  type: string
-                  enum: [FINISHED]
+                status: { type: string, enum: [VOID, POSTPONED, CANCELED] }
       responses:
         '200':
-          description: Results applied and calculation triggered
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  recalculation_triggered: { type: boolean }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/leaderboard/{round_id}/override:
+    post:
+      tags: [admin (supervisor)]
+      summary: Manual tie-break override (Fallback when all 4 criteria identical)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: round_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ordered_user_ids]
+              properties:
+                ordered_user_ids:
+                  type: array
+                  items: { type: integer }
+      responses:
+        '200': { description: Override applied }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/recalculate:
+    post:
+      tags: [admin (system)]
+      summary: ADMIN-only full contest recalculation (UC-13)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Recalculated }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
 components:
   securitySchemes:
@@ -152,3 +339,189 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  responses:
+    Unauthorized: { description: Missing/invalid token }
+    Forbidden: { description: Role not permitted (RBAC) }
+    NotFound: { description: Resource not found }
+    ValidationError: { description: Pydantic validation error }
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login: { type: string }
+        password: { type: string }
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: bearer }
+        is_temp_password: { type: boolean }
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password: { type: string }
+        new_password: { type: string }
+    UserOut:
+      type: object
+      properties:
+        id: { type: integer }
+        login: { type: string }
+        role: { type: string, enum: [SUPERVISOR, ADMIN, USER] }
+        first_name: { type: string }
+        last_name: { type: string }
+        is_temp_password: { type: boolean }
+    RoundOut:
+      type: object
+      properties:
+        id: { type: integer }
+        number: { type: integer }
+        deadline: { type: string, format: date-time }
+        status: { type: string, enum: [DRAFT, ACTIVE, CLOSED, CALCULATED, PUBLISHED] }
+        matches_count: { type: integer }
+    PredictionItem:
+      type: object
+      required: [match_id, score1, score2]
+      description: score1/score2 are required integers 0..max_score_value. Missing prediction = item omitted entirely (batch rejected if incomplete).
+      properties:
+        match_id: { type: integer }
+        score1: { type: integer, minimum: 0 }
+        score2: { type: integer, minimum: 0 }
+    PredictionBatchRequest:
+      type: object
+      required: [predictions]
+      properties:
+        predictions:
+          type: array
+          description: MUST contain exactly matches_per_round items (all matches of the round).
+          items: { $ref: '#/components/schemas/PredictionItem' }
+    RoundPredictionsView:
+      type: object
+      properties:
+        round_id: { type: integer }
+        deadline_passed: { type: boolean }
+        matches:
+          type: array
+          items: { $ref: '#/components/schemas/MatchOut' }
+        entries:
+          type: array
+          description: Pre-deadline -> scores null for non-owner; submitted flag only.
+          items:
+            type: object
+            properties:
+              user_id: { type: integer }
+              user_name: { type: string }
+              submitted: { type: boolean }
+              predictions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    match_id: { type: integer }
+                    score1: { type: integer, nullable: true }
+                    score2: { type: integer, nullable: true }
+    MatchOut:
+      type: object
+      properties:
+        id: { type: integer }
+        team1: { type: string }
+        team2: { type: string }
+        date_time: { type: string, format: date-time }
+        score1: { type: integer, nullable: true }
+        score2: { type: integer, nullable: true }
+        status: { type: string, enum: [SCHEDULED, POSTPONED, CANCELED, VOID, FINISHED] }
+    CreateRoundRequest:
+      type: object
+      required: [number, deadline, matches]
+      properties:
+        number: { type: integer }
+        deadline: { type: string, format: date-time }
+        matches:
+          type: array
+          items:
+            type: object
+            required: [team1_id, team2_id, date_time]
+            properties:
+              team1_id: { type: integer }
+              team2_id: { type: integer }
+              date_time: { type: string, format: date-time }
+    UpdateRoundRequest:
+      type: object
+      properties:
+        deadline: { type: string, format: date-time, description: rejected if violates 24h rule }
+        matches:
+          type: array
+          items:
+            type: object
+            properties:
+              match_id: { type: integer }
+              team1_id: { type: integer }
+              team2_id: { type: integer }
+              date_time: { type: string, format: date-time }
+              status: { type: string, enum: [SCHEDULED, POSTPONED, CANCELED] }
+    MatchResultRequest:
+      type: object
+      required: [score1, score2]
+      properties:
+        score1: { type: integer, minimum: 0 }
+        score2: { type: integer, minimum: 0 }
+        status: { type: string, enum: [FINISHED] }
+    ScoreDetail:
+      type: object
+      description: >-
+        NOTE: count_* detail fields are currently NON-AUTHORITATIVE in fixtures
+        (see agent_docs/reports/BLOCKED.md). base/bonus/total are the reliable invariants.
+      properties:
+        user_id: { type: integer }
+        user_name: { type: string }
+        points_base: { type: integer }
+        bonus1: { type: integer }
+        bonus2: { type: integer }
+        bonus3: { type: integer }
+        total_without_bonus3: { type: integer }
+        total_with_bonus3: { type: integer }
+        correct_outcomes: { type: integer }
+    Leaderboard:
+      type: object
+      properties:
+        round_id: { type: integer, nullable: true }
+        round_number: { type: integer, nullable: true }
+        leaderboard:
+          type: array
+          items:
+            allOf:
+              - { $ref: '#/components/schemas/ScoreDetail' }
+              - type: object
+                properties:
+                  rank: { type: integer }
+                  predictions_count: { type: integer }
+                  tiebreaker_status: { type: string, nullable: true, enum: [null, manual_override] }
+    RoundResults:
+      type: object
+      properties:
+        round_id: { type: integer }
+        matches:
+          type: array
+          items: { $ref: '#/components/schemas/MatchOut' }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id: { type: integer }
+              user_name: { type: string }
+              points:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    match_id: { type: integer }
+                    points: { type: integer }
+              bonus1: { type: integer }
+              bonus2: { type: integer }
+              bonus3: { type: integer }
+              total: { type: integer }
+              correct_outcomes: { type: integer }
