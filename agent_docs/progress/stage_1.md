@@ -85,3 +85,43 @@
 - Executed: uv run alembic upgrade head → exit 0; uv run pytest tests/integration/ -v → 36 passed, 0 failed (5.27s)
 - Verified: [LD-COUNT/NULL/ABSENCE/MAP/IDEMPOTENT] PASS, [DL-24H-FAIL/OK] PASS, [ST-ILLEGAL/LOCK] PASS, [BT-PARTIAL/FULL/ZERO/DEADLINE] PASS, [CALC-ROUND] 90/90, [CALC-COUNTS] 10/10, [CALC-COUNTS-ROW] 90/90, [CALC-ATOMIC/VOID] PASS
 - Report: agent_docs/reports/test_1.2.md
+
+## 2026-06-09 — Planner (1.3 augment — Phase B)
+- STATUS: INSTRUCTIONS_READY (1.3 updated; 1.2.1 migration spec added)
+- Artifacts:
+  - `instructions/coder_1.3.md` — lifecycle, immutability, exceptional tie-break, safe delete
+  - `instructions/tester_1.3.md` — [API-CS-*], [API-TB-*], [API-CONTEST-*] tests
+  - `instructions/coder_1.2.1.md` — migration only (status/paused_at/finished_at + exceptional_tiebreak_points)
+  - `contracts/api_v1.yaml` — contest admin endpoints; removed legacy override endpoint
+  - `contracts/db_schema.md`, `contracts/leaderboard_tiebreakers.md` — synced
+  - `plans/draft_1.3_contest_lifecycle.md`
+- Next: @Coder runs 1.2.1 then 1.3
+
+## 2026-06-21 — Coder (1.2.1)
+- STATUS: READY_FOR_TEST
+- Files: src/database/models.py, alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py, agent_docs/contracts/db_schema.md (already synced), tests/unit/test_migration_1_2_1.py
+- Verified: alembic upgrade head → exit 0; alembic downgrade -1 → exit 0; re-upgrade → exit 0; pytest tests/unit/test_services_1_2.py tests/unit/test_migration_1_2_1.py → 35 passed
+
+## 2026-06-21 — Coder (1.3)
+- STATUS: READY_FOR_TEST
+- Files: main.py, config/settings.py, src/core/security.py, src/api/__init__.py, src/api/deps.py, src/api/v1/{auth,rounds,predictions,admin_rounds,admin_results,admin_contest,admin_misc}.py, src/schemas/{auth,predictions,rounds,admin,leaderboard,contest}.py, src/services/{contest_lifecycle_service,contest_teardown,leaderboard_service}.py, tests/unit/test_api_unit_1_3.py, tests/unit/test_contest_lifecycle_1_3.py
+- Verified: app import OK (main.app); pytest tests/unit/test_contest_lifecycle_1_3.py tests/unit/test_api_unit_1_3.py → 24 passed
+- Deps added (approved): fastapi, uvicorn[standard], python-jose[cryptography], passlib[bcrypt], python-multipart
+
+## 2026-06-21 — Planner (1.4)
+- STATUS: INSTRUCTIONS_READY
+- Artifacts: draft_1.4_contest_setup.md, coder_1.4.md, tester_1.4.md, contest_lifecycle_flow.md
+- Updated: tester_1.3.md (narrow scope), api_v1.yaml, db_schema.md
+- Note: full HTTP integration test → Stage 1.4
+- Next: @Tester runs 1.3 (narrow), then @Coder 1.4
+- Note: tester_1.4.md §8a — deliverable `manuals/MANUAL_SCORING_VERIFICATION.md` (RU, Stage 1 sign-off)
+
+## 2026-06-21 — Tester (1.3)
+- STATUS: TEST_PASS
+- Tests: tests/api/conftest.py, tests/api/test_auth_rbac_1_3.py, tests/api/test_predictions_flow_1_3.py, tests/api/test_contest_lifecycle_1_3.py, tests/api/test_calculate_smoke_1_3.py
+- Executed: uv run pytest tests/api/ -v → 31 passed, 1 skipped, 0 failed (~109s); regression tests/integration/ → 36 passed
+- Verified: [AUTH-*] [RBAC-*] [API-PRED-*] [API-SMOKE-*] [API-VOID] [API-CACHE-*] [API-CS-*] [API-TB-*] (except [API-TB-RANK] SKIP) [API-CONTEST-*] PASS
+- Report: agent_docs/reports/test_1.3.md
+- Notes: SQLite naive datetime workaround in conftest for grace period; [API-CONTEST-DELETE-BADCONFIRM] returns 422 (Pydantic Literal)
+- Next: @Coder implements 1.4 per coder_1.4.md
+

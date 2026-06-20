@@ -17,6 +17,19 @@ class Settings(BaseSettings):
     seed_admin_first_name: str = "Admin"
     seed_admin_last_name: str = "User"
 
+    jwt_secret_key: str = "dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24
+
+    cors_origins: list[str] = ["*"]
+
+    contest_delete_grace_seconds: int = 10
+    contest_delete_enabled: bool = True
+    contest_allow_instant_delete: bool = False
+
+    cache_max_age_seconds: int = 300
+    cache_stale_while_revalidate_seconds: int = 60
+
 
 @lru_cache
 def get_settings() -> Settings:

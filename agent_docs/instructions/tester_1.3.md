@@ -1,128 +1,95 @@
-# Tester Instructions — Stage 1.3: API Integration & Triggers
+# Tester Instructions — Stage 1.3: API Integration & Triggers (Narrow Scope)
 
-> Status gate: @Coder `READY_FOR_TEST` for 1.3. Tests/reports English; user verdict
-> Russian. Contracts: `api_v1.yaml`, `leaderboard_tiebreakers.md`, `bonus_rules.md`.
-> Reference data: `docs/test_data/contracted/`.
+> Status gate: @Coder `READY_FOR_TEST` for 1.3. Prerequisite: 1.2.1 migration applied.
+> Tests/reports English; user verdict Russian. Contracts: `api_v1.yaml`,
+> `leaderboard_tiebreakers.md`, `bonus_rules.md`.
 
 ## 1. Objective
-End-to-end HTTP validation: auth/RBAC, batch/deadline/privacy over the API, the
-`calculate` trigger, and that public leaderboard/results served via HTTP reproduce
-the contracted reference. Use `httpx.AsyncClient` against the ASGI app.
+
+HTTP validation on **loader data** (`load_test_data.py`): auth/RBAC, batch/deadline/privacy,
+**contest immutability**, **lifecycle** (pause/finish/safe delete), **exceptional tie-break
+points**, VOID, caching. Lightweight calculate smoke only — **NOT** the 90/90 contract gate
+(moved to Stage 1.4 full E2E).
+
+Use `httpx.AsyncClient` against the ASGI app. Legacy paths (without `/contests/{id}/`) OK via shims after 1.4; for 1.3-only Coder use singleton paths.
 
 ## 2. Scope — files you may create
+
 ```
-tests/api/conftest.py                # ASGI client, isolated DB, loaded contracted data, auth helpers
+tests/api/conftest.py                     # loader DB, lifecycle helpers, instant-delete env
 tests/api/test_auth_rbac_1_3.py
 tests/api/test_predictions_flow_1_3.py
-tests/api/test_calculate_leaderboard_1_3.py
-# Manual two-phase verification (see §6) — standalone runnable scripts, NOT pytest:
-tests/manual/verify_via_api.py       # SCRIPT 1: drives ONLY HTTP endpoints, NO knowledge of reference CSVs
-tests/manual/compare_db_vs_reference.py  # SCRIPT 2: READ-ONLY compare of DB rows vs contracted CSVs
-tests/manual/README.md               # how to run both scripts by hand + DBeaver checkpoint + canary test
+tests/api/test_contest_lifecycle_1_3.py   # immutability, lifecycle, tie-break
+tests/api/test_calculate_smoke_1_3.py     # VOID, cache, single-round smoke — NOT 90/90
 ```
-Isolated test DB seeded via the 1.2 loader. Create test users with known passwords
-(a USER, a SUPERVISOR, an ADMIN) — hash via the app's security module; do NOT modify `src/`.
+Do NOT create `verify_via_api.py` / `compare_db_vs_reference.py` here (Stage 1.4).
+Isolated test DB for DELETE tests. Do NOT modify `src/`.
 
 ## 3. Auth & RBAC (`[AUTH-*]`, `[RBAC-*]`)
 - `[AUTH-LOGIN]` valid creds → 200 + token; bad creds → 401.
-- `[AUTH-TEMP]` user with `is_temp_password=true` is restricted to change-password/me
-  (other protected route → 403); after change-password the flag clears and access opens.
-- `[RBAC-USER]` USER cannot call a SUPERVISOR endpoint (e.g. `POST /admin/rounds`) → 403.
+- `[AUTH-TEMP]` temp password restricted to change-password/me → 403 elsewhere; clears after change.
+- `[RBAC-USER]` USER cannot call SUPERVISOR endpoint → 403.
 - `[RBAC-PUB]` public GET leaderboard/results without token → 200.
-- `[RBAC-ADMIN]` `POST /admin/recalculate` allowed only for ADMIN.
+- `[RBAC-ADMIN]` `POST /admin/recalculate` ADMIN only.
 
 ## 4. Predictions over HTTP (`[API-PRED-*]`)
-- `[API-PRED-PARTIAL]` `POST /rounds/{id}/predictions` with 7/8 → 400.
-- `[API-PRED-FULL]` 8/8 to an ACTIVE round before deadline → 200, `saved_count=8`.
-- `[API-PRED-RANGE]` score `21` → 422; `0` accepted.
-- `[API-PRED-DEADLINE]` POST after deadline / non-ACTIVE round → 403.
-- `[API-PRED-PRIVACY]` `GET /rounds/{id}/predictions` before deadline → requester sees own
-  scores, others only `submitted` flag; after deadline → all scores visible.
+- `[API-PRED-PARTIAL]` 7/8 → 400.
+- `[API-PRED-FULL]` 8/8 ACTIVE round before deadline → 200.
+- `[API-PRED-RANGE]` score 21 → 422; 0 accepted.
+- `[API-PRED-DEADLINE]` after deadline / non-ACTIVE → 403.
+- `[API-PRED-PRIVACY]` before deadline: own scores + others `submitted` only; after: all visible.
+- `[API-PRED-VISITOR]` GET predictions without token → 401.
 
-## 5. Calculate trigger + leaderboard correctness (`[API-CALC-*]`, `[API-LB-*]`)
-This is the integration-level repeat of the math, now THROUGH the API:
-- `[API-CALC]` `POST /admin/rounds/{id}/calculate` (rounds 1–9) → 200, status `CALCULATED`,
-  `users_scored` correct.
-- `[API-RESULTS]` `GET /rounds/{id}/results` per-user per-match points + bonuses match
-  `expected_scores.csv` (join by id): `total == expected_total`, `bonus1+bonus2 == expected_bonus1`,
-  `bonus3 == expected_bonus3`. Expect 90/90 across rounds 1–9.
-- `[API-LB-GLOBAL]` `GET /leaderboard` after calculating all rounds reproduces
-  `leaderboard.csv` EXACTLY: `rank` order, `total_points`, `total_without_bonuses`,
-  `total_bonuses`, and the count columns (`exact_high_count/exact_count/diff_count/outcome_count`),
-  `total_predictions` (serov=64). Confirm tie-break pairs (shutov>kurakov, volchenko>serov).
-- `[API-VOID]` `PATCH /admin/matches/{id}/status` VOID after calculation → recalculation
-  triggered; `GET /leaderboard` reflects the change atomically (no half-updated state).
-- `[API-CACHE]` public GET leaderboard/results carry `Cache-Control` + `ETag`; the predictions
-  submit endpoint does not.
-- `[API-OVERRIDE]` `POST /admin/leaderboard/{round_id}/override` persists manual priorities and
-  changes ordering only when all 4 primary keys tie (construct/inspect a synthetic tie).
+## 5. Calculate smoke + cache (`[API-SMOKE-*]`) — NOT full contract
 
-## 6. Manual two-phase verification (mandatory for Stage 1 sign-off)
-A human-in-the-loop flow on top of the automated pytest. Goal: prove the system writes
-CORRECT data to a REAL database, with a manual DBeaver checkpoint, and an independent
-read-only reference comparison. The two scripts MUST be separate processes.
+**Out of scope for 1.3:** `[API-CALC]` 90/90, `[API-LB-*]` 10/10 global leaderboard contract,
+manual two-phase scripts → see `tester_1.4.md`.
 
-### SCRIPT 1 — `tests/manual/verify_via_api.py` ("verify the CODE")
-- Talks to the running app **exclusively through HTTP endpoints** that @Coder built
-  (login, submit predictions / load, `POST /admin/rounds/{id}/calculate`, `GET /results`,
-  `GET /leaderboard`). It uses the SAME database the app writes to.
-- It MUST NOT import, open, or reference ANY file under `docs/test_data/` — it has zero
-  knowledge that canonical CSVs exist. Hard rule: no `expected_*.csv`, no `leaderboard.csv`.
-- It only checks **internal self-consistency** of what the code produced, e.g.:
-  - calculate rounds 1–9 → every round ends `CALCULATED`, `users_scored > 0`;
-  - for every result row: `total == base + bonus1 + bonus2 + bonus3`;
-  - `16·count_exact_high + 12·count_exact + 8·count_diff + 4·count_outcome == base`;
-  - leaderboard `rank` is monotonic and consistent with the documented tiebreak ordering;
-  - `total_without_bonuses + total_bonuses == total_points` per user.
-- Output: a short PASS/FAIL on code self-consistency. It does NOT decide correctness vs
-  the contest history — that is Script 2's job.
+- `[API-SMOKE-CALC]` single round calculate on loader → status CALCULATED, `users_scored > 0`.
+- `[API-VOID]` VOID → atomic recalc; leaderboard row changes.
+- `[API-CACHE]` public GET have Cache-Control + ETag; POST predictions does not.
+- `[API-CACHE-ETAG]` ETag changes after calculate.
 
-### MANUAL STOP — user inspects the DB in DBeaver
-After Script 1 passes, **HALT and ask the user** to open DBeaver and visually confirm the
-`scores` / leaderboard rows that were actually persisted. Do not run Script 2 until the
-user explicitly confirms. State this stop clearly in the report.
+## 5a. Contest immutability (`[API-CS-*]`)
+- `[API-CS-GET]` GET `/admin/contest-settings` (or contest-scoped equivalent via shim) as SUPERVISOR → 200 with `status`, `is_locked`.
+- `[API-CS-PATCH-UNLOCKED]` PATCH `rules_json.scoring_rules` before first activate → 200.
+- `[API-CS-PATCH-LOCKED]` after activate, PATCH any settings field → 403.
+- `[API-CS-ACTIVATE]` first activate → `is_locked=true`, `status=RUNNING`.
 
-### SCRIPT 2 — `tests/manual/compare_db_vs_reference.py` ("compare DB vs reference")
-- **READ-ONLY**: opens a DB connection and the contracted CSVs, compares, and prints a
-  discrepancy report. It MUST NOT write to the DB, MUST NOT modify `src/`, MUST NOT call
-  any mutating endpoint, MUST NOT re-run calculate or re-load data.
-- Joins strictly by id (`login → user_id`, `short_name → team_id`); names only for
-  human-readable diff lines.
-- Compares persisted DB rows against `expected_scores.csv` (per-round: base, bonus1(=b1+b2),
-  bonus3, total, rank, `count_*`) and `leaderboard.csv` (aggregates, counts, tiebreak order).
-- Output: a discrepancy report — for each mismatch print `(user_id, round, column, db_value,
-  reference_value)`. Zero discrepancies ⇒ DB reproduces the contest history.
+## 5b. Exceptional tie-break (`[API-TB-*]`)
+- `[API-TB-SET]` ADMIN `PUT .../exceptional-tiebreak` `{points: 5}` → 200.
+- `[API-TB-LOCKED]` set exceptional points **after** contest locked → 200 (not a rules change).
+- `[API-TB-RANK]` construct synthetic 4-criteria tie; user with higher exceptional points ranks above.
+- `[API-TB-RBAC]` SUPERVISOR cannot set exceptional points → 403.
+- `[API-TB-DISPLAY]` `GET /leaderboard` includes `exceptional_tiebreak_points` column.
 
-### Manual run (document verbatim in `tests/manual/README.md`)
-```
-# 0. start the app against an isolated DB and load contracted data via the 1.2 loader
-# 1. self-consistency of the code (no reference knowledge):
-uv run python tests/manual/verify_via_api.py --base-url http://localhost:8000
-# 2. >>> STOP: inspect the scores/leaderboard tables in DBeaver, then confirm <<<
-# 3. independent read-only comparison DB vs canonical CSVs:
-uv run python tests/manual/compare_db_vs_reference.py --reference docs/test_data/contracted/
-```
+## 5c. Contest lifecycle & safe delete (`[API-CONTEST-*]`)
+- `[API-CONTEST-PAUSE]` POST pause from RUNNING → PAUSED, `paused_at` set.
+- `[API-CONTEST-PAUSE-BLOCK]` POST predictions while PAUSED → 403.
+- `[API-CONTEST-RESUME]` pause → resume → RUNNING; predictions work again.
+- `[API-CONTEST-FINISH]` POST finish → FINISHED; predictions → 403; public GET still 200.
+- `[API-CONTEST-FINISH-IDEM]` finish when already FINISHED → 200 no-op.
+- `[API-CONTEST-DELETE-RBAC]` DELETE as SUPERVISOR → 403.
+- `[API-CONTEST-DELETE-NOGRACE]` DELETE immediately after pause (instant=false) → 400.
+- `[API-CONTEST-DELETE-BADCONFIRM]` wrong confirm body → 400.
+- `[API-CONTEST-DELETE-OK]` with `contest_allow_instant_delete=true` in conftest:
+  pause → DELETE `{confirm:"DELETE"}` → 200; DB wiped/reseeded; `status=DRAFT`.
 
-### CANARY (proves Script 2 truly compares two sources)
-Document this as an explicit, repeatable check: edit a value in a **reference** file
-(e.g. change one prediction in `predictions.csv`, or one number in `expected_scores.csv`)
-WITHOUT recomputing/reloading the DB, then re-run **only Script 2**. It MUST now report a
-discrepancy. If Script 2 still passes after a deliberate reference edit, the comparison is
-fake → treat as a Stage-1 blocker. (Revert the reference edit afterwards.)
+## 6. Automated execution & report
 
-## 7. Automated execution & report
 ```
 uv run pytest tests/api/ -v
-# optionally full suite: uv run pytest tests/ -v
 ```
-- **PASS** → `agent_docs/reports/test_1.3.md` (Russian) with [TEST-ID] table; confirm the
-  roadmap success criteria for Stage 1 ("API passes contract tests, calc matches historical
-  data, transactions atomic"); append `STATUS: TEST_PASS` to `progress/stage_1.md`.
-- **FAIL** → per `[TEST-ID]` expected vs actual (HTTP status, body, ids/numbers) + fix for
-  @Coder; append `STATUS: TEST_FAIL`. Never edit `src/`.
+- **PASS** → `agent_docs/reports/test_1.3.md` (Russian) with [TEST-ID] table;
+  append `STATUS: TEST_PASS` to `progress/stage_1.md`.
+- **FAIL** → per [TEST-ID] expected vs actual; append `STATUS: TEST_FAIL`. Never edit `src/`.
 
-## 8. Verdict to user (Russian)
-Этап 1.3, PASS/FAIL, покрытие (auth/RBAC, batch/privacy, calculate→90/90, leaderboard→10/10,
-VOID-атомарность, кэш), результат двух-скриптовой ручной проверки (script1 self-consistency,
-ручная остановка на DBeaver, script2 сверка БД↔эталон + canary), дефекты с `[TEST-ID]`,
-и общий статус готовности Этапа 1.
+## 7. Verdict to user (Russian)
+
+Этап 1.3, PASS/FAIL, покрытие: auth/RBAC, batch/privacy, **immutability (lock guards)**,
+**exceptional tie-break**, **lifecycle + safe delete**, VOID/cache smoke на loader data.
+**Без** 90/90 и 10/10 (перенесено в 1.4). Дефекты с [TEST-ID].
+
+## 8. Next step
+
+After 1.3 PASS → @Coder implements 1.4 per `coder_1.4.md`; full E2E per `tester_1.4.md`.

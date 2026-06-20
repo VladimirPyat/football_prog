@@ -23,7 +23,8 @@ Contest scoring rules, bonuses, tie-breakers, and engine implementation.
 | Rules stored in DB (`contest_settings.rules_json`) | ✅ Seeded via [CONFIG.md](CONFIG.md) |
 | Pure scoring engine (`src/scoring/`) | ✅ Stage 1.1 — implemented and verified (90/90) |
 | Scoring persistence (`src/services/scoring_persistence.py`) | ✅ Stage 1.2 — implemented and verified (90/90) |
-| API endpoints (`/leaderboard`, `/results`) | ❌ Stage 1.3 — see [API_GUIDE.md](API_GUIDE.md) |
+| Leaderboard service (`src/services/leaderboard_service.py`) | ✅ Stage 1.3 — aggregates scores + tie-break [NEW] |
+| API endpoints (`/leaderboard`, `/results`) | ✅ Stage 1.3 — see [API_GUIDE.md](API_GUIDE.md) [UPDATED] |
 
 ## Configuration Source [UPDATED]
 
@@ -177,9 +178,13 @@ On VOID or result change: re-run the full round in one atomic transaction.
 2. `exact_scores_count DESC` — sum of `count_exact_high + count_exact`
 3. `total_without_bonuses DESC` — sum of `base_points` only (no bonuses)
 4. `correct_diffs_count DESC` — sum of `count_diff`
-5. `manual_override DESC` — admin-set priority in `rules_json.tiebreakers.manual_overrides`; default 0
+5. `manual_override DESC` — `users.exceptional_tiebreak_points` (admin-set; default 0) [UPDATED]
+
+**Before → After:** Criterion 5 was previously documented as `rules_json.tiebreakers.manual_overrides`. Stage 1.2.1 moved this to `users.exceptional_tiebreak_points` — a per-user DB column updatable by ADMIN at any time (even when contest is locked). `LeaderboardService` reads the column and passes it as `manual_overrides` to `build_standings()`.
 
 `tiebreaker_status = "manual_override"` is set on rows whose position was decided by criterion 5.
+
+Leaderboard API responses include `exceptional_tiebreak_points` per row. See [API_GUIDE.md](API_GUIDE.md#endpoints-reference).
 
 > Bonuses affect `total_points` (criterion 1) only; they are excluded from criteria 2–4.
 

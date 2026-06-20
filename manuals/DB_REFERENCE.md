@@ -21,6 +21,7 @@ Overview of the database layer: SQLAlchemy models, enums, constraints, and Alemb
 | Engine | `src/database/engine.py` | Async engine + session factory |
 | Initial migration | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates all 8 tables |
 | Scores extension | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds `count_*` columns to `scores` |
+| Lifecycle extension | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Adds contest lifecycle + tie-break columns [NEW] |
 | Alembic runner | `alembic/env.py` | Async migrations; URL from [CONFIG.md](CONFIG.md) |
 
 **Stack:** SQLAlchemy 2.0+ async, `DateTime(timezone=True)` (TIMESTAMPTZ), JSON column for `rules_json`.
@@ -57,6 +58,17 @@ Defined in `src/database/models.py` as `StrEnum` values stored as `VARCHAR`.
 | `VOID` | Played but annulled (0 points) |
 | `FINISHED` | Result confirmed |
 
+### `ContestLifecycleStatus` [NEW]
+
+| Value | Description |
+|-------|-------------|
+| `DRAFT` | Contest not yet started; settings editable |
+| `RUNNING` | Active contest (set on first round activation) |
+| `PAUSED` | Mutating ops blocked; required before safe delete |
+| `FINISHED` | Early termination; mutating ops blocked |
+
+Stored on `contest_settings.status`. Independent of `is_locked` (lock prevents rule edits; status controls operational pause/finish).
+
 ## Tables [NEW]
 
 ### `users`
@@ -70,6 +82,9 @@ Defined in `src/database/models.py` as `StrEnum` values stored as `VARCHAR`.
 | `first_name` | VARCHAR | NOT NULL |
 | `last_name` | VARCHAR | NOT NULL |
 | `is_temp_password` | BOOLEAN | NOT NULL, default `false` |
+| `exceptional_tiebreak_points` | INTEGER | NOT NULL, default `0` [NEW] |
+
+> `exceptional_tiebreak_points` is an admin-entered operational tie-break (criterion 5 only). It is **not** part of `rules_json` and is **not** frozen by `is_locked`. See [SCORING_LOGIC.md](SCORING_LOGIC.md#tie-breakers-and-final-standings).
 
 ### `contacts`
 
@@ -155,6 +170,9 @@ Defined in `src/database/models.py` as `StrEnum` values stored as `VARCHAR`.
 |--------|------|-------------|
 | `id` | INTEGER | PK |
 | `is_locked` | BOOLEAN | NOT NULL, default `false` |
+| `status` | VARCHAR | NOT NULL, default `'DRAFT'` (`ContestLifecycleStatus`) [NEW] |
+| `paused_at` | TIMESTAMPTZ | NULL — set on pause [NEW] |
+| `finished_at` | TIMESTAMPTZ | NULL — set on early finish [NEW] |
 | `total_teams` | INTEGER | NOT NULL |
 | `matches_per_round` | INTEGER | NOT NULL |
 | `total_rounds` | INTEGER | NOT NULL |
@@ -172,6 +190,8 @@ Defined in `src/database/models.py` as `StrEnum` values stored as `VARCHAR`.
 | `ck_matches_score2_range` | `matches` | `score2 IS NULL OR (score2 >= 0 AND score2 <= 20)` |
 | `ck_predictions_score1_range` | `predictions` | same as matches `score1` |
 | `ck_predictions_score2_range` | `predictions` | same as matches `score2` |
+| `ck_contest_settings_status` | `contest_settings` | `status IN ('DRAFT','RUNNING','PAUSED','FINISHED')` [NEW] |
+| `ck_users_exceptional_tiebreak_nonneg` | `users` | `exceptional_tiebreak_points >= 0` [NEW] |
 
 ### UNIQUE constraints
 
@@ -217,7 +237,10 @@ uv run alembic downgrade base    # roll back all
 | Revision | File | Description |
 |----------|------|-------------|
 | `0992bb744cc8` | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates all 8 tables |
-| `a2b3c4d5e6f7` | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds 4 `count_*` columns to `scores` [NEW] |
+| `a2b3c4d5e6f7` | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds 4 `count_*` columns to `scores` |
+| `b3c4d5e6f7a8` | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Lifecycle columns on `contest_settings`; `exceptional_tiebreak_points` on `users` [NEW] |
+
+Migration `b3c4d5e6f7a8` backfills `status = 'RUNNING'` where `is_locked = TRUE`. Uses batch operations for SQLite compatibility.
 
 Alembic uses async engine (`alembic init -t async`). Database URL resolved from `config/settings.py` — see [CONFIG.md](CONFIG.md).
 

@@ -1,25 +1,33 @@
 openapi: 3.0.3
 info:
   title: Football Predictions API
-  version: 1.0.0
+  version: 1.1.0
   description: >-
-    Stage 1 (Backend Core) contract. DRAFT for review.
-    Auth via JWT (Bearer). All score fields are integers in [0, max_score_value];
-    a MISSING prediction is represented by the ABSENCE of a row, never by 0.
-    CSV import delimiter is ';' (exception: teams.csv uses ',').
-    Timestamps are TIMESTAMPTZ (UTC, ISO 8601).
+    Stage 1.4 contract — multi-contest backend.
+    Primary prefix: /api/v1/contests/{contest_id}/...
+    Legacy paths without contest_id are DEPRECATED shims (resolve default contest for loader regression).
+    Auth via JWT (Bearer). Score fields integers [0, max_score_value]; MISSING prediction = absent row, never 0.
+    CSV delimiter ';' (teams.csv ',' in loader). Timestamps TIMESTAMPTZ UTC ISO 8601.
+    Phases: SETUP (DRAFT, !is_locked) vs RUNNING (after first activate). See contest_lifecycle_flow.md.
+    Exceptional tie-break: contest_participants.exceptional_tiebreak_points (admin, NOT rules_json; allowed when locked).
+    Auto-close: sync hook on contest-scoped calls — ACTIVE→CLOSED when deadline passed (no BackgroundTasks).
 
 servers:
   - url: /api/v1
 
 tags:
   - name: auth
+  - name: contests
+  - name: contest setup
   - name: predictions
   - name: rounds (public)
   - name: admin (supervisor)
+  - name: admin (contest)
   - name: admin (system)
+  - name: legacy (deprecated)
 
 paths:
+  # ─── Auth (global) ───
   /api/v1/auth/login:
     post:
       tags: [auth]
@@ -31,7 +39,6 @@ paths:
             schema: { $ref: '#/components/schemas/LoginRequest' }
       responses:
         '200':
-          description: OK (if is_temp_password=true, client must call change-password)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenResponse' }
@@ -40,7 +47,7 @@ paths:
   /api/v1/auth/change-password:
     post:
       tags: [auth]
-      summary: Change password (mandatory on first login, UC-4)
+      summary: Change password (mandatory on first login)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -48,9 +55,8 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
       responses:
-        '200': { description: Password changed; is_temp_password set to false }
+        '200': { description: Password changed }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '422': { $ref: '#/components/responses/ValidationError' }
 
   /api/v1/auth/me:
     get:
@@ -59,46 +65,277 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: OK
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UserOut' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
-  /api/v1/rounds:
+  # ─── Contests ───
+  /api/v1/contests:
     get:
-      tags: [rounds (public)]
-      summary: List rounds (number, status, deadline)
+      tags: [contests]
+      summary: List contests (SUPERVISOR+)
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ContestOut' }
+    post:
+      tags: [contests]
+      summary: Create contest in DRAFT (SETUP phase)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateContestRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestOut' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/contests/{contest_id}:
+    get:
+      tags: [contests]
+      summary: Get contest by id
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestOut' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [contests]
+      summary: Update contest settings (forbidden when is_locked)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContestPatchRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestOut' }
+        '403': { $ref: '#/components/responses/ContestLocked' }
+    delete:
+      tags: [admin (contest)]
+      summary: Safe delete one contest (PAUSED + grace + confirm)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContestDeleteConfirmRequest' }
+      responses:
+        '200': { description: Contest wiped }
+        '400': { $ref: '#/components/responses/GracePeriodActive' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/contests/{contest_id}/pause:
+    post:
+      tags: [admin (contest)]
+      summary: Pause contest (RUNNING -> PAUSED)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestLifecycleOut' }
+
+  /api/v1/contests/{contest_id}/resume:
+    post:
+      tags: [admin (contest)]
+      summary: Resume contest (PAUSED -> RUNNING)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestLifecycleOut' }
+
+  /api/v1/contests/{contest_id}/finish:
+    post:
+      tags: [admin (contest)]
+      summary: Early finish (RUNNING|PAUSED -> FINISHED)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestLifecycleOut' }
+
+  # ─── Setup: teams ───
+  /api/v1/contests/{contest_id}/teams:
+    get:
+      tags: [contest setup]
+      summary: List teams in contest
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TeamOut' }
+    post:
+      tags: [contest setup]
+      summary: Create team (SETUP only, !is_locked)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamCreateRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeamOut' }
+        '403': { $ref: '#/components/responses/ContestLocked' }
+
+  /api/v1/contests/{contest_id}/teams/{team_id}:
+    patch:
+      tags: [contest setup]
+      summary: Update team (SETUP only)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/contest_id' }
+        - { name: team_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamPatchRequest' }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/ContestLocked' }
+    delete:
+      tags: [contest setup]
+      summary: Delete team (SETUP only)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/contest_id' }
+        - { name: team_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Deleted }
+        '403': { $ref: '#/components/responses/ContestLocked' }
+
+  # ─── Setup: participants ───
+  /api/v1/contests/{contest_id}/participants:
+    get:
+      tags: [contest setup]
+      summary: List contest participants
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ParticipantOut' }
+    post:
+      tags: [contest setup]
+      summary: Add participant + invite (temp password returned; no email send in 1.4)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParticipantCreateRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParticipantInviteOut' }
+        '403': { $ref: '#/components/responses/ContestLocked' }
+
+  /api/v1/contests/{contest_id}/participants/{user_id}:
+    delete:
+      tags: [contest setup]
+      summary: Remove participant from contest (SETUP only)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/contest_id' }
+        - { name: user_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Removed }
+        '403': { $ref: '#/components/responses/ContestLocked' }
+
+  /api/v1/contests/{contest_id}/participants/{user_id}/exceptional-tiebreak:
+    put:
+      tags: [admin (contest)]
+      summary: Set exceptional tie-break points for participant (allowed when is_locked)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/contest_id' }
+        - { name: user_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExceptionalTiebreakRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contest_id: { type: integer }
+                  user_id: { type: integer }
+                  exceptional_tiebreak_points: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ─── Public / user (contest-scoped) ───
+  /api/v1/contests/{contest_id}/rounds:
+    get:
+      tags: [rounds (public)]
+      summary: List rounds in contest
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/RoundOut' }
 
-  /api/v1/rounds/{id}/predictions:
+  /api/v1/contests/{contest_id}/rounds/{id}/predictions:
     get:
       tags: [predictions]
-      summary: >-
-        Get predictions for a round. Pre-deadline: only own scores are visible,
-        others show "submitted" flag without scores. Post-deadline: full table.
+      summary: Get predictions for round (privacy rules unchanged)
       security: [{ bearerAuth: [] }]
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: OK (visibility depends on deadline + role)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RoundPredictionsView' }
-        '404': { $ref: '#/components/responses/NotFound' }
     post:
       tags: [predictions]
-      summary: Submit predictions for a round (BATCH-ONLY, all-or-nothing, atomic)
+      summary: Submit predictions (batch-only, RUNNING + ACTIVE + before deadline)
       security: [{ bearerAuth: [] }]
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
         required: true
@@ -106,60 +343,49 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/PredictionBatchRequest' }
       responses:
-        '200':
-          description: Saved
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  saved_count: { type: integer }
-        '400': { description: Not all matches provided / partial save rejected }
-        '403': { description: Deadline passed or round not ACTIVE }
-        '422': { $ref: '#/components/responses/ValidationError' }
+        '200': { description: Saved }
+        '400': { description: Partial batch rejected }
+        '403': { description: Deadline passed / not ACTIVE / contest not RUNNING }
 
-  /api/v1/rounds/{id}/leaderboard:
+  /api/v1/contests/{contest_id}/rounds/{id}/leaderboard:
     get:
       tags: [rounds (public)]
-      summary: Public per-round leaderboard
+      summary: Per-round leaderboard
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: OK
           headers:
-            Cache-Control: { schema: { type: string }, description: 'public, max-age=300, stale-while-revalidate=60' }
+            Cache-Control: { schema: { type: string } }
             ETag: { schema: { type: string } }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Leaderboard' }
-        '404': { $ref: '#/components/responses/NotFound' }
 
-  /api/v1/rounds/{id}/results:
+  /api/v1/contests/{contest_id}/rounds/{id}/results:
     get:
       tags: [rounds (public)]
-      summary: Public per-round results matrix (matches + per-user points)
+      summary: Per-round results (CALCULATED/PUBLISHED)
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: OK (only after CALCULATED/PUBLISHED)
           headers:
             Cache-Control: { schema: { type: string } }
             ETag: { schema: { type: string } }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RoundResults' }
-        '404': { $ref: '#/components/responses/NotFound' }
 
-  /api/v1/leaderboard:
+  /api/v1/contests/{contest_id}/leaderboard:
     get:
       tags: [rounds (public)]
-      summary: Global aggregated leaderboard (with tie-breaking order)
+      summary: Global aggregated leaderboard for contest
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
       responses:
         '200':
-          description: OK
           headers:
             Cache-Control: { schema: { type: string } }
             ETag: { schema: { type: string } }
@@ -167,11 +393,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Leaderboard' }
 
-  /api/v1/admin/rounds:
+  # ─── Admin operational (contest-scoped) ───
+  /api/v1/contests/{contest_id}/admin/rounds:
     post:
       tags: [admin (supervisor)]
-      summary: Create round with matches (max matches_per_round, unique teams, 24h rule)
+      summary: Create round with matches (existing teams only when locked)
       security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
       requestBody:
         required: true
         content:
@@ -179,7 +407,6 @@ paths:
             schema: { $ref: '#/components/schemas/CreateRoundRequest' }
       responses:
         '200':
-          description: Created
           content:
             application/json:
               schema:
@@ -187,47 +414,84 @@ paths:
                 properties:
                   round_id: { type: integer }
                   status: { type: string, enum: [DRAFT, ACTIVE] }
-        '400': { description: Validation (max matches, duplicate team, 24h rule) }
-        '403': { $ref: '#/components/responses/Forbidden' }
 
-  /api/v1/admin/rounds/{id}:
-    patch:
+  /api/v1/contests/{contest_id}/admin/rounds/free-tour:
+    post:
       tags: [admin (supervisor)]
-      summary: Edit ACTIVE round before deadline (teams/date/status; NOT matches count, NOT deadline <24h)
+      summary: Create Free Tour from POSTPONED matches (scenario 7)
       security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: integer } }
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
       requestBody:
         required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FreeTourRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  round_id: { type: integer }
+                  round_number: { type: integer }
+        '400': { description: Invalid match status or contest phase }
+
+  /api/v1/contests/{contest_id}/admin/rounds/{id}:
+    patch:
+      tags: [admin (supervisor)]
+      summary: Edit ACTIVE round before deadline
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/contest_id' }
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/UpdateRoundRequest' }
       responses:
         '200': { description: Updated }
-        '400': { description: 24h rule / forbidden change }
-        '403': { $ref: '#/components/responses/Forbidden' }
 
-  /api/v1/admin/rounds/{id}/activate:
+  /api/v1/contests/{contest_id}/admin/rounds/{id}/activate:
     post:
       tags: [admin (supervisor)]
-      summary: Activate round (DRAFT -> ACTIVE). First activation locks contest_settings.
+      summary: Activate round; first activation locks contest and sets RUNNING
       security: [{ bearerAuth: [] }]
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         '200': { description: Activated }
-        '403': { $ref: '#/components/responses/Forbidden' }
 
-  /api/v1/admin/rounds/{id}/calculate:
+  /api/v1/contests/{contest_id}/admin/rounds/{id}/close:
     post:
       tags: [admin (supervisor)]
-      summary: Trigger atomic scoring for the round (CLOSED -> CALCULATED)
+      summary: Close round ACTIVE -> CLOSED (requires now >= deadline; auto-close also applies)
       security: [{ bearerAuth: [] }]
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: Calculated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  round_id: { type: integer }
+                  status: { type: string, enum: [CLOSED] }
+        '400': { description: Deadline not yet passed }
+
+  /api/v1/contests/{contest_id}/admin/rounds/{id}/calculate:
+    post:
+      tags: [admin (supervisor)]
+      summary: Calculate round (requires CLOSED)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/contest_id' }
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
           content:
             application/json:
               schema:
@@ -236,25 +500,25 @@ paths:
                   round_id: { type: integer }
                   status: { type: string, enum: [CALCULATED] }
                   users_scored: { type: integer }
-        '403': { $ref: '#/components/responses/Forbidden' }
 
-  /api/v1/admin/rounds/{id}/publish:
+  /api/v1/contests/{contest_id}/admin/rounds/{id}/publish:
     post:
       tags: [admin (supervisor)]
-      summary: Publish round results (CALCULATED -> PUBLISHED, immutable)
+      summary: Publish round (CALCULATED -> PUBLISHED)
       security: [{ bearerAuth: [] }]
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
         '200': { description: Published }
-        '403': { $ref: '#/components/responses/Forbidden' }
 
-  /api/v1/admin/matches/{id}/result:
+  /api/v1/contests/{contest_id}/admin/matches/{id}/result:
     put:
       tags: [admin (supervisor)]
-      summary: Apply match result, set FINISHED (score 0..max_score_value)
+      summary: Apply match result (only after round deadline and round CLOSED)
       security: [{ bearerAuth: [] }]
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
         required: true
@@ -262,24 +526,16 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/MatchResultRequest' }
       responses:
-        '200':
-          description: Result applied
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  round_id: { type: integer }
-        '400': { $ref: '#/components/responses/ValidationError' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '200': { description: Result applied }
+        '403': { description: Before deadline or round not CLOSED }
 
-  /api/v1/admin/matches/{id}/status:
+  /api/v1/contests/{contest_id}/admin/matches/{id}/status:
     patch:
       tags: [admin (supervisor)]
-      summary: Change match status (VOID/POSTPONED/CANCELED). VOID triggers atomic recalculation.
+      summary: Change match status (VOID/POSTPONED/CANCELED)
       security: [{ bearerAuth: [] }]
       parameters:
+        - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
         required: true
@@ -291,47 +547,82 @@ paths:
               properties:
                 status: { type: string, enum: [VOID, POSTPONED, CANCELED] }
       responses:
+        '200': { description: OK }
+
+  /api/v1/contests/{contest_id}/admin/recalculate:
+    post:
+      tags: [admin (system)]
+      summary: ADMIN full contest recalculation
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200': { description: Recalculated }
+
+  # ─── Legacy shims (deprecated — default contest resolution) ───
+  /api/v1/rounds:
+    get:
+      tags: [legacy (deprecated)]
+      deprecated: true
+      summary: '[DEPRECATED] List rounds — use /contests/{contest_id}/rounds'
+      responses:
         '200':
-          description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  recalculation_triggered: { type: boolean }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                type: array
+                items: { $ref: '#/components/schemas/RoundOut' }
 
-  /api/v1/admin/leaderboard/{round_id}/override:
-    post:
-      tags: [admin (supervisor)]
-      summary: Manual tie-break override (Fallback when all 4 criteria identical)
+  /api/v1/leaderboard:
+    get:
+      tags: [legacy (deprecated)]
+      deprecated: true
+      summary: '[DEPRECATED] Global leaderboard — use /contests/{contest_id}/leaderboard'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Leaderboard' }
+
+  /api/v1/admin/contest-settings:
+    get:
+      tags: [legacy (deprecated)]
+      deprecated: true
+      summary: '[DEPRECATED] Maps to default contest GET'
       security: [{ bearerAuth: [] }]
-      parameters:
-        - { name: round_id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestOut' }
+    patch:
+      tags: [legacy (deprecated)]
+      deprecated: true
+      summary: '[DEPRECATED] Maps to default contest PATCH'
+      security: [{ bearerAuth: [] }]
       requestBody:
-        required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [ordered_user_ids]
-              properties:
-                ordered_user_ids:
-                  type: array
-                  items: { type: integer }
+            schema: { $ref: '#/components/schemas/ContestPatchRequest' }
       responses:
-        '200': { description: Override applied }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestOut' }
 
-  /api/v1/admin/recalculate:
-    post:
-      tags: [admin (system)]
-      summary: ADMIN-only full contest recalculation (UC-13)
+  /api/v1/admin/users/{user_id}/exceptional-tiebreak:
+    put:
+      tags: [legacy (deprecated)]
+      deprecated: true
+      summary: '[DEPRECATED] Use /contests/{contest_id}/participants/{user_id}/exceptional-tiebreak'
       security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: user_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExceptionalTiebreakRequest' }
       responses:
-        '200': { description: Recalculated }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '200': { description: Updated on default contest participant }
 
 components:
   securitySchemes:
@@ -340,11 +631,21 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  parameters:
+    contest_id:
+      name: contest_id
+      in: path
+      required: true
+      schema: { type: integer }
+      description: Contest primary key. All contest data scoped by this id.
+
   responses:
     Unauthorized: { description: Missing/invalid token }
     Forbidden: { description: Role not permitted (RBAC) }
     NotFound: { description: Resource not found }
     ValidationError: { description: Pydantic validation error }
+    ContestLocked: { description: contests.is_locked — no structural/rule changes allowed }
+    GracePeriodActive: { description: Delete grace period not yet elapsed since pause }
 
   schemas:
     LoginRequest:
@@ -374,10 +675,127 @@ components:
         first_name: { type: string }
         last_name: { type: string }
         is_temp_password: { type: boolean }
+    ContestStatus:
+      type: string
+      enum: [DRAFT, RUNNING, PAUSED, FINISHED]
+    ContestOut:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: string, nullable: true }
+        is_locked: { type: boolean }
+        status: { $ref: '#/components/schemas/ContestStatus' }
+        paused_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        total_teams: { type: integer }
+        matches_per_round: { type: integer }
+        total_rounds: { type: integer }
+        is_round_robin: { type: boolean }
+        rules_json: { type: object }
+    CreateContestRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        slug: { type: string, nullable: true }
+        rules_json: { type: object, description: 'Defaults from contest_defaults.json if omitted' }
+        total_teams: { type: integer }
+        matches_per_round: { type: integer }
+        total_rounds: { type: integer }
+        is_round_robin: { type: boolean }
+    ContestPatchRequest:
+      type: object
+      description: Partial update. Rejected with 403 when is_locked=true.
+      properties:
+        name: { type: string }
+        total_teams: { type: integer }
+        matches_per_round: { type: integer }
+        total_rounds: { type: integer }
+        is_round_robin: { type: boolean }
+        rules_json: { type: object }
+    ContestLifecycleOut:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/ContestStatus' }
+        paused_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        deletable_at: { type: string, format: date-time, nullable: true }
+        seconds_until_deletable: { type: integer, nullable: true }
+    ContestDeleteConfirmRequest:
+      type: object
+      required: [confirm]
+      properties:
+        confirm: { type: string, enum: [DELETE] }
+    TeamOut:
+      type: object
+      properties:
+        id: { type: integer }
+        contest_id: { type: integer }
+        name: { type: string }
+        short_name: { type: string }
+        logo_url: { type: string, nullable: true }
+    TeamCreateRequest:
+      type: object
+      required: [name, short_name]
+      properties:
+        name: { type: string }
+        short_name: { type: string }
+        logo_url: { type: string, nullable: true }
+    TeamPatchRequest:
+      type: object
+      properties:
+        name: { type: string }
+        short_name: { type: string }
+        logo_url: { type: string, nullable: true }
+    ParticipantOut:
+      type: object
+      properties:
+        user_id: { type: integer }
+        login: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string, nullable: true }
+        status: { type: string, enum: [PENDING, ACCEPTED] }
+        exceptional_tiebreak_points: { type: integer }
+    ParticipantCreateRequest:
+      type: object
+      required: [email, first_name, last_name]
+      properties:
+        email: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        login: { type: string, description: 'Auto-generated from email if omitted' }
+    ParticipantInviteOut:
+      type: object
+      properties:
+        user_id: { type: integer }
+        login: { type: string }
+        temp_password: { type: string }
+        status: { type: string, enum: [PENDING, ACCEPTED] }
+    ExceptionalTiebreakRequest:
+      type: object
+      required: [points]
+      properties:
+        points: { type: integer, minimum: 0 }
+    FreeTourRequest:
+      type: object
+      required: [deadline, matches]
+      properties:
+        deadline: { type: string, format: date-time }
+        matches:
+          type: array
+          items:
+            type: object
+            required: [match_id, new_date_time]
+            properties:
+              match_id: { type: integer }
+              new_date_time: { type: string, format: date-time }
     RoundOut:
       type: object
       properties:
         id: { type: integer }
+        contest_id: { type: integer }
         number: { type: integer }
         deadline: { type: string, format: date-time }
         status: { type: string, enum: [DRAFT, ACTIVE, CLOSED, CALCULATED, PUBLISHED] }
@@ -385,7 +803,6 @@ components:
     PredictionItem:
       type: object
       required: [match_id, score1, score2]
-      description: score1/score2 are required integers 0..max_score_value. Missing prediction = item omitted entirely (batch rejected if incomplete).
       properties:
         match_id: { type: integer }
         score1: { type: integer, minimum: 0 }
@@ -396,33 +813,14 @@ components:
       properties:
         predictions:
           type: array
-          description: MUST contain exactly matches_per_round items (all matches of the round).
           items: { $ref: '#/components/schemas/PredictionItem' }
     RoundPredictionsView:
       type: object
       properties:
         round_id: { type: integer }
         deadline_passed: { type: boolean }
-        matches:
-          type: array
-          items: { $ref: '#/components/schemas/MatchOut' }
-        entries:
-          type: array
-          description: Pre-deadline -> scores null for non-owner; submitted flag only.
-          items:
-            type: object
-            properties:
-              user_id: { type: integer }
-              user_name: { type: string }
-              submitted: { type: boolean }
-              predictions:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    match_id: { type: integer }
-                    score1: { type: integer, nullable: true }
-                    score2: { type: integer, nullable: true }
+        matches: { type: array, items: { $ref: '#/components/schemas/MatchOut' } }
+        entries: { type: array, items: { type: object } }
     MatchOut:
       type: object
       properties:
@@ -451,17 +849,8 @@ components:
     UpdateRoundRequest:
       type: object
       properties:
-        deadline: { type: string, format: date-time, description: rejected if violates 24h rule }
-        matches:
-          type: array
-          items:
-            type: object
-            properties:
-              match_id: { type: integer }
-              team1_id: { type: integer }
-              team2_id: { type: integer }
-              date_time: { type: string, format: date-time }
-              status: { type: string, enum: [SCHEDULED, POSTPONED, CANCELED] }
+        deadline: { type: string, format: date-time }
+        matches: { type: array, items: { type: object } }
     MatchResultRequest:
       type: object
       required: [score1, score2]
@@ -471,9 +860,6 @@ components:
         status: { type: string, enum: [FINISHED] }
     ScoreDetail:
       type: object
-      description: >-
-        NOTE: count_* detail fields are currently NON-AUTHORITATIVE in fixtures
-        (see agent_docs/reports/BLOCKED.md). base/bonus/total are the reliable invariants.
       properties:
         user_id: { type: integer }
         user_name: { type: string }
@@ -487,6 +873,7 @@ components:
     Leaderboard:
       type: object
       properties:
+        contest_id: { type: integer }
         round_id: { type: integer, nullable: true }
         round_number: { type: integer, nullable: true }
         leaderboard:
@@ -498,30 +885,11 @@ components:
                 properties:
                   rank: { type: integer }
                   predictions_count: { type: integer }
+                  exceptional_tiebreak_points: { type: integer }
                   tiebreaker_status: { type: string, nullable: true, enum: [null, manual_override] }
     RoundResults:
       type: object
       properties:
         round_id: { type: integer }
-        matches:
-          type: array
-          items: { $ref: '#/components/schemas/MatchOut' }
-        results:
-          type: array
-          items:
-            type: object
-            properties:
-              user_id: { type: integer }
-              user_name: { type: string }
-              points:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    match_id: { type: integer }
-                    points: { type: integer }
-              bonus1: { type: integer }
-              bonus2: { type: integer }
-              bonus3: { type: integer }
-              total: { type: integer }
-              correct_outcomes: { type: integer }
+        matches: { type: array, items: { $ref: '#/components/schemas/MatchOut' } }
+        results: { type: array, items: { type: object } }

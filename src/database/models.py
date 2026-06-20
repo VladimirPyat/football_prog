@@ -47,6 +47,12 @@ class MatchStatus(StrEnum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "exceptional_tiebreak_points >= 0",
+            name="ck_users_exceptional_tiebreak_nonneg",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True, nullable=False)
@@ -55,6 +61,9 @@ class User(Base):
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False)
     is_temp_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    exceptional_tiebreak_points: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
 
     contact: Mapped[Contact | None] = relationship(back_populates="user", uselist=False)
 
@@ -153,11 +162,27 @@ class Score(Base):
     count_outcome: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
+class ContestLifecycleStatus(StrEnum):
+    DRAFT = "DRAFT"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    FINISHED = "FINISHED"
+
+
 class ContestSettings(Base):
     __tablename__ = "contest_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('DRAFT', 'RUNNING', 'PAUSED', 'FINISHED')",
+            name="ck_contest_settings_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default=ContestLifecycleStatus.DRAFT)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_teams: Mapped[int] = mapped_column(Integer, nullable=False)
     matches_per_round: Mapped[int] = mapped_column(Integer, nullable=False)
     total_rounds: Mapped[int] = mapped_column(Integer, nullable=False)

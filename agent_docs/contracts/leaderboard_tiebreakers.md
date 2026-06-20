@@ -32,8 +32,9 @@ previous keys.
    = `exact_high_count + exact_count` (large + normal exacts).
 3. `total_without_bonuses` DESC  — base points only (no bonus 1/2/3).
 4. `correct_diffs_count` DESC  — `diff_count` (diff_plus_outcome hits).
-5. `manual_tiebreak` DESC  — admin-set manual priority (see §3). Used only if 1–4
-   are all equal. Set `tiebreaker_status = "manual_override"` for the affected users.
+5. `exceptional_tiebreak_points` DESC  — admin-entered tie-break points on
+   `contest_participants` (per contest; see §3). Used only if 1–4 are all equal.
+   Set `tiebreaker_status = "manual_override"` for affected users when this key decides order.
 
 Bonuses affect only key 1 (`total_points`); they are excluded from keys 2–4 to keep
 prize placement deterministic.
@@ -44,19 +45,20 @@ prize placement deterministic.
 - **volchenko vs serov**: both `total_points = 232`. volchenko `exact = 5`,
   serov `exact = 4` → volchenko higher (9th vs 10th). ✓
 
-## 3. Manual 5th criterion (config-driven, very rare)
-When keys 1–4 are identical for 2+ users, an Admin assigns an explicit ordering
-value. Store it in config so it is visible and editable, e.g. in
-`contest_settings.rules_json.tiebreakers`:
+## 3. Exceptional tie-break points (operational, very rare)
+When keys 1–4 are identical for 2+ users, an Admin may assign **exceptional
+tie-break points** per participant. This is **not** a contest rule change.
 
-```json
-"manual_overrides": { "<user_id>": <int priority, higher = better>, ... }
-```
-- Default: empty → no manual override.
-- Engine reads `manual_overrides`; missing user → priority 0.
-- Exposed via `POST /api/v1/admin/leaderboard/{round_id}/override` (per api_v1.yaml)
-  which persists the values into config.
-- Probability is negligible, but the endpoint and config key are mandatory.
+- Storage: `contest_participants.exceptional_tiebreak_points` (INTEGER NOT NULL DEFAULT 0),
+  scoped by `(contest_id, user_id)`.
+- **NOT** stored in `rules_json`. **NOT** blocked by `is_locked`.
+- Default: 0 for all participants → no effect on ranking.
+- `LeaderboardService` loads values for the contest and passes `{user_id: points}` to
+  `build_standings(..., manual_overrides=...)` (higher points = better rank on key 5).
+- API: `PUT /api/v1/contests/{contest_id}/participants/{user_id}/exceptional-tiebreak` (ADMIN only).
+  Legacy shim: `PUT /api/v1/admin/users/{user_id}/exceptional-tiebreak` → default contest (deprecated).
+- Display: include `exceptional_tiebreak_points` in contest leaderboard rows.
+- Probability is negligible, but the column and endpoint are mandatory.
 
 ## 4. Scope: per-round vs global
 - The same ordering applies to a single round's leaderboard and to the global

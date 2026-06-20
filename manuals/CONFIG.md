@@ -11,7 +11,7 @@ Environment variables, application settings, seed workflow, and contest defaults
 - [Database URL](#database-url)
 - [Project Dependencies](#project-dependencies)
 
-## Settings Module [NEW]
+## Settings Module [UPDATED]
 
 **Path:** `config/settings.py`
 
@@ -25,11 +25,24 @@ class Settings(BaseSettings):
     seed_admin_password_hash: str = "dev-only-placeholder-hash"
     seed_admin_first_name: str = "Admin"
     seed_admin_last_name: str = "User"
+
+    jwt_secret_key: str = "dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 1440
+
+    cors_origins: list[str] = ["*"]
+
+    contest_delete_grace_seconds: int = 10
+    contest_delete_enabled: bool = True
+    contest_allow_instant_delete: bool = False
+
+    cache_max_age_seconds: int = 300
+    cache_stale_while_revalidate_seconds: int = 60
 ```
 
 Access via `get_settings()` (cached singleton).
 
-## Environment Variables [NEW]
+## Environment Variables [UPDATED]
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -38,6 +51,15 @@ Access via `get_settings()` (cached singleton).
 | `SEED_ADMIN_PASSWORD_HASH` | `dev-only-placeholder-hash` | Password hash for seed ADMIN (replace in production) |
 | `SEED_ADMIN_FIRST_NAME` | `Admin` | ADMIN first name |
 | `SEED_ADMIN_LAST_NAME` | `User` | ADMIN last name |
+| `JWT_SECRET_KEY` | `dev-secret-change-in-production` | HS256 signing key for access tokens [NEW] |
+| `JWT_ALGORITHM` | `HS256` | JWT algorithm [NEW] |
+| `JWT_EXPIRE_MINUTES` | `1440` | Token lifetime in minutes (24 h) [NEW] |
+| `CORS_ORIGINS` | `["*"]` | Allowed CORS origins (JSON list) [NEW] |
+| `CONTEST_DELETE_GRACE_SECONDS` | `10` | Seconds after pause before safe delete allowed [NEW] |
+| `CONTEST_DELETE_ENABLED` | `true` | Enable/disable contest delete endpoint [NEW] |
+| `CONTEST_ALLOW_INSTANT_DELETE` | `false` | Skip grace period (test/dev only) [NEW] |
+| `CACHE_MAX_AGE_SECONDS` | `300` | Public leaderboard/results cache TTL [NEW] |
+| `CACHE_STALE_WHILE_REVALIDATE_SECONDS` | `60` | Stale-while-revalidate window [NEW] |
 
 > `contest_defaults_path` is a code default pointing to `docs/test_data/config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
 
@@ -71,10 +93,14 @@ Built by `build_rules_json()` in `src/scripts/seed.py`:
 
 Scoring rule values are documented in [SCORING_LOGIC.md](SCORING_LOGIC.md). DB schema in [DB_REFERENCE.md](DB_REFERENCE.md).
 
-### Lock behavior
+### Lock behavior [UPDATED]
 
 - `contest_settings.is_locked` defaults to `false` at seed.
-- After contest start, `is_locked=true` prevents rule edits (enforced in Stage 1+ application logic).
+- After first round activation (`DRAFT → ACTIVE`), `is_locked=true` and `status=RUNNING`.
+- While locked: structural fields and `rules_json` cannot be PATCHed (HTTP 403).
+- `users.exceptional_tiebreak_points` is **not** locked — ADMIN may update at any time via API.
+
+See [API_GUIDE.md — Contest Lifecycle](API_GUIDE.md#contest-lifecycle--immutability).
 
 ## Seed Script [NEW]
 
@@ -167,7 +193,7 @@ uv run python src/scripts/load_test_data.py [--reset] [--database-url URL]
 **On success:** prints `✅ Data loaded successfully`, exits 0.  
 **On error:** fails with the offending row — no silent skips.
 
-## Project Dependencies [NEW]
+## Project Dependencies [UPDATED]
 
 Managed with `uv`. Key packages from `pyproject.toml`:
 
@@ -178,10 +204,21 @@ Managed with `uv`. Key packages from `pyproject.toml`:
 | `aiosqlite` | Dev async SQLite driver |
 | `asyncpg` | Production PostgreSQL driver (ready, not wired) |
 | `pydantic`, `pydantic-settings` | Settings validation |
+| `fastapi` | HTTP API framework [NEW] |
+| `uvicorn[standard]` | ASGI server [NEW] |
+| `python-jose[cryptography]` | JWT encode/decode [NEW] |
+| `passlib[bcrypt]` | Listed dependency; hashing uses `bcrypt` directly [NEW] |
+| `python-multipart` | Form/file upload support [NEW] |
 | `pytest`, `pytest-asyncio` | Tests (dev group) |
 
 Install:
 
 ```bash
 uv sync
+```
+
+Run API server:
+
+```bash
+uv run uvicorn main:app --reload
 ```
