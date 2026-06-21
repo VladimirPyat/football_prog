@@ -27,5 +27,6 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | **1.4** — Full HTTP E2E + manual sign-off | [MANUAL_SCORING_VERIFICATION.md](MANUAL_SCORING_VERIFICATION.md), `tests/manual/` |
 | **1.5** — Errors, logging, docstrings | [ERROR_LOGGING.md](ERROR_LOGGING.md) |
 | **1.6** — Bootstrap users & organizer API | [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) |
+| **1.8** — Contest discovery & user contacts | [API_GUIDE.md](API_GUIDE.md#contest-discovery--user-contacts) |
 
-Last synced: Stage 1.6 bootstrap users + organizer API.
+Last synced: Stage 1.8 discovery/contacts + SUPERVISOR pre-deadline privacy policy.

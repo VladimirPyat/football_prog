@@ -1,56 +1,126 @@
 # BLOCKED — Stage 2 Frontend: Backend Prerequisites
 
-> **Created:** 2026-06-21
-> **Context:** Planning of Stage 2 (Frontend) per `agent_docs/plans/draft_2.md`.
-> **Rule basis:** Frontend must integrate the real backend (no mocks, `docs/03_user_scenarios.md`). Several screens require endpoints/fields that **do not exist** in `agent_docs/contracts/api_v1.yaml` (v1.1.0). Per honesty rule, these are reported here instead of being silently stubbed/mocked.
+> **Created:** 2026-06-21  
+> **Updated:** 2026-06-22 — B1–B6 **RESOLVED** (Stages 1.7–1.9, `test_1.7.md` / `test_1.8.md` / `test_1.9.md` TEST_PASS). **Stage 2.1–2.4 backend prerequisites complete.**  
+> **Context:** `agent_docs/plans/draft_2.md`, `agent_docs/contracts/api_v1.yaml` v1.2.0.  
+> **Rule:** Frontend integrates the real backend (no mocks). Where an endpoint is missing, use documented fallbacks — never mock data.
 
-## Summary
+---
 
-Six backend additions are required to fully deliver the approved Stage-2 UI. They were surfaced while reconciling `docs/03`, `docs/04`, the `docs/screens/*` reference screenshots, and the current API contract. Each has a documented frontend fallback if not delivered, so frontend work is **not fully blocked** — but the listed screens cannot reach "done" without them.
+## Status summary
 
-## Required additions
+| # | Item | Stage 2.1 | Stage 2.3 | Stage 2.4 | Status |
+|---|------|-----------|-----------|-----------|--------|
+| **B1** | `GET /api/v1/me/contests` | ✅ required | — | — | **RESOLVED** (1.8) |
+| **B2** | `GET /api/v1/contests/public` | ✅ required | — | optional | **RESOLVED** (1.8) |
+| **B3** | `GET/PATCH /api/v1/auth/me/contacts` | ✅ required | — | — | **RESOLVED** (1.8) |
+| **B4** | `count_*` in `ScoreDetail` | — | — | ✅ required | **RESOLVED** (1.7) |
+| **B5** | Team logo upload | — | ✅ required | — | **RESOLVED** (1.9) |
+| **B6** | Invite-accept flow confirmation | — | optional | — | **RESOLVED** (1.7) |
 
-### B1 — `GET /api/v1/me/contests`
-- **Why:** Users are invited to specific contests (no self-registration; see `supervisor_settings2.jpg`). An authenticated USER needs a «Конкурсы» picker listing **only** contests they belong to.
-- **Current state:** `GET /api/v1/contests` is SUPERVISOR+ only. No user-scoped listing.
-- **Storage:** `contest_participants` already links users↔contests (used by `/participants`, `exceptional-tiebreak`). No schema change expected.
-- **Proposed response:** array of `{ id, name, status, role_in_contest, participant_status }`.
-- **Blocks:** Sub-stage 2.1 (user navigation), parts of 2.2/2.4.
-- **Fallback:** dev-only single contest via `NEXT_PUBLIC_DEFAULT_CONTEST_ID`.
+**Verdict:** Sub-stages **2.1–2.4** backend prerequisites complete. Frontend may integrate all B1–B6 endpoints without fallbacks (fallbacks remain for legacy/dev resilience).
 
-### B2 — `GET /api/v1/contests/public`
-- **Why:** Anonymous Visitor has no invitations but must browse public leaderboards/results. Needs a discovery list.
-- **Current state:** no anonymous contest listing.
-- **Proposed response:** running/visible contests, minimal fields `{ id, name, status }`, no auth.
-- **Blocks:** Home discovery (2.1/2.4).
-- **Fallback:** `NEXT_PUBLIC_DEFAULT_CONTEST_ID` single contest.
+---
 
-### B3 — `GET/PATCH /api/v1/auth/me/contacts`
-- **Why:** Profile contacts (email, VK, TG, `notify_enabled`) per `docs/03` §2.
-- **Current state:** `contacts` table exists in DB; **no HTTP endpoints**.
-- **Proposed:** GET returns current contacts; PATCH updates partial fields + toggle.
-- **Blocks:** Profile contacts UI (2.1).
-- **Fallback:** read-only stub (degraded UX).
+## RESOLVED — B1: `GET /api/v1/me/contests` (Stage 1.8)
 
-### B4 — Extend `ScoreDetail` with count fields
-- **Why:** `user_leaderboard.jpg` shows non-zero columns **Точный кр. счет / Точный счет / Разница / Исход**. API returns only `points_base` + bonuses.
-- **Current state:** `count_*` absent from `ScoreDetail` / `Leaderboard`.
-- **Proposed:** add `count_exact_high`, `count_exact`, `count_diff`, `count_outcome` (data exists in `scores`).
-- **Blocks:** Leaderboard fidelity (2.4).
-- **Fallback:** hide the four columns (visible deviation from screenshot).
+- **Delivered:** `src/api/v1/me.py`; tests `tests/api/test_me_contests.py`.
+- **Contract:** Bearer → enrolled contests only; fields include `participant_status`, global `role`.
+- **Frontend:** User «Конкурсы» picker → primary path.
+- **Fallback (if endpoint fails / empty in dev):** use `NEXT_PUBLIC_DEFAULT_CONTEST_ID` from frontend config (see § Frontend fallbacks).
 
-### B5 — Team logo upload
-- **Why:** `supervisor_settings3.jpg` shows a file picker (PNG/JPG/GIF ≤2MB). API `TeamCreateRequest` only accepts `logo_url: string`.
-- **Proposed:** `POST /contests/{id}/teams/{team_id}/logo` (multipart) → stores file, returns `logo_url`; or accept multipart on team create/patch.
-- **Blocks:** Teams admin upload (2.3).
-- **Fallback:** plain `logo_url` text input.
+---
 
-### B6 — Confirm invite-accept flow
-- **Why:** Participant status `PENDING → ACCEPTED` (`supervisor_settings2.jpg`). Invite endpoint currently only returns a temp password.
-- **Question:** Is "accept" simply first login + forced password change flipping status, or is a dedicated endpoint required?
-- **Blocks:** Accurate status display (2.3) — low risk.
-- **Fallback:** display status as returned by `GET /participants`.
+## RESOLVED — B2: `GET /api/v1/contests/public` (Stage 1.8)
 
-## Proposed resolution (per user decision 2026-06-21)
+- **Delivered:** `GET /api/v1/contests/public` in `contests.py` (registered before `/{contest_id}`); tests `tests/api/test_contests_public.py`.
+- **Contract:** No auth; **RUNNING contests only** (DRAFT/PAUSED/FINISHED excluded).
+- **Frontend:** Visitor home discovery → primary path.
+- **Fallback:** redirect to contest from `NEXT_PUBLIC_DEFAULT_CONTEST_ID`.
 
-Document as Stage-2 prerequisites (this file + `plans/draft_2.md` §13). Backend implementation is a **separate task** to be scheduled before/alongside the dependent frontend sub-stage. `instructions/coder_2.md` will specify exact request/response contracts so backend and frontend can proceed in parallel. Where a prerequisite is undelivered, the documented fallback applies — **never** mock data.
+---
+
+## RESOLVED — B3: `GET/PATCH /api/v1/auth/me/contacts` (Stage 1.8)
+
+- **Delivered:** `src/api/v1/auth.py`; tests `tests/api/test_contacts.py`.
+- **Contract:** GET defaults when row missing; PATCH upsert; allowed during `is_temp_password`.
+- **Frontend:** Profile contacts form → primary path (editable).
+- **Fallback (if GET fails e.g. 404/501 on old backend):** show contact fields **readonly** with empty values; hide Save button; log warning.
+
+---
+
+## RESOLVED — B4: Leaderboard count columns (Stage 1.7)
+
+- **Delivered:** `count_exact_high`, `count_exact`, `count_diff`, `count_outcome` in round/global leaderboard; tests `tests/api/test_leaderboard_counts.py`.
+- **Contract:** `ScoreDetail` in `api_v1.yaml`; documented in `manuals/API_GUIDE.md`.
+- **Frontend:** Sub-stage **2.4** — four count columns in user leaderboard.
+- **Fallback (legacy):** hide columns if API omits keys.
+
+---
+
+## RESOLVED — B5: Team logo upload (Stage 1.9)
+
+- **Delivered:** `POST /api/v1/contests/{id}/teams/{team_id}/logo` (multipart); default asset `static/assets/default-team-logo.jpg`; tests `tests/api/test_team_logo_upload.py`.
+- **Contract:** `api_v1.yaml` v1.2.0; upload settings in `CONFIG.md` / `.env.example`.
+- **Frontend:** Sub-stage **2.3** — file picker + 64×64 preview; copy default asset to `frontend/public/assets/`.
+- **Fallback (legacy):** plain `logo_url` text input.
+
+---
+
+## RESOLVED — B6: Invite-accept flow (Stage 1.7)
+
+- **Delivered:** `POST /auth/change-password` flips `contest_participants.status` PENDING → ACCEPTED; prediction guard `PARTICIPANT_NOT_ACCEPTED`; tests `tests/api/test_participant_accept.py`.
+- **Frontend:** Sub-stage **2.3** — accurate `participant_status` badge; `/me/contests` shows ACCEPTED after password change.
+- **Fallback:** display status from `GET /participants`.
+
+---
+
+## Frontend fallbacks (config-driven, no mocks)
+
+Documented in `agent_docs/contracts/frontend_api_integration.md` §6.
+
+| Blocker | Primary API | Fallback |
+|---------|-------------|----------|
+| **B1** | `GET /me/contests` | If empty or request fails → open contest `NEXT_PUBLIC_DEFAULT_CONTEST_ID` from `frontend/.env.local` |
+| **B2** | `GET /contests/public` | If empty or request fails → redirect to `NEXT_PUBLIC_DEFAULT_CONTEST_ID` |
+| **B3** | `GET/PATCH /auth/me/contacts` | If GET unavailable → fields **readonly**, no Save; if PATCH fails → keep readonly + toast |
+
+**Config (`frontend/.env.local.example`):**
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_DEFAULT_CONTEST_ID=1   # fallback contest when B1/B2 lists are empty or unavailable
+```
+
+Implement a single helper e.g. `resolveDefaultContestId()` used by Visitor home and User «Конкурсы» when list endpoints return `[]` or error.
+
+---
+
+## Stage 2.1 readiness checklist
+
+Criteria for marking sub-stage **2.1 done** (manual + E2E smoke):
+
+- [ ] **`user/user` login → `/profile`** — `POST /auth/login`, redirect to profile hub; header shows login instead of «Вход».
+- [ ] **Supervisor sees contest switcher** — `ContestPicker` populated from `GET /contests` (SUPERVISOR+); selection updates active contest context.
+- [ ] **401 on any request → auto logout** — API client clears `fp_access_token`, resets auth context, Visitor state; login modal available.
+- [ ] **Temp password → forced change** — `is_temp_password=true` after login redirects to `/change-password`; other routes blocked until `POST /auth/change-password` succeeds.
+- [ ] **CORS `:3000` ↔ `:8000`** — Next.js dev on 3000 calls FastAPI on 8000 without browser CORS errors (`cors_origins` includes `http://localhost:3000` or `*` in dev).
+
+**Also expected in 2.1 (from plan, not in smoke list above):**
+
+- [ ] Visitor: `GET /contests/public` → contest list (or fallback to default contest id).
+- [ ] User: `GET /me/contests` → «Конкурсы» (or fallback).
+- [ ] Profile: `GET/PATCH /auth/me/contacts` (or readonly fallback).
+
+---
+
+## References
+
+| Doc | Content |
+|-----|---------|
+| `agent_docs/reports/test_1.7.md` | B4, B6 TEST_PASS |
+| `agent_docs/reports/test_1.8.md` | B1–B3 TEST_PASS |
+| `agent_docs/reports/test_1.9.md` | B5 TEST_PASS |
+| `agent_docs/contracts/api_v1.yaml` | v1.2.0 |
+| `manuals/API_GUIDE.md` | B1–B6 sections |
+| `agent_docs/plans/draft_2.md` | § Sub-stages 2.1–2.4 |

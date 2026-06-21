@@ -88,6 +88,8 @@ Build a **Next.js 14+ (App Router) + TypeScript + Tailwind CSS** single-page app
 | `ui/forms_validation.md` | §5.3, §7.3 | `instructions/coder_2.md` |
 | `ui/state_management.md` | §3.4 | `instructions/coder_2.md` |
 | `instructions/coder_2.md` | — | Phase 2 only |
+| `instructions/coder_2.1.md` | § Sub-stage 2.1 | **Ready** — foundation & auth |
+| `instructions/tester_2.1.md` | § Sub-stage 2.1 | **Ready** — unit + E2E smoke |
 | `instructions/tester_2.md` | §8 Testing | Phase 2 only |
 | `reports/test_2.md` | — | @Tester deliverable |
 
@@ -482,14 +484,22 @@ Data from `RoundPredictionsView`:
 
 **API endpoints:** `POST /auth/login`, `POST /auth/change-password`, `GET /auth/me`, `GET /contests`, `GET /contests/{id}`
 
-**Done checklist:**
+**Dependencies:** Backend running (Stage 1.8+ for B1–B3); bootstrap users (`manuals/BOOTSTRAP_USERS.md`). **Blockers B1–B3 resolved** — see `agent_docs/reports/BLOCKED.md`.
 
-- [ ] `user/user` login → profile (with test seed)
-- [ ] Temp password forces `/change-password` before predictions
-- [ ] 401 clears session and shows login
-- [ ] CORS works against local FastAPI
+**Frontend fallbacks (no mocks):**
 
-**Dependencies:** Backend running; bootstrap users (`manuals/BOOTSTRAP_USERS.md`)
+| Case | Behavior |
+|------|----------|
+| B1/B2 list empty or unavailable | Use `NEXT_PUBLIC_DEFAULT_CONTEST_ID` from `frontend/.env.local` |
+| B3 contacts GET fails | Show email/VK/TG/notify fields **readonly**; no Save |
+
+**Readiness checklist (2.1 done):**
+
+- [ ] `user/user` login → `/profile`
+- [ ] Supervisor sees contest switcher (`GET /contests`)
+- [ ] 401 on any request → automatic logout
+- [ ] Temp password → forced `/change-password`
+- [ ] CORS works between `:3000` and `:8000`
 
 ---
 
@@ -787,6 +797,8 @@ After user approval (✅), Planner Phase B will create:
 | `agent_docs/ui/forms_validation.md` | Zod schemas, business rules |
 | `agent_docs/ui/state_management.md` | Context providers, data flow diagrams |
 | `agent_docs/instructions/coder_2.md` | Step-by-step implementation per sub-stage 2.1–2.4 |
+| `agent_docs/instructions/coder_2.1.md` | ✅ Sub-stage 2.1 — foundation, auth, profile (ready) |
+| `agent_docs/instructions/tester_2.1.md` | ✅ Sub-stage 2.1 — Vitest + Playwright smoke (ready) |
 | `agent_docs/instructions/tester_2.md` | E2E scenarios, data setup, pass criteria |
 | `agent_docs/progress/stage_2.md` | Append `INSTRUCTIONS_READY` |
 
@@ -925,18 +937,18 @@ Remaining minor items (Q5 language=RU assumed; Q6 schedule import=manual; Q8 pac
 
 ## 13. Backend Prerequisites (Stage-2 blockers — see `reports/BLOCKED.md`)
 
-The frontend **must not use mocks** (`docs/03`). The following backend additions are required before the dependent sub-stage can be completed. They are **not** part of `api_v1.yaml` v1.1.0 today.
+The frontend **must not use mocks** (`docs/03`). The following backend additions were required; **B1–B3 and B4 are now delivered** (Stages 1.7–1.8). See `agent_docs/reports/BLOCKED.md` for current status.
 
-| # | Endpoint / change | Needed by | Sub-stage | Notes |
-|---|-------------------|-----------|-----------|-------|
-| B1 | `GET /api/v1/me/contests` — contests the current USER is invited to | User «Конкурсы» picker | 2.1 | Source: `contest_participants`; storage already exists |
-| B2 | `GET /api/v1/contests/public` — running/visible contests for anon Visitor | Home discovery | 2.1 / 2.4 | No auth; minimal fields (id, name, status) |
-| B3 | `GET/PATCH /api/v1/auth/me/contacts` — email/vk/tg + `notify_enabled` | Profile contacts | 2.1 | `contacts` table exists; no HTTP layer |
-| B4 | Extend `ScoreDetail` with `count_exact_high`, `count_exact`, `count_diff`, `count_outcome` | Leaderboard columns | 2.4 | Data exists in `scores` table |
-| B5 | Team logo upload (e.g. `POST /contests/{id}/teams/{team_id}/logo` or accept multipart) returning `logo_url` | Teams admin | 2.3 | Or fallback to `logo_url` text field if descoped |
-| B6 | Confirm invite-accept flow | Participant status | 2.3 | Likely first-login + password change → `PENDING→ACCEPTED`; verify no separate endpoint needed |
+| # | Endpoint / change | Needed by | Sub-stage | Status |
+|---|-------------------|-----------|-----------|--------|
+| B1 | `GET /api/v1/me/contests` | User «Конкурсы» picker | 2.1 | ✅ **RESOLVED** (1.8) |
+| B2 | `GET /api/v1/contests/public` | Home discovery | 2.1 / 2.4 | ✅ **RESOLVED** (1.8) |
+| B3 | `GET/PATCH /api/v1/auth/me/contacts` | Profile contacts | 2.1 | ✅ **RESOLVED** (1.8) |
+| B4 | Extend `ScoreDetail` with `count_*` | Leaderboard columns | 2.4 | ✅ **RESOLVED** (1.7) |
+| B5 | Team logo upload | Teams admin | 2.3 | ⏳ OPEN (1.9) |
+| B6 | Confirm invite-accept flow | Participant status | 2.3 | ⏳ OPEN (low risk) |
 
-**Handling:** Per locked decision, these are documented as prerequisites. `instructions/coder_2.md` will reference exact request/response shapes; the actual backend implementation is a separate task tracked in `reports/BLOCKED.md`. If a prerequisite is not delivered, the dependent UI degrades to a documented fallback (e.g. `logo_url` text input, hidden count columns) rather than mocking.
+**Stage 2.1:** unblocked. Frontend fallbacks for B1/B2/B3 documented in `BLOCKED.md` and `frontend_api_integration.md` (resilience, not primary path).
 
 ---
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import timedelta, timezone
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
@@ -14,7 +13,6 @@ from api.deps import (
     DbSession,
     RoleChecker,
     cache_control_header,
-    require_not_temp_password,
 )
 from api.handlers.leaderboard import (
     get_global_leaderboard_response,
@@ -23,7 +21,7 @@ from api.handlers.leaderboard import (
 )
 from api.handlers.predictions import build_round_predictions_view
 from core.exceptions import NotFoundError, ValidationError
-from database.models import Contest, Match, MatchStatus, Round, RoundStatus, User, UserRole
+from database.models import Contest, Match, MatchStatus, Round, RoundStatus, UserRole
 from schemas.admin import (
     CreateRoundRequest,
     MatchResultRequest,
@@ -86,7 +84,7 @@ async def post_predictions(
     round_id: int,
     body: PredictionBatchRequest,
     session: DbSession,
-    user: Annotated[User, Depends(require_not_temp_password)],
+    user: CurrentUser,
     _contest: ContestContext,
 ) -> PredictionBatchResponse:
     """Сохранить пакет прогнозов пользователя на тур.

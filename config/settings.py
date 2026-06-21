@@ -39,6 +39,14 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # Team logos — target 64×64 px square after upload (center-crop)
+    upload_dir: Path = PROJECT_ROOT / "uploads"
+    static_assets_dir: Path = PROJECT_ROOT / "static" / "assets"
+    static_url_prefix: str = "/static"
+    max_logo_bytes: int = 2_097_152  # 2 MiB
+    team_logo_target_px: int = 64
+    default_team_logo_url: str = "/static/assets/default-team-logo.jpg"
+
 
 @lru_cache
 def get_settings() -> Settings:

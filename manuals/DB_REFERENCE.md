@@ -281,6 +281,8 @@ uv run alembic downgrade base    # roll back all
 
 Migration `c4d5e6f7a8b9` migrates existing `contest_settings` row → `contests` id=1, copies users into `contest_participants`, sets `contest_id=1` on teams/rounds, then drops `users.exceptional_tiebreak_points`.
 
+**Downgrade note [UPDATED]:** when restoring `users.exceptional_tiebreak_points`, users without a `contest_participants` row for contest id=1 (e.g. bootstrap SUPERVISOR) get `0` via `COALESCE`, not `NULL`.
+
 > **SQLite operational note [UPDATED]:** Columns declared `DateTime(timezone=True)` may return naive datetimes when read via aiosqlite. API handlers normalize deadlines for prediction visibility; grace-period delete logic should normalize `paused_at` to UTC-aware before comparison.
 
 Alembic uses async engine (`alembic init -t async`). Database URL resolved from `config/settings.py` — see [CONFIG.md](CONFIG.md).

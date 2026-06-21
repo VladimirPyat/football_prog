@@ -88,12 +88,12 @@ JWT bearer tokens. Payload: `{sub: user_id, role, exp}`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/v1/auth/login` | None | Verify credentials → `{access_token, token_type, is_temp_password}` |
-| `POST` | `/api/v1/auth/change-password` | Bearer | Change password; clears `is_temp_password` |
+| `POST` | `/api/v1/auth/change-password` | Bearer | Change password; clears `is_temp_password`; accepts all pending contest invites (`PENDING` → `ACCEPTED`) |
 | `GET` | `/api/v1/auth/me` | Bearer | Return current user profile |
 | `GET` | `/api/v1/auth/me/contacts` | Bearer | Profile contacts (email, VK, TG, notify toggle) |
 | `PATCH` | `/api/v1/auth/me/contacts` | Bearer | Partial update / upsert contacts |
 
-**Temp password flow:** While `is_temp_password=true`, `/auth/change-password`, `/auth/me`, and `/auth/me/contacts` (GET/PATCH) are allowed without restriction. Other mutating endpoints (e.g. `POST /rounds/{id}/predictions`) return `403` via `require_not_temp_password`.
+**Temp password flow:** While `is_temp_password=true`, `/auth/change-password`, `/auth/me`, and `/auth/me/contacts` (GET/PATCH) are allowed without restriction. `POST .../predictions` returns `403` with `code=PARTICIPANT_NOT_ACCEPTED` until the user changes the temporary password (which also flips `contest_participants.status` to `ACCEPTED`).
 
 Bad credentials → `401` (`Неверный логин или пароль`). Invalid/expired token → `401`. Auth/RBAC responses use Russian `detail` only (no `code` field).
 
@@ -162,6 +162,7 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET/POST/PATCH/DELETE` | `/contests/{id}/teams` | Team CRUD |
+| `POST` | `/contests/{id}/teams/{team_id}/logo` | Multipart logo upload (PNG/JPEG/GIF, max 2 MiB; SETUP only) |
 | `GET/POST/DELETE` | `/contests/{id}/participants` | Invite/list/remove participants |
 | `PUT` | `/contests/{id}/participants/{user_id}/exceptional-tiebreak` | Per-contest tie-break (ADMIN) |
 
@@ -174,6 +175,25 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | `GET` | `/contests/{id}/rounds/{rid}/leaderboard` | Public | Round standings |
 | `GET` | `/contests/{id}/rounds/{rid}/results` | Public | Results + points |
 | `GET` | `/contests/{id}/leaderboard` | Public | Global standings |
+
+**Leaderboard row fields (Stage 1.7):** Each entry includes tie-break count columns from persisted scores / `StandingRow` aggregates:
+
+| Field | Meaning |
+|-------|---------|
+| `count_exact_high` | Exact score with high tie-break weight |
+| `count_exact` | Exact score (standard) |
+| `count_diff` | Correct goal difference |
+| `count_outcome` | Correct outcome only |
+
+Round leaderboard reads per-round `scores` columns; global leaderboard uses cross-round `StandingRow` sums (same source as rank tie-breakers).
+
+**Team logos (Stage 1.9):** `TeamOut.logo_url` is never `null` in JSON — when `teams.logo_url` is unset, the API returns `DEFAULT_TEAM_LOGO_URL` (default `/static/assets/default-team-logo.jpg`). Uploaded files are stored under `uploads/teams/{contest_id}/{team_id}.jpg` and served at `{STATIC_URL_PREFIX}/teams/{contest_id}/{team_id}.jpg`. Images are center-cropped and resized to `TEAM_LOGO_TARGET_PX` (default 64×64). Clear a custom logo with `PATCH .../teams/{id}` and `"logo_url": null`.
+
+| Static path | Content |
+|-------------|---------|
+| `/static/assets/*` | Bundled read-only assets (default team logo) |
+| `/static/teams/*` | Supervisor-uploaded team logos |
+
 | `POST/PATCH/…` | `/contests/{id}/admin/rounds`, `/admin/matches/…` | SUPERVISOR+ | Round/match admin (same semantics as legacy) |
 | `POST` | `/contests/{id}/admin/recalculate` | ADMIN | Recalculate all CALCULATED rounds |
 
@@ -349,7 +369,50 @@ async def update_exceptional_tiebreak(session, contest_id: int, user_id, points)
 
 ### `leaderboard_service.py` [UPDATED]
 
-Aggregates `Score` rows, reads `contest_participants.exceptional_tiebreak_points`, calls `build_standings(manual_overrides=…)`, and builds ETag hashes for cache headers.
+Aggregates `Score` rows, reads `contest_participants.exceptional_tiebreak_points`, calls `build_standings(manual_overrides=…)`, serializes `count_exact_high`, `count_exact`, `count_diff`, `count_outcome` on each leaderboard row, and builds ETag hashes for cache headers.
+
+### `team_logo_service.py` [NEW]
+
+Stage 1.9 — validate, resize (64×64 center-crop), persist team logos; resolve default URL for API responses.
+
+```python
+async def save_team_logo(session, *, contest_id, team_id, file_bytes, content_type, settings) -> str
+def resolve_team_logo_url(logo_url: str | None, settings) -> str
+def delete_uploaded_logo_if_custom(logo_url: str | None, settings) -> None
+```
+
+### `participant_service.py` [NEW]
+
+Stage 1.7 — flip pending invites to accepted on password change.
+
+```python
+async def accept_pending_participations(session, user_id: int) -> int
+```
+
+### `contest_discovery_service.py` [NEW]
+
+Stage 1.8 — contest lists for enrolled users and anonymous visitors.
+
+```python
+async def list_user_contests(session, *, user_id: int, role: str) -> list[UserContestOut]
+async def list_public_contests(session) -> list[PublicContestOut]
+```
+
+- `list_user_contests`: JOIN `contests` + `contest_participants` for `user_id`; ordered by `contests.name`; echoes global `users.role`.
+- `list_public_contests`: `contests.status = RUNNING` only; ordered by name.
+
+### `contact_service.py` [NEW]
+
+Stage 1.8 — read/upsert `contacts` row for profile endpoints.
+
+```python
+async def get_contacts(session, user_id: int) -> ContactOut
+async def upsert_contacts(session, user_id: int, patch: dict) -> ContactOut
+```
+
+- Missing row → defaults (`email/vk_id/tg_id` null, `notify_enabled=false`).
+- Partial PATCH via `model_dump(exclude_unset=True)` in router; empty string clears `email`.
+- Invalid email → `ValidationError` (`400`, `VALIDATION_ERROR`).
 
 ## Endpoints Reference [UPDATED]
 

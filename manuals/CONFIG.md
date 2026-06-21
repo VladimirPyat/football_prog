@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     cache_stale_while_revalidate_seconds: int = 60
 
     log_level: str = "INFO"  # root logger level [NEW]
+
+    upload_dir: Path = PROJECT_ROOT / "uploads"
+    static_assets_dir: Path = PROJECT_ROOT / "static" / "assets"
+    static_url_prefix: str = "/static"
+    max_logo_bytes: int = 2097152  # 2 MiB
+    team_logo_target_px: int = 64  # center-crop + resize target (square)
+    default_team_logo_url: str = "/static/assets/default-team-logo.jpg"
 ```
 
 Access via `get_settings()` (cached singleton).
@@ -77,6 +84,11 @@ Access via `get_settings()` (cached singleton).
 | `CACHE_MAX_AGE_SECONDS` | `300` | Public leaderboard/results cache TTL [NEW] |
 | `CACHE_STALE_WHILE_REVALIDATE_SECONDS` | `60` | Stale-while-revalidate window [NEW] |
 | `LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) [NEW] |
+| `UPLOAD_DIR` | `./uploads` | Writable root for uploaded team logos [NEW] |
+| `STATIC_URL_PREFIX` | `/static` | URL prefix for static mounts (`/assets`, `/teams`) [NEW] |
+| `MAX_LOGO_BYTES` | `2097152` | Max team logo upload size (2 MiB) [NEW] |
+| `TEAM_LOGO_TARGET_PX` | `64` | Uploaded logos normalized to this square size (px) [NEW] |
+| `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback when `teams.logo_url` is NULL [NEW] |
 
 > `contest_defaults_path` is a code default pointing to `docs/test_data/config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
 >

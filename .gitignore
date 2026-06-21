@@ -37,6 +37,9 @@ __pycache__
 .cursor/*.lock
 .trash/
 
+uploads/
+!uploads/.gitkeep
+
 docs/
 
 # environment

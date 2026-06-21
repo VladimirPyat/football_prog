@@ -24,6 +24,7 @@ from database.models import (
 )
 from core.exceptions import NotFoundError, ValidationError
 from services.contest_lifecycle_service import require_unlocked
+from services.team_logo_service import delete_uploaded_logo_if_custom
 
 
 def _build_rules_json(data: dict) -> dict:
@@ -160,7 +161,15 @@ async def update_team(
     if team is None or team.contest_id != contest_id:
         raise NotFoundError(f"Команда {team_id} не найдена в конкурсе {contest_id}")
 
-    for field in ("name", "short_name", "logo_url"):
+    settings = get_settings()
+    if "logo_url" in patch:
+        if patch["logo_url"] is None:
+            delete_uploaded_logo_if_custom(team.logo_url, settings)
+            team.logo_url = None
+        else:
+            team.logo_url = patch["logo_url"]
+
+    for field in ("name", "short_name"):
         if field in patch and patch[field] is not None:
             setattr(team, field, patch[field])
     return team

@@ -14,7 +14,7 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 - **Roles:** all.
 - **Visitor:** list of running contests (`GET /contests/public`, B2) → select → `/contest/{id}`.
 - **User:** may redirect to «Конкурсы» or last contest.
-- Fallback (no B2): redirect to `NEXT_PUBLIC_DEFAULT_CONTEST_ID`.
+- Fallback (B2 unavailable/empty): redirect to `NEXT_PUBLIC_DEFAULT_CONTEST_ID`.
 
 ### `/contests` — «Конкурсы»
 - **User:** contests they were invited to (`GET /me/contests`, B1).
@@ -39,6 +39,7 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 ### `/profile` — personal hub
 - **Roles:** USER+.
 - Sections: `ContactsForm` (email/VK/TG + notify, B3), «Конкурсы» link, «Сделать прогноз» shortcut (active round), «Просмотр результатов», «Личная статистика» (stub), «Выйти».
+- **Contacts fallback:** if `GET /auth/me/contacts` fails → fields readonly, Save hidden.
 - Default center: active prediction form (if open) or latest results.
 
 ### `/change-password` — forced change gate

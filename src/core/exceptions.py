@@ -32,6 +32,12 @@ class ScoreOutOfRangeError(AppError):
 
 
 class ContestRuleError(AppError):
+    """Contest business rule violation (403).
+
+    Known codes include PARTICIPANT_NOT_ENROLLED and PARTICIPANT_NOT_ACCEPTED
+    (prediction submit when user is not an accepted participant).
+    """
+
     http_status = 403
     code = "CONTEST_RULE_VIOLATION"
 

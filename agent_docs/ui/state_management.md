@@ -47,6 +47,7 @@
 
 - Public pages set `contestId` from the route param.
 - User «Конкурсы» list from `GET /me/contests` (B1); Visitor list from `GET /contests/public` (B2); Supervisor picker from `GET /contests`.
+- **Fallback:** B1/B2 empty or error → `resolveDefaultContestId()` from `NEXT_PUBLIC_DEFAULT_CONTEST_ID`.
 
 ---
 
@@ -62,7 +63,7 @@ Lightweight SWR-style hooks over the typed API client (no external SWR lib unles
 | `usePredictionsView(contestId, roundId)` | `GET …/predictions` | **never cached** (privacy) |
 | `useMyContests()` | `GET /me/contests` (B1) | in-memory |
 | `usePublicContests()` | `GET /contests/public` (B2) | in-memory |
-| `useContacts()` | `GET/PATCH /auth/me/contacts` (B3) | in-memory |
+| `useContacts()` | `GET/PATCH /auth/me/contacts` (B3) | in-memory; **fallback:** readonly UI if GET fails |
 
 Each hook returns `{ data, error, loading, refetch }`. Errors are typed `AppError` (`{status, detail, code?}`).
 
@@ -117,4 +118,4 @@ Phase derivation (mirrors plan §3.6) lives in a pure helper `deriveUiMode(conte
 
 | Date | Change |
 |------|--------|
-| 2026-06-21 | Initial: Auth/Contest contexts, fetch hooks, caching, deadline/phase derivation (covers 2.1–2.2; admin specifics to deepen in 2.3). |
+| 2026-06-22 | B1–B3 resolved note; fallback via `NEXT_PUBLIC_DEFAULT_CONTEST_ID`; contacts readonly fallback. |

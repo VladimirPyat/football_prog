@@ -195,3 +195,35 @@
 - Contract: api_v1.yaml v1.2.0-rc
 - Verified: pytest 1.8 tests → 9 passed; regression → 286 passed, 2 skipped
 - Next: Coder 1.7 or 1.9 per user schedule; frontend 2.1 can start API integration
+
+## 2026-06-22 — Coder (1.7 counts & invite accept)
+- STATUS: READY_FOR_TEST
+- Blockers: B4, B6
+- Files: src/schemas/leaderboard.py, src/services/{leaderboard_service,participant_service,prediction_service}.py, src/api/v1/{auth,contest_ops,predictions}.py, src/core/exceptions.py, agent_docs/contracts/api_v1.yaml, manuals/API_GUIDE.md, tests/api/{test_leaderboard_counts,test_participant_accept}.py
+- Verified: pytest tests/ --ignore=tests/manual → 300 passed, 2 skipped
+- Next: agent_docs/instructions/tester_1.7.md
+
+## 2026-06-22 — Coder (1.9 team logo upload)
+- STATUS: READY_FOR_TEST
+- Blocker: B5
+- Asset: static/assets/default-team-logo.jpg
+- Contract: api_v1.yaml v1.2.0
+- Files: config/settings.py, main.py, src/services/{team_logo_service,team_out}.py, src/services/contest_setup_service.py, src/api/v1/contest_teams.py, src/schemas/contest.py, uploads/.gitkeep, .gitignore, .env.example, pyproject.toml (pillow), agent_docs/contracts/api_v1.yaml, manuals/{API_GUIDE,CONFIG}.md, tests/api/test_team_logo_upload.py
+- Frontend note: copy to frontend/public/assets/default-team-logo.jpg
+- Verified: pytest tests/ --ignore=tests/manual → 300 passed, 2 skipped
+- Next: agent_docs/instructions/tester_1.9.md
+
+## 2026-06-22 — Tester (1.7)
+- STATUS: TEST_PASS
+- Blockers verified: B4, B6
+- Tests: tests/api/test_leaderboard_counts.py, tests/api/test_participant_accept.py (+ test_accept_me_contests)
+- Executed: pytest 1.7 tests → 7 passed; test_calculate_leaderboard_1_4.py → 8 passed, 1 skipped; test_setup_part_auth → 1 passed; regression → 302 passed, 2 skipped
+- Report: agent_docs/reports/test_1.7.md
+
+## 2026-06-22 — Tester (1.9)
+- STATUS: TEST_PASS
+- Blocker verified: B5
+- Tests: tests/api/test_team_logo_upload.py (+ test_logo_upload_reupload)
+- Executed: pytest logo tests → 9 passed; test_setup_teams_crud_and_duplicate → 1 passed; regression → 302 passed, 2 skipped
+- Report: agent_docs/reports/test_1.9.md
+- Contract: api_v1.yaml v1.2.0

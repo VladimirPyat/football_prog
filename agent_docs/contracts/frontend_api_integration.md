@@ -13,7 +13,7 @@
 |------|-------|
 | API base URL | `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`) |
 | API prefix | `/api/v1` |
-| Default contest (dev) | `NEXT_PUBLIC_DEFAULT_CONTEST_ID` (optional convenience) |
+| Default contest (fallback) | `NEXT_PUBLIC_DEFAULT_CONTEST_ID` — used when B1/B2 lists empty or unavailable |
 | CORS | Backend `cors_origins` default `["*"]` (`config/settings.py`); direct browser→FastAPI calls OK in dev |
 | Timestamps | TIMESTAMPTZ, UTC, ISO 8601 — parse as UTC, render local |
 | Content type | `application/json` (except team logo upload B5 → `multipart/form-data`) |
@@ -178,11 +178,23 @@ const next = await res.json(); saveEtag(url, res.headers.get('ETag')); return ne
 
 These endpoints/fields are **assumed by the frontend** and tracked as Stage-2 prerequisites. Contracts are pre-specified here so backend & frontend can proceed in parallel. Until delivered, use the listed fallback (never mock).
 
+### Fallback implementation (Stage 2.1)
+
+| # | Primary | Fallback |
+|---|---------|----------|
+| B1 | `GET /me/contests` | Empty/error → navigate using `NEXT_PUBLIC_DEFAULT_CONTEST_ID` |
+| B2 | `GET /contests/public` | Empty/error → redirect to `NEXT_PUBLIC_DEFAULT_CONTEST_ID` |
+| B3 | `GET/PATCH /auth/me/contacts` | GET fails → contacts fields **readonly**, hide Save; PATCH fails → toast, stay readonly |
+
+Helper: `resolveDefaultContestId()` — reads env, validates number, used by Visitor home and User «Конкурсы».
+
+**Status (2026-06-22):** B1–B3 **implemented** (Stage 1.8). Fallbacks remain for resilience and older backends.
+
 | # | Proposed endpoint / change | Request | Response (proposed) | Fallback |
 |---|----------------------------|---------|---------------------|----------|
 | B1 | `GET /api/v1/me/contests` | Bearer | `[{ id, name, status, participant_status }]` | `NEXT_PUBLIC_DEFAULT_CONTEST_ID` |
-| B2 | `GET /api/v1/contests/public` | none | `[{ id, name, status }]` (RUNNING/visible) | default contest id |
-| B3 | `GET/PATCH /api/v1/auth/me/contacts` | Bearer; PATCH `{email?, vk_id?, tg_id?, notify_enabled?}` | `{email, vk_id, tg_id, notify_enabled}` | read-only stub |
+| B2 | `GET /api/v1/contests/public` | none | `[{ id, name, status }]` (RUNNING only) | `NEXT_PUBLIC_DEFAULT_CONTEST_ID` |
+| B3 | `GET/PATCH /api/v1/auth/me/contacts` | Bearer; PATCH partial | `{email, vk_id, tg_id, notify_enabled}` | **readonly** fields, no Save |
 | B4 | Extend `ScoreDetail` | — | + `count_exact_high, count_exact, count_diff, count_outcome` | hide 4 columns |
 | B5 | `POST /api/v1/contests/{id}/teams/{team_id}/logo` | `multipart` file | `{ logo_url }` | `logo_url` text input |
 | B6 | Invite-accept confirmation | — | status `PENDING→ACCEPTED` on first login+pwd change | show status from `/participants` |
@@ -250,4 +262,4 @@ types/api.ts       // interfaces from §7
 
 | Date | Change |
 |------|--------|
-| 2026-06-21 | Initial version: auth, errors, caching, endpoint matrix, prerequisites B1–B6, response shapes, client sketch (covers 2.1; 2.2–2.4 to be deepened). |
+| 2026-06-22 | B1–B3 RESOLVED (Stage 1.8); fallback table for B1/B2/B3; `NEXT_PUBLIC_DEFAULT_CONTEST_ID` naming. |

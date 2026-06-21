@@ -77,6 +77,10 @@ class ExceptionalTiebreakResponse(BaseModel):
     exceptional_tiebreak_points: int
 
 
+class LogoUploadResponse(BaseModel):
+    logo_url: str
+
+
 class TeamOut(BaseModel):
     id: int
     contest_id: int

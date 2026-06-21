@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from fastapi import APIRouter
 
-from fastapi import APIRouter, Depends
-
-from api.deps import CurrentUser, DbSession, require_not_temp_password, resolve_default_contest_id
+from api.deps import CurrentUser, DbSession, resolve_default_contest_id
 from api.handlers.predictions import build_round_predictions_view
-from database.models import User
 from schemas.predictions import PredictionBatchRequest, PredictionBatchResponse, RoundPredictionsView
 from services.contest_lifecycle_service import assert_contest_running
 from services.prediction_service import submit_batch
@@ -32,7 +29,7 @@ async def post_predictions(
     round_id: int,
     body: PredictionBatchRequest,
     session: DbSession,
-    user: Annotated[User, Depends(require_not_temp_password)],
+    user: CurrentUser,
 ) -> PredictionBatchResponse:
     """Сохранить прогнозы. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)

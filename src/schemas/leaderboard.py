@@ -19,6 +19,10 @@ class ScoreDetailOut(BaseModel):
     predictions_count: int
     exceptional_tiebreak_points: int = 0
     tiebreaker_status: str | None = None
+    count_exact_high: int = 0
+    count_exact: int = 0
+    count_diff: int = 0
+    count_outcome: int = 0
 
 
 class LeaderboardOut(BaseModel):

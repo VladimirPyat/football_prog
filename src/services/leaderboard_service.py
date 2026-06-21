@@ -112,6 +112,10 @@ async def get_round_leaderboard(
                     uid, overrides, context=f"round_leaderboard round={round_id}"
                 ),
                 "tiebreaker_status": row.tiebreaker_status,
+                "count_exact_high": sr.count_exact_high if sr else 0,
+                "count_exact": sr.count_exact if sr else 0,
+                "count_diff": sr.count_diff if sr else 0,
+                "count_outcome": sr.count_outcome if sr else 0,
             }
         )
 
@@ -170,6 +174,10 @@ async def get_global_leaderboard(session: AsyncSession, contest_id: int) -> dict
                     uid, overrides, context=f"global_leaderboard contest={contest_id}"
                 ),
                 "tiebreaker_status": row.tiebreaker_status,
+                "count_exact_high": row.exact_high_count,
+                "count_exact": row.exact_count,
+                "count_diff": row.diff_count,
+                "count_outcome": row.outcome_count,
             }
         )
 

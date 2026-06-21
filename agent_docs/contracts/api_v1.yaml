@@ -1,9 +1,11 @@
 openapi: 3.0.3
 info:
   title: Football Predictions API
-  version: 1.2.0-rc
+  version: 1.2.0
   description: >-
-    Stage 1.8 contract — contest discovery (B1/B2) and user contacts (B3).
+    Stage 1.2.0 — frontend prerequisites bundle: discovery/contacts (1.8),
+    leaderboard count_* fields (1.7), invite accept on password change (1.7),
+    team logo upload + static assets (1.9).
     Primary prefix: /api/v1/contests/{contest_id}/...
     Legacy paths without contest_id are DEPRECATED shims (resolve default contest for loader regression).
     Auth via JWT (Bearer). Score fields integers [0, max_score_value]; MISSING prediction = absent row, never 0.
@@ -49,6 +51,9 @@ paths:
     post:
       tags: [auth]
       summary: Change password (mandatory on first login)
+      description: >-
+        Clears is_temp_password and flips all PENDING contest_participants rows
+        for the user to ACCEPTED.
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -266,6 +271,33 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TeamOut' }
+        '403': { $ref: '#/components/responses/ContestLocked' }
+
+  /api/v1/contests/{contest_id}/teams/{team_id}/logo:
+    post:
+      tags: [contest setup]
+      summary: Upload team logo (SETUP only, PNG/JPEG/GIF, max 2 MiB)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/contest_id' }
+        - { name: team_id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogoUploadResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
         '403': { $ref: '#/components/responses/ContestLocked' }
 
   /api/v1/contests/{contest_id}/teams/{team_id}:
@@ -858,7 +890,15 @@ components:
         contest_id: { type: integer }
         name: { type: string }
         short_name: { type: string }
-        logo_url: { type: string, nullable: true }
+        logo_url:
+          type: string
+          description: >-
+            Never null in API responses — default static URL when unset in DB.
+    LogoUploadResponse:
+      type: object
+      required: [logo_url]
+      properties:
+        logo_url: { type: string }
     TeamCreateRequest:
       type: object
       required: [name, short_name]
@@ -994,6 +1034,10 @@ components:
         total_without_bonus3: { type: integer }
         total_with_bonus3: { type: integer }
         correct_outcomes: { type: integer }
+        count_exact_high: { type: integer, minimum: 0 }
+        count_exact: { type: integer, minimum: 0 }
+        count_diff: { type: integer, minimum: 0 }
+        count_outcome: { type: integer, minimum: 0 }
     Leaderboard:
       type: object
       properties:

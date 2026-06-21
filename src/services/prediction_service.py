@@ -14,7 +14,17 @@ from core.exceptions import (
     ScoreOutOfRangeError,
     ValidationError,
 )
-from database.models import Contest, Match, Prediction, Round, RoundStatus, UserRole
+from database.models import (
+    Contest,
+    ContestParticipant,
+    Match,
+    ParticipantStatus,
+    Prediction,
+    Round,
+    RoundStatus,
+    User,
+    UserRole,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +71,25 @@ async def submit_batch(
 
     if now >= deadline:
         raise ContestRuleError("Дедлайн тура истёк", code="DEADLINE_PASSED")
+
+    user = await session.get(User, user_id)
+    if user is not None and user.is_temp_password:
+        raise ContestRuleError(
+            "Примите приглашение (смените временный пароль)",
+            code="PARTICIPANT_NOT_ACCEPTED",
+        )
+
+    participant = await session.get(ContestParticipant, (contest_id, user_id))
+    if participant is None:
+        raise ContestRuleError(
+            "Вы не участник этого конкурса",
+            code="PARTICIPANT_NOT_ENROLLED",
+        )
+    if participant.status != ParticipantStatus.ACCEPTED:
+        raise ContestRuleError(
+            "Примите приглашение (смените временный пароль)",
+            code="PARTICIPANT_NOT_ACCEPTED",
+        )
 
     if len(items) != matches_per_round:
         raise ValidationError(
