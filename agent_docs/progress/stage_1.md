@@ -125,3 +125,22 @@
 - Notes: SQLite naive datetime workaround in conftest for grace period; [API-CONTEST-DELETE-BADCONFIRM] returns 422 (Pydantic Literal)
 - Next: @Coder implements 1.4 per coder_1.4.md
 
+## 2026-06-21 — Coder (1.4)
+- STATUS: READY_FOR_TEST
+- Files: src/database/models.py, alembic/versions/c4d5e6f7a8b9_multi_contest_and_participants.py, src/services/{contest_setup_service,round_auto_close_service,contest_lifecycle_service,contest_teardown,round_service,match_service,prediction_service,scoring_persistence,leaderboard_service}.py, src/api/{deps,v1/contests,contest_teams,contest_participants,contest_ops}.py, refactored legacy v1 routers, src/schemas/{contest,rounds,leaderboard}.py, src/scripts/{load_test_data,seed}.py, main.py, tests/unit/test_{contest_setup,multi_contest,round_auto_close}_1_4.py, extended test_contest_lifecycle_1_3.py, integration/unit test updates for Contest model
+- Verified: alembic upgrade head → exit 0; pytest tests/unit/test_*_1_4.py tests/unit/test_contest_lifecycle_1_3.py tests/unit/test_api_unit_1_3.py → 31 passed; pytest tests/unit/test_services_1_2.py → 34 passed; pytest tests/integration/ → 36 passed; pytest tests/api/ → 31 passed, 1 skipped
+- Migration: c4d5e6f7a8b9_multi_contest_and_participants
+- Next: agent_docs/instructions/tester_1.4.md
+
+## 2026-06-21 — Planner/audit (1.4.1 patch)
+- Gap audit: tester_1.4 vs docs/03_user_scenarios.md, docs/04_supervisor_scenario.md, api_v1.yaml
+- Created: agent_docs/instructions/tester_1.4.1.md — safe delete contest-scoped, operational gaps (privacy/24h/round-edit/recalc), CANARY pytest + manual cross-ref
+- API routes complete for Stage 1; gaps were test coverage only (newsletters/contacts out of scope)
+
+## 2026-06-21 — Tester (1.4 + 1.4.1)
+- STATUS: TEST_FAIL
+- Tests: tests/api/conftest.py, reference_compare.py, test_setup_phase_1_4.py, test_operational_phase_1_4.py, test_multi_contest_1_4.py, test_calculate_leaderboard_1_4.py, test_free_tour_1_4.py, test_contest_lifecycle_1_4.py, test_operational_gaps_1_4.py, test_canary_scoring_1_4.py, tests/manual/{verify_via_api.py,compare_db_vs_reference.py,README.md}, manuals/MANUAL_SCORING_VERIFICATION.md
+- Executed: uv run pytest tests/api/ -v → 81 passed, 1 failed, 2 skipped; uv run pytest tests/integration/ -v → 36 passed
+- Verified: [API-RESULTS] 90/90, [API-LB-GLOBAL] 10/10, [CANARY-PYTEST-*] PASS, contest-scoped lifecycle/gaps/multi PASS; [OP-CLOSE] FAIL — auto_close + close handler conflict, no commit (see test_1.4.md)
+- Report: agent_docs/reports/test_1.4.md
+- Next: @Coder fix [OP-CLOSE] in src/api/deps.py + round close idempotency; re-test

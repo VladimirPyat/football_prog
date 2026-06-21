@@ -7,46 +7,33 @@ from datetime import datetime, timezone
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import ContestSettings, Match, Prediction, Round, RoundStatus, UserRole
+from database.models import Contest, Match, Prediction, Round, RoundStatus, UserRole
 
 
-async def _get_settings(session: AsyncSession) -> ContestSettings:
-    settings = await session.scalar(select(ContestSettings).limit(1))
-    if settings is None:
-        raise ValueError("Contest settings not found in database")
-    return settings
+async def _get_contest_for_round(session: AsyncSession, round_id: int) -> Contest:
+    round_ = await session.get(Round, round_id)
+    if round_ is None:
+        raise ValueError(f"Round {round_id} not found")
+    contest = await session.get(Contest, round_.contest_id)
+    if contest is None:
+        raise ValueError(f"Contest {round_.contest_id} not found")
+    return contest
 
 
 async def submit_batch(
     session: AsyncSession,
+    contest_id: int,
     user_id: int,
     round_id: int,
     items: list[tuple[int, int, int]],
 ) -> int:
-    """Submit predictions for all matches in a round atomically.
+    """Submit predictions for all matches in a round atomically."""
+    contest = await _get_contest_for_round(session, round_id)
+    if contest.id != contest_id:
+        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
 
-    Parameters
-    ----------
-    items:
-        List of (match_id, score1, score2) tuples. Must cover EXACTLY all
-        matches in the round — no more, no less.
-
-    Returns
-    -------
-    Number of saved prediction rows (equals matches_per_round on success).
-
-    Raises
-    ------
-    PermissionError
-        If the deadline has passed or the round is not ACTIVE.
-    ValueError
-        If the item count or match coverage is wrong, or any score is out of range.
-
-    Caller is responsible for wrapping in a transaction.
-    """
-    settings = await _get_settings(session)
-    matches_per_round: int = settings.matches_per_round
-    max_score: int = settings.rules_json["constraints"]["score_validation_range"][1]
+    matches_per_round: int = contest.matches_per_round
+    max_score: int = contest.rules_json["constraints"]["score_validation_range"][1]
 
     round_ = await session.get(Round, round_id)
     if round_ is None:
@@ -95,7 +82,6 @@ async def submit_batch(
                 f"score2={score2} for match {match_id} out of range [0, {max_score}]"
             )
 
-    # Delete existing predictions for (user, round) before inserting fresh ones.
     await session.execute(
         delete(Prediction).where(
             Prediction.user_id == user_id, Prediction.round_id == round_id
@@ -117,23 +103,17 @@ async def submit_batch(
 
 async def visible_predictions(
     session: AsyncSession,
+    contest_id: int,
     round_id: int,
     viewer_role: str,
     viewer_id: int,
 ) -> list[dict]:
-    """Return predictions filtered by deadline and viewer role.
-
-    Before deadline:
-      - Supervisors/Admins see all predictions with full scores.
-      - Regular users see their own predictions with scores, and for others
-        only a submitted/not-submitted flag.
-
-    After deadline:
-      - All predictions are visible to everyone.
-    """
+    """Return predictions filtered by deadline and viewer role."""
     round_ = await session.get(Round, round_id)
     if round_ is None:
         raise ValueError(f"Round {round_id} not found")
+    if round_.contest_id != contest_id:
+        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
 
     now = datetime.now(timezone.utc)
     deadline = round_.deadline
@@ -164,7 +144,4 @@ async def visible_predictions(
         else:
             result.append({"user_id": pred.user_id, "submitted": True})
 
-    # Add "submitted: False" entries for users who have no prediction for matches they could have made.
-    # This requires knowing all participant user_ids; callers can filter further if needed.
-    # For simplicity, return only the records that exist in DB.
     return result

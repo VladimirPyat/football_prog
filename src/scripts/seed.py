@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.settings import get_settings
 from database.base import Base
 from database.engine import create_engine, create_session_factory
-from database.models import ContestSettings, User, UserRole
+from database.models import Contest, ContestParticipant, ParticipantStatus, User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +40,17 @@ def build_rules_json(data: dict) -> dict:
     }
 
 
-async def seed_contest_settings(session: AsyncSession, defaults_path: Path) -> ContestSettings:
-    existing = await session.scalar(select(ContestSettings).limit(1))
+async def seed_contest(session: AsyncSession, defaults_path: Path) -> Contest:
+    existing = await session.scalar(select(Contest).order_by(Contest.id).limit(1))
     if existing is not None:
-        logger.info("Contest settings already exist (id=%s), skipping", existing.id)
+        logger.info("Contest already exists (id=%s), skipping", existing.id)
         return existing
 
     data = load_contest_defaults(defaults_path)
     structure = data["contest_structure"]
-    settings = ContestSettings(
+    contest = Contest(
+        name="Default",
+        slug=None,
         is_locked=False,
         total_teams=structure["total_teams"],
         matches_per_round=structure["matches_per_round"],
@@ -56,17 +58,26 @@ async def seed_contest_settings(session: AsyncSession, defaults_path: Path) -> C
         is_round_robin=structure["is_round_robin"],
         rules_json=build_rules_json(data),
     )
-    session.add(settings)
+    session.add(contest)
     await session.flush()
-    logger.info("Created contest settings (id=%s)", settings.id)
-    return settings
+    logger.info("Created contest (id=%s)", contest.id)
+    return contest
 
 
-async def seed_admin_user(session: AsyncSession) -> User:
+async def seed_admin_user(session: AsyncSession, contest_id: int) -> User:
     settings = get_settings()
     existing = await session.scalar(select(User).where(User.login == settings.seed_admin_login))
     if existing is not None:
         logger.info("Admin user already exists (login=%s), skipping", existing.login)
+        participant = await session.get(ContestParticipant, (contest_id, existing.id))
+        if participant is None:
+            session.add(
+                ContestParticipant(
+                    contest_id=contest_id,
+                    user_id=existing.id,
+                    status=ParticipantStatus.ACCEPTED,
+                )
+            )
         return existing
 
     user = User(
@@ -79,6 +90,13 @@ async def seed_admin_user(session: AsyncSession) -> User:
     )
     session.add(user)
     await session.flush()
+    session.add(
+        ContestParticipant(
+            contest_id=contest_id,
+            user_id=user.id,
+            status=ParticipantStatus.ACCEPTED,
+        )
+    )
     logger.info("Created admin user (login=%s, id=%s)", user.login, user.id)
     return user
 
@@ -97,15 +115,15 @@ async def run_seed(database_url: str | None = None, defaults_path: Path | None =
 
     async with session_factory() as session:
         async with session.begin():
-            await seed_contest_settings(session, path)
-            await seed_admin_user(session)
+            contest = await seed_contest(session, path)
+            await seed_admin_user(session, contest.id)
 
     await engine.dispose()
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    parser = argparse.ArgumentParser(description="Seed contest settings and admin user")
+    parser = argparse.ArgumentParser(description="Seed contest and admin user")
     parser.add_argument(
         "--database-url",
         default=None,

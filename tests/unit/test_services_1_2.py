@@ -18,9 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from database.base import Base
 from database.models import (
-    ContestSettings,
+    Contest,
+    ContestParticipant,
     Match,
     MatchStatus,
+    ParticipantStatus,
     Prediction,
     Round,
     RoundStatus,
@@ -40,6 +42,8 @@ from services.scoring_persistence import calculate_round, recalculate_round
 # ---------------------------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+CONTEST_ID = 1
 
 TEST_RULES = {
     "scoring_rules": {
@@ -104,9 +108,10 @@ async def session(session_factory):
         yield s
 
 
-async def _seed_settings(session: AsyncSession, **overrides) -> ContestSettings:
+async def _seed_settings(session: AsyncSession, **overrides) -> Contest:
     rules = dict(TEST_RULES)
-    cfg = ContestSettings(
+    cfg = Contest(
+        name="Test",
         is_locked=False,
         total_teams=16,
         matches_per_round=8,
@@ -121,8 +126,19 @@ async def _seed_settings(session: AsyncSession, **overrides) -> ContestSettings:
     return cfg
 
 
+async def _add_participant(session: AsyncSession, user_id: int) -> None:
+    session.add(
+        ContestParticipant(
+            contest_id=CONTEST_ID,
+            user_id=user_id,
+            status=ParticipantStatus.ACCEPTED,
+        )
+    )
+    await session.flush()
+
+
 async def _make_team(session: AsyncSession, n: int) -> Team:
-    t = Team(name=f"Team{n}", short_name=f"T{n}")
+    t = Team(contest_id=CONTEST_ID, name=f"Team{n}", short_name=f"T{n}")
     session.add(t)
     await session.flush()
     return t
@@ -139,6 +155,7 @@ async def _make_user(session: AsyncSession, n: int) -> User:
     )
     session.add(u)
     await session.flush()
+    await _add_participant(session, u.id)
     return u
 
 
@@ -150,6 +167,7 @@ async def _make_round(
     matches_count: int = 8,
 ) -> Round:
     r = Round(
+        contest_id=CONTEST_ID,
         number=number,
         status=status,
         deadline=deadline or _FUTURE,
@@ -472,7 +490,7 @@ async def test_batch_wrong_count_rejected(session: AsyncSession):
     items_7 = [(mids[i], 1, 0) for i in range(7)]
     with pytest.raises(ValueError, match="exactly"):
         async with session.begin():
-            await submit_batch(session, uid, rid, items_7)
+            await submit_batch(session, CONTEST_ID, uid, rid, items_7)
 
 
 async def test_batch_valid_saves_all(session: AsyncSession):
@@ -482,7 +500,7 @@ async def test_batch_valid_saves_all(session: AsyncSession):
 
     items_8 = [(mid, 1, 0) for mid in mids]
     async with session.begin():
-        saved = await submit_batch(session, uid, rid, items_8)
+        saved = await submit_batch(session, CONTEST_ID, uid, rid, items_8)
     assert saved == 8
 
     async with session.begin():
@@ -503,7 +521,7 @@ async def test_batch_zero_zero_accepted(session: AsyncSession):
 
     items = [(mids[0], 0, 0)] + [(mids[i], 1, 0) for i in range(1, 8)]
     async with session.begin():
-        saved = await submit_batch(session, uid, rid, items)
+        saved = await submit_batch(session, CONTEST_ID, uid, rid, items)
     assert saved == 8
 
     async with session.begin():
@@ -526,7 +544,7 @@ async def test_batch_after_deadline_rejected(session: AsyncSession):
     items = [(mid, 1, 0) for mid in mids]
     with pytest.raises(PermissionError, match="Deadline has passed"):
         async with session.begin():
-            await submit_batch(session, uid, rid, items)
+            await submit_batch(session, CONTEST_ID, uid, rid, items)
 
 
 async def test_batch_invalid_score_no_partial_save(session: AsyncSession):
@@ -538,7 +556,7 @@ async def test_batch_invalid_score_no_partial_save(session: AsyncSession):
     items = [(mids[0], 1, 999)] + [(mids[i], 1, 0) for i in range(1, 8)]
     with pytest.raises(ValueError, match="out of range"):
         async with session.begin():
-            await submit_batch(session, uid, rid, items)
+            await submit_batch(session, CONTEST_ID, uid, rid, items)
 
     async with session.begin():
         count = len(
@@ -568,7 +586,7 @@ async def test_batch_round_not_active_rejected(session: AsyncSession):
     items = [(mid, 1, 0) for mid in match_ids]
     with pytest.raises(PermissionError, match="must be ACTIVE"):
         async with session.begin():
-            await submit_batch(session, user.id, r.id, items)
+            await submit_batch(session, CONTEST_ID, user.id, r.id, items)
 
 
 # ---------------------------------------------------------------------------
@@ -613,7 +631,7 @@ async def test_active_transition_locks_settings(session: AsyncSession):
         await transition_round(session, r.id, RoundStatus.ACTIVE)
 
     async with session.begin():
-        s = await session.scalar(select(ContestSettings))
+        s = await session.scalar(select(Contest))
     assert s is not None
     assert s.is_locked is True
 
@@ -668,7 +686,7 @@ async def test_calculate_round_creates_score_rows(session: AsyncSession):
         round_id, user_ids = await _setup_scorable_round(session)
 
     async with session.begin():
-        count = await calculate_round(session, round_id)
+        count = await calculate_round(session, round_id, CONTEST_ID)
 
     assert count == len(user_ids)
 
@@ -686,7 +704,7 @@ async def test_calculate_round_totals_match_engine(session: AsyncSession):
         round_id, user_ids = await _setup_scorable_round(session)
 
     async with session.begin():
-        await calculate_round(session, round_id)
+        await calculate_round(session, round_id, CONTEST_ID)
 
     async with session.begin():
         score_row = await session.scalar(
@@ -718,7 +736,7 @@ async def test_calculate_round_non_closed_raises(session: AsyncSession):
 
     with pytest.raises(ValueError, match="CLOSED"):
         async with session.begin():
-            await calculate_round(session, r.id)
+            await calculate_round(session, r.id, CONTEST_ID)
 
 
 async def test_calculate_round_transitions_to_calculated(session: AsyncSession):
@@ -727,7 +745,7 @@ async def test_calculate_round_transitions_to_calculated(session: AsyncSession):
         round_id, _ = await _setup_scorable_round(session)
 
     async with session.begin():
-        await calculate_round(session, round_id)
+        await calculate_round(session, round_id, CONTEST_ID)
 
     async with session.begin():
         r = await session.get(Round, round_id)
@@ -740,7 +758,7 @@ async def test_void_match_triggers_recalculate(session: AsyncSession):
         round_id, user_ids = await _setup_scorable_round(session)
 
     async with session.begin():
-        await calculate_round(session, round_id)
+        await calculate_round(session, round_id, CONTEST_ID)
 
     # Capture scores before VOID.
     async with session.begin():
@@ -752,7 +770,7 @@ async def test_void_match_triggers_recalculate(session: AsyncSession):
     # VOID the first match.
     async with session.begin():
         match = await session.scalar(select(Match).where(Match.round_id == round_id).limit(1))
-        await change_status(session, match.id, MatchStatus.VOID)
+        await change_status(session, CONTEST_ID, match.id, MatchStatus.VOID)
 
     # Scores should now be recalculated (match excluded from scoring).
     async with session.begin():
@@ -778,7 +796,7 @@ async def test_recalculate_non_calculated_round_raises(session: AsyncSession):
 
     with pytest.raises(ValueError, match="CALCULATED"):
         async with session.begin():
-            await recalculate_round(session, r.id)
+            await recalculate_round(session, r.id, CONTEST_ID)
 
 
 # ---------------------------------------------------------------------------
@@ -801,7 +819,7 @@ async def test_calculate_round_on_loaded_round1(loaded_db_url: str):
             assert round1 is not None
             assert round1.status == RoundStatus.CLOSED
 
-            await calculate_round(session, round1.id)
+            await calculate_round(session, round1.id, CONTEST_ID)
 
         async with session.begin():
             scores = (
@@ -833,7 +851,7 @@ async def test_calculate_round_on_loaded_round1(loaded_db_url: str):
                 )
             ).all()
             all_uids = list(await session.scalars(select(User.id)))
-            settings = await session.scalar(select(ContestSettings))
+            settings = await session.scalar(select(Contest))
 
     results = [
         MatchResult(match_id=m.id, score1=m.score1, score2=m.score2, is_scorable=True)

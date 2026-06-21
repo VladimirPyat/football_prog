@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from database.models import ContestLifecycleStatus, ContestSettings, User
+from database.models import ContestLifecycleStatus, Contest, User
 from tests.api.conftest import (
     API_PREFIX,
     api_login,
@@ -324,6 +324,6 @@ async def test_contest_delete_ok(delete_api):
     assert resp.json()["status"] == "DRAFT"
 
     async with sf() as session:
-        settings = await session.scalar(select(ContestSettings).limit(1))
-        assert settings is not None
-        assert settings.status == ContestLifecycleStatus.DRAFT.value
+        contest = await session.scalar(select(Contest).limit(1))
+        assert contest is not None
+        assert contest.status == ContestLifecycleStatus.DRAFT.value

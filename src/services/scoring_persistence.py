@@ -6,32 +6,35 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import (
-    ContestSettings,
+    Contest,
+    ContestParticipant,
     Match,
     MatchStatus,
     Prediction,
     Round,
     RoundStatus,
     Score,
-    User,
 )
 from scoring.rules import ScoringRules
 from scoring.engine import score_round
 from scoring.types import MatchResult, UserPrediction
 
 
-async def _get_settings(session: AsyncSession) -> ContestSettings:
-    settings = await session.scalar(select(ContestSettings).limit(1))
-    if settings is None:
-        raise ValueError("Contest settings not found in database")
-    return settings
+async def _get_contest(session: AsyncSession, contest_id: int) -> Contest:
+    contest = await session.get(Contest, contest_id)
+    if contest is None:
+        raise ValueError(f"Contest {contest_id} not found")
+    return contest
 
 
 async def _collect_round_data(
-    session: AsyncSession, round_id: int
+    session: AsyncSession, round_id: int, contest_id: int
 ) -> tuple[list[MatchResult], list[UserPrediction], list[int]]:
     """Load scorable matches, predictions, and participant IDs for a round."""
-    # Only FINISHED matches with non-NULL scores are scorable; VOID/SCHEDULED/POSTPONED/CANCELED excluded.
+    round_ = await session.get(Round, round_id)
+    if round_ is None or round_.contest_id != contest_id:
+        raise ValueError(f"Round {round_id} not found in contest {contest_id}")
+
     matches_rows = (
         await session.scalars(
             select(Match).where(
@@ -61,18 +64,23 @@ async def _collect_round_data(
         UserPrediction(
             user_id=p.user_id,
             match_id=p.match_id,
-            score1=p.score1,  # type: ignore[arg-type]  # never NULL via submit_batch
+            score1=p.score1,  # type: ignore[arg-type]
             score2=p.score2,  # type: ignore[arg-type]
         )
         for p in prediction_rows
         if p.score1 is not None and p.score2 is not None
     ]
 
-    user_ids = list(
-        await session.scalars(select(User.id))
+    participant_ids = list(
+        await session.scalars(
+            select(ContestParticipant.user_id).where(
+                ContestParticipant.contest_id == contest_id,
+                ContestParticipant.status == "ACCEPTED",
+            )
+        )
     )
 
-    return results, predictions, user_ids
+    return results, predictions, participant_ids
 
 
 async def _persist_scores(
@@ -85,19 +93,15 @@ async def _persist_scores(
     sr = ScoringRules(rules)
 
     for uid, user_score in user_scores.items():
-        points_exact = (
-            user_score.count_exact_high * sr.exact_high_score
-            + user_score.count_exact * sr.exact_score
-        )
-        points_diff = user_score.count_diff * sr.diff_plus_outcome
-        points_outcome = user_score.count_outcome * sr.outcome_only
-
         score_row = Score(
             user_id=uid,
             round_id=round_id,
-            points_exact=points_exact,
-            points_diff=points_diff,
-            points_outcome=points_outcome,
+            points_exact=(
+                user_score.count_exact_high * sr.exact_high_score
+                + user_score.count_exact * sr.exact_score
+            ),
+            points_diff=user_score.count_diff * sr.diff_plus_outcome,
+            points_outcome=user_score.count_outcome * sr.outcome_only,
             bonus1=user_score.bonus1,
             bonus2=user_score.bonus2,
             bonus3=user_score.bonus3,
@@ -114,53 +118,70 @@ async def _persist_scores(
     return len(user_scores)
 
 
-async def calculate_round(session: AsyncSession, round_id: int) -> int:
-    """Compute and persist scores for a CLOSED round; transition it to CALCULATED.
-
-    Returns the number of users scored.
-    Raises ValueError if the round is not in CLOSED status.
-    Caller is responsible for wrapping in a transaction.
-    """
+async def calculate_round(
+    session: AsyncSession, round_id: int, contest_id: int
+) -> int:
+    """Compute and persist scores for a CLOSED round; transition it to CALCULATED."""
     round_ = await session.get(Round, round_id)
     if round_ is None:
         raise ValueError(f"Round {round_id} not found")
+    if round_.contest_id != contest_id:
+        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
     if round_.status != RoundStatus.CLOSED:
         raise ValueError(
             f"calculate_round requires CLOSED status, got {round_.status} for round {round_id}"
         )
 
-    settings = await _get_settings(session)
-    results, predictions, participant_ids = await _collect_round_data(session, round_id)
-    user_scores = score_round(results, predictions, participant_ids, rules=settings.rules_json)
+    contest = await _get_contest(session, contest_id)
+    results, predictions, participant_ids = await _collect_round_data(
+        session, round_id, contest_id
+    )
+    user_scores = score_round(results, predictions, participant_ids, rules=contest.rules_json)
 
-    count = await _persist_scores(session, round_id, user_scores, settings.rules_json)
+    count = await _persist_scores(session, round_id, user_scores, contest.rules_json)
 
     round_.status = RoundStatus.CALCULATED
     return count
 
 
-async def recalculate_round(session: AsyncSession, round_id: int) -> int:
-    """Re-run scoring for a CALCULATED round (e.g. after a VOID result change).
-
-    Deletes existing Score rows for the round and recomputes from current match data.
-    Returns the number of users scored.
-    Caller is responsible for wrapping in a transaction.
-    """
+async def recalculate_round(
+    session: AsyncSession, round_id: int, contest_id: int
+) -> int:
+    """Re-run scoring for a CALCULATED round."""
     round_ = await session.get(Round, round_id)
     if round_ is None:
         raise ValueError(f"Round {round_id} not found")
+    if round_.contest_id != contest_id:
+        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
     if round_.status != RoundStatus.CALCULATED:
         raise ValueError(
             f"recalculate_round requires CALCULATED status, got {round_.status} for round {round_id}"
         )
 
-    # Remove existing scores atomically before reinserting.
     await session.execute(delete(Score).where(Score.round_id == round_id))
 
-    settings = await _get_settings(session)
-    results, predictions, participant_ids = await _collect_round_data(session, round_id)
-    user_scores = score_round(results, predictions, participant_ids, rules=settings.rules_json)
+    contest = await _get_contest(session, contest_id)
+    results, predictions, participant_ids = await _collect_round_data(
+        session, round_id, contest_id
+    )
+    user_scores = score_round(results, predictions, participant_ids, rules=contest.rules_json)
 
-    count = await _persist_scores(session, round_id, user_scores, settings.rules_json)
-    # Round stays CALCULATED — no status transition on recalculation.
+    count = await _persist_scores(session, round_id, user_scores, contest.rules_json)
+    return count
+
+
+async def recalculate_contest(session: AsyncSession, contest_id: int) -> int:
+    """Recalculate all CALCULATED rounds in a contest."""
+    rounds = (
+        await session.scalars(
+            select(Round).where(
+                Round.contest_id == contest_id,
+                Round.status == RoundStatus.CALCULATED,
+            )
+        )
+    ).all()
+    count = 0
+    for round_ in rounds:
+        await recalculate_round(session, round_.id, contest_id)
+        count += 1
     return count

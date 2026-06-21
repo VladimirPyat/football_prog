@@ -1,4 +1,4 @@
-"""Prediction submission and visibility endpoints."""
+"""Prediction submission and visibility endpoints (legacy 1.3 shims)."""
 
 from __future__ import annotations
 
@@ -8,23 +8,24 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
-from api.deps import CurrentUser, DbSession, require_not_temp_password
+from api.deps import CurrentUser, DbSession, require_not_temp_password, resolve_default_contest_id
 from database.models import Match, Round, Team, User
 from schemas.predictions import PredictionBatchRequest, PredictionBatchResponse, RoundPredictionsView
 from services.contest_lifecycle_service import assert_contest_running
 from services.prediction_service import submit_batch, visible_predictions
 
-router = APIRouter(prefix="/rounds", tags=["predictions"])
+router = APIRouter(prefix="/rounds", tags=["legacy (deprecated)", "predictions"])
 
 
-@router.get("/{round_id}/predictions", response_model=RoundPredictionsView)
+@router.get("/{round_id}/predictions", response_model=RoundPredictionsView, deprecated=True)
 async def get_predictions(
     round_id: int,
     session: DbSession,
     user: CurrentUser,
 ) -> RoundPredictionsView:
+    contest_id = await resolve_default_contest_id(session)
     round_ = await session.get(Round, round_id)
-    if round_ is None:
+    if round_ is None or round_.contest_id != contest_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Round not found")
 
     now = datetime.now(timezone.utc)
@@ -57,7 +58,7 @@ async def get_predictions(
             }
         )
 
-    raw = await visible_predictions(session, round_id, user.role, user.id)
+    raw = await visible_predictions(session, contest_id, round_id, user.role, user.id)
 
     users = {u.id: u for u in (await session.scalars(select(User))).all()}
     by_user: dict[int, list] = {}
@@ -96,17 +97,18 @@ async def get_predictions(
     )
 
 
-@router.post("/{round_id}/predictions", response_model=PredictionBatchResponse)
+@router.post("/{round_id}/predictions", response_model=PredictionBatchResponse, deprecated=True)
 async def post_predictions(
     round_id: int,
     body: PredictionBatchRequest,
     session: DbSession,
     user: Annotated[User, Depends(require_not_temp_password)],
 ) -> PredictionBatchResponse:
+    contest_id = await resolve_default_contest_id(session)
     try:
-        await assert_contest_running(session)
+        await assert_contest_running(session, contest_id)
         items = [(p.match_id, p.score1, p.score2) for p in body.predictions]
-        count = await submit_batch(session, user.id, round_id, items)
+        count = await submit_batch(session, contest_id, user.id, round_id, items)
         await session.commit()
     except PermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc

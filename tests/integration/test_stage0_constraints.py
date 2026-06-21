@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from database.base import Base
-from database.models import Match, MatchStatus, Prediction, Round, RoundStatus, Team, User, UserRole
+from database.models import Contest, Match, MatchStatus, Prediction, Round, RoundStatus, Team, User, UserRole
 
 
 @pytest_asyncio.fixture
@@ -23,12 +23,26 @@ async def session_factory():
 
 
 async def _seed_match_context(session: AsyncSession) -> tuple[User, Round, Match]:
-    team1 = Team(name="Team A", short_name="TA")
-    team2 = Team(name="Team B", short_name="TB")
+    contest = Contest(
+        name="Constraints Test",
+        is_locked=False,
+        total_teams=2,
+        matches_per_round=1,
+        total_rounds=1,
+        is_round_robin=False,
+        rules_json={"constraints": {"score_validation_range": [0, 20]}},
+    )
+    session.add(contest)
+    await session.flush()
+
+    team1 = Team(contest_id=contest.id, name="Team A", short_name="TA")
+    team2 = Team(contest_id=contest.id, name="Team B", short_name="TB")
     round_ = Round(
+        contest_id=contest.id,
         number=1,
         deadline=datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc),
         status=RoundStatus.ACTIVE,
+        matches_count=1,
     )
     session.add_all([team1, team2, round_])
     await session.flush()

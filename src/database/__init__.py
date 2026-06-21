@@ -1,9 +1,12 @@
 from database.base import Base
 from database.models import (
     Contact,
-    ContestSettings,
+    Contest,
+    ContestLifecycleStatus,
+    ContestParticipant,
     Match,
     MatchStatus,
+    ParticipantStatus,
     Prediction,
     Round,
     RoundStatus,
@@ -16,9 +19,12 @@ from database.models import (
 __all__ = [
     "Base",
     "Contact",
-    "ContestSettings",
+    "Contest",
+    "ContestLifecycleStatus",
+    "ContestParticipant",
     "Match",
     "MatchStatus",
+    "ParticipantStatus",
     "Prediction",
     "Round",
     "RoundStatus",

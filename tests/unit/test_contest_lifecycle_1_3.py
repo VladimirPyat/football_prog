@@ -1,4 +1,4 @@
-"""Unit tests for Stage 1.3 contest lifecycle service."""
+"""Unit tests for Stage 1.3 contest lifecycle service (contest_id=1)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from config.settings import Settings, get_settings
 from database.base import Base
-from database.models import ContestLifecycleStatus, ContestSettings, Round, RoundStatus, User, UserRole
+from database.models import (
+    Contest,
+    ContestLifecycleStatus,
+    ContestParticipant,
+    ParticipantStatus,
+    Round,
+    RoundStatus,
+    User,
+    UserRole,
+)
 from services.contest_lifecycle_service import (
     ContestLockedError,
     GracePeriodError,
@@ -25,6 +34,8 @@ from services.contest_lifecycle_service import (
     resume_contest,
     update_exceptional_tiebreak,
 )
+
+CONTEST_ID = 1
 
 TEST_RULES = {
     "scoring_rules": {"base_points": {}, "bonuses": {}},
@@ -42,7 +53,8 @@ async def session() -> AsyncSession:
 
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as sess:
-        settings = ContestSettings(
+        contest = Contest(
+            name="Default",
             is_locked=False,
             status=ContestLifecycleStatus.DRAFT,
             total_teams=16,
@@ -51,7 +63,9 @@ async def session() -> AsyncSession:
             is_round_robin=True,
             rules_json=TEST_RULES,
         )
-        sess.add(settings)
+        sess.add(contest)
+        await sess.flush()
+        assert contest.id == CONTEST_ID
         await sess.commit()
         yield sess
 
@@ -60,41 +74,41 @@ async def session() -> AsyncSession:
 
 @pytest.mark.asyncio
 async def test_require_unlocked_when_locked(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.is_locked = True
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.is_locked = True
     await session.commit()
 
     with pytest.raises(ContestLockedError):
-        await require_unlocked(session)
+        await require_unlocked(session, CONTEST_ID)
 
 
 @pytest.mark.asyncio
 async def test_require_unlocked_when_unlocked(session: AsyncSession) -> None:
-    result = await require_unlocked(session)
+    result = await require_unlocked(session, CONTEST_ID)
     assert result.is_locked is False
 
 
 @pytest.mark.asyncio
 async def test_assert_contest_running_blocks_paused(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.status = ContestLifecycleStatus.PAUSED
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.status = ContestLifecycleStatus.PAUSED
     await session.commit()
 
     with pytest.raises(PermissionError):
-        await assert_contest_running(session)
+        await assert_contest_running(session, CONTEST_ID)
 
 
 @pytest.mark.asyncio
 async def test_pause_resume_happy_path(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.status = ContestLifecycleStatus.RUNNING
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.status = ContestLifecycleStatus.RUNNING
     await session.commit()
 
-    paused = await pause_contest(session)
+    paused = await pause_contest(session, CONTEST_ID)
     assert paused.status == ContestLifecycleStatus.PAUSED
     assert paused.paused_at is not None
 
-    resumed = await resume_contest(session)
+    resumed = await resume_contest(session, CONTEST_ID)
     assert resumed.status == ContestLifecycleStatus.RUNNING
     assert resumed.paused_at is None
 
@@ -102,14 +116,15 @@ async def test_pause_resume_happy_path(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_illegal_draft_to_finish(session: AsyncSession) -> None:
     with pytest.raises(IllegalTransitionError):
-        await finish_contest(session)
+        await finish_contest(session, CONTEST_ID)
 
 
 @pytest.mark.asyncio
 async def test_finish_from_running(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.status = ContestLifecycleStatus.RUNNING
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.status = ContestLifecycleStatus.RUNNING
     round_ = Round(
+        contest_id=CONTEST_ID,
         number=1,
         deadline=datetime.now(timezone.utc) + timedelta(days=1),
         status=RoundStatus.ACTIVE,
@@ -120,7 +135,7 @@ async def test_finish_from_running(session: AsyncSession) -> None:
     round_id = round_.id
     await session.commit()
 
-    finished = await finish_contest(session)
+    finished = await finish_contest(session, CONTEST_ID)
     assert finished.status == ContestLifecycleStatus.FINISHED
     assert finished.finished_at is not None
     await session.commit()
@@ -132,12 +147,12 @@ async def test_finish_from_running(session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_finish_idempotent(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.status = ContestLifecycleStatus.FINISHED
-    settings.finished_at = datetime.now(timezone.utc)
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.status = ContestLifecycleStatus.FINISHED
+    contest.finished_at = datetime.now(timezone.utc)
     await session.commit()
 
-    result = await finish_contest(session)
+    result = await finish_contest(session, CONTEST_ID)
     assert result.status == ContestLifecycleStatus.FINISHED
 
 
@@ -151,34 +166,34 @@ async def test_delete_wrong_confirm_rejected_by_api_layer() -> None:
 
 @pytest.mark.asyncio
 async def test_delete_grace_period(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.status = ContestLifecycleStatus.PAUSED
-    settings.paused_at = datetime.now(timezone.utc)
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.status = ContestLifecycleStatus.PAUSED
+    contest.paused_at = datetime.now(timezone.utc)
     await session.commit()
 
     test_settings = Settings(contest_allow_instant_delete=False, contest_delete_grace_seconds=3600)
     with patch("services.contest_lifecycle_service.get_settings", return_value=test_settings):
         with pytest.raises(GracePeriodError):
-            await assert_deletable(session)
+            await assert_deletable(session, CONTEST_ID)
 
 
 @pytest.mark.asyncio
 async def test_delete_instant_allowed(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.status = ContestLifecycleStatus.PAUSED
-    settings.paused_at = datetime.now(timezone.utc)
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.status = ContestLifecycleStatus.PAUSED
+    contest.paused_at = datetime.now(timezone.utc)
     await session.commit()
 
     test_settings = Settings(contest_allow_instant_delete=True)
     with patch("services.contest_lifecycle_service.get_settings", return_value=test_settings):
-        result = await assert_deletable(session)
+        result = await assert_deletable(session, CONTEST_ID)
         assert result.status == ContestLifecycleStatus.PAUSED
 
 
 @pytest.mark.asyncio
 async def test_exceptional_tiebreak_when_locked(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.is_locked = True
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.is_locked = True
     user = User(
         login="u1",
         password_hash="h",
@@ -190,21 +205,28 @@ async def test_exceptional_tiebreak_when_locked(session: AsyncSession) -> None:
     session.add(user)
     await session.flush()
     user_id = user.id
+    session.add(
+        ContestParticipant(
+            contest_id=CONTEST_ID,
+            user_id=user_id,
+            status=ParticipantStatus.ACCEPTED,
+        )
+    )
     await session.commit()
 
-    points = await update_exceptional_tiebreak(session, user_id, 5)
+    points = await update_exceptional_tiebreak(session, CONTEST_ID, user_id, 5)
     assert points == 5
     await session.commit()
-    refreshed = await session.get(User, user_id)
-    assert refreshed is not None
-    assert refreshed.exceptional_tiebreak_points == 5
+    participant = await session.get(ContestParticipant, (CONTEST_ID, user_id))
+    assert participant is not None
+    assert participant.exceptional_tiebreak_points == 5
 
 
 @pytest.mark.asyncio
 async def test_delete_contest_data_resets_to_draft(session: AsyncSession) -> None:
-    settings = await session.get(ContestSettings, 1)
-    settings.is_locked = True
-    settings.status = ContestLifecycleStatus.PAUSED
+    contest = await session.get(Contest, CONTEST_ID)
+    contest.is_locked = True
+    contest.status = ContestLifecycleStatus.PAUSED
     await session.commit()
 
     test_settings = Settings(
@@ -212,7 +234,7 @@ async def test_delete_contest_data_resets_to_draft(session: AsyncSession) -> Non
         contest_allow_instant_delete=True,
     )
     with patch("services.contest_teardown.get_settings", return_value=test_settings):
-        new_settings = await delete_contest_data(session)
+        new_contest = await delete_contest_data(session, CONTEST_ID)
 
-    assert new_settings.status == ContestLifecycleStatus.DRAFT
-    assert new_settings.is_locked is False
+    assert new_contest.status == ContestLifecycleStatus.DRAFT
+    assert new_contest.is_locked is False

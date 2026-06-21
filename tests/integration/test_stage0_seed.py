@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from database.base import Base
-from database.models import ContestSettings
+from database.models import Contest
 from scripts.seed import build_rules_json, load_contest_defaults, run_seed
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -36,13 +36,13 @@ async def test_seed_contest_settings_matches_defaults(seeded_db):
     structure = defaults["contest_structure"]
 
     async with session_factory() as session:
-        settings = await session.scalar(select(ContestSettings).limit(1))
-        assert settings is not None
-        assert settings.total_teams == structure["total_teams"]
-        assert settings.matches_per_round == structure["matches_per_round"]
-        assert settings.total_rounds == structure["total_rounds"]
-        assert settings.is_round_robin == structure["is_round_robin"]
-        assert settings.rules_json == expected_rules
+        contest = await session.scalar(select(Contest).limit(1))
+        assert contest is not None
+        assert contest.total_teams == structure["total_teams"]
+        assert contest.matches_per_round == structure["matches_per_round"]
+        assert contest.total_rounds == structure["total_rounds"]
+        assert contest.is_round_robin == structure["is_round_robin"]
+        assert contest.rules_json == expected_rules
 
 
 @pytest.mark.asyncio
@@ -52,10 +52,10 @@ async def test_seed_rules_json_excludes_meta_only_fields(seeded_db):
     defaults = load_contest_defaults(DEFAULTS_PATH)
 
     async with session_factory() as session:
-        settings = await session.scalar(select(ContestSettings).limit(1))
-        assert settings is not None
-        assert "_meta" not in settings.rules_json
-        assert settings.rules_json["scoring_rules"] == defaults["scoring_rules"]
-        assert settings.rules_json["tiebreakers"] == defaults["tiebreakers"]
-        assert settings.rules_json["constraints"] == defaults["constraints"]
-        assert settings.rules_json["contest_structure"] == defaults["contest_structure"]
+        contest = await session.scalar(select(Contest).limit(1))
+        assert contest is not None
+        assert "_meta" not in contest.rules_json
+        assert contest.rules_json["scoring_rules"] == defaults["scoring_rules"]
+        assert contest.rules_json["tiebreakers"] == defaults["tiebreakers"]
+        assert contest.rules_json["constraints"] == defaults["constraints"]
+        assert contest.rules_json["contest_structure"] == defaults["contest_structure"]

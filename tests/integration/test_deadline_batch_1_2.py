@@ -13,9 +13,11 @@ import pytest
 from sqlalchemy import func, select
 
 from database.models import (
-    ContestSettings,
+    Contest,
+    ContestParticipant,
     Match,
     MatchStatus,
+    ParticipantStatus,
     Prediction,
     Round,
     RoundStatus,
@@ -60,21 +62,22 @@ _RULES_JSON = {
 }
 
 
+CONTEST_ID = 1
+
+
 async def _create_synthetic_round(
     session,
     round_status: RoundStatus = RoundStatus.DRAFT,
     deadline: datetime | None = None,
     first_match_dt: datetime = _FUTURE_MATCH_DT,
     n_matches: int = 8,
-) -> tuple[ContestSettings, Round, list[Match], User]:
-    """Create ContestSettings + Round + N matches + one User in the given session.
-
-    Caller must wrap this in session.begin().
-    """
+) -> tuple[Contest, Round, list[Match], User]:
+    """Create Contest + Round + N matches + one User in the given session."""
     if deadline is None:
         deadline = first_match_dt - timedelta(days=3)
 
-    settings = ContestSettings(
+    contest = Contest(
+        name="Synthetic",
         is_locked=False,
         total_teams=16,
         matches_per_round=n_matches,
@@ -82,17 +85,23 @@ async def _create_synthetic_round(
         is_round_robin=True,
         rules_json=_RULES_JSON,
     )
-    session.add(settings)
+    session.add(contest)
     await session.flush()
 
-    round_ = Round(number=1, deadline=deadline, status=round_status, matches_count=n_matches)
+    round_ = Round(
+        contest_id=contest.id,
+        number=1,
+        deadline=deadline,
+        status=round_status,
+        matches_count=n_matches,
+    )
     session.add(round_)
     await session.flush()
 
     # Create 2*n_matches unique teams so each match has a distinct pair.
     teams: list[Team] = []
     for i in range(n_matches * 2):
-        t = Team(name=f"Synthetic Team {i:02d}", short_name=f"ST{i:02d}")
+        t = Team(contest_id=contest.id, name=f"Synthetic Team {i:02d}", short_name=f"ST{i:02d}")
         session.add(t)
         teams.append(t)
     await session.flush()
@@ -121,8 +130,16 @@ async def _create_synthetic_round(
     )
     session.add(user)
     await session.flush()
+    session.add(
+        ContestParticipant(
+            contest_id=contest.id,
+            user_id=user.id,
+            status=ParticipantStatus.ACCEPTED,
+        )
+    )
+    await session.flush()
 
-    return settings, round_, matches, user
+    return contest, round_, matches, user
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +273,7 @@ async def test_st_lock_draft_to_active_sets_is_locked(minimal_db):
             await transition_round(session, round_id, RoundStatus.ACTIVE)
 
     async with sf() as session:
-        cs = await session.scalar(select(ContestSettings).limit(1))
+        cs = await session.scalar(select(Contest).limit(1))
     assert cs is not None
     assert cs.is_locked is True, (
         f"Expected is_locked=True after DRAFT→ACTIVE, got {cs.is_locked}"
@@ -290,7 +307,7 @@ async def test_bt_partial_7_of_8_rejected(minimal_db):
     async with sf() as session:
         async with session.begin():
             with pytest.raises(ValueError):
-                await submit_batch(session, user_id, round_id, partial_items)
+                await submit_batch(session, CONTEST_ID, user_id, round_id, partial_items)
 
     async with sf() as session:
         count = await session.scalar(
@@ -328,7 +345,7 @@ async def test_bt_full_8_of_8_saved_atomically(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            saved = await submit_batch(session, user_id, round_id, items)
+            saved = await submit_batch(session, CONTEST_ID, user_id, round_id, items)
     assert saved == 8
 
     async with sf() as session:
@@ -362,11 +379,11 @@ async def test_bt_full_resubmit_replaces_batch(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            await submit_batch(session, user_id, round_id, items)
+            await submit_batch(session, CONTEST_ID, user_id, round_id, items)
 
     async with sf() as session:
         async with session.begin():
-            saved2 = await submit_batch(session, user_id, round_id, items)
+            saved2 = await submit_batch(session, CONTEST_ID, user_id, round_id, items)
     assert saved2 == 8
 
     async with sf() as session:
@@ -408,7 +425,7 @@ async def test_bt_zero_score_stored_as_real_value(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            saved = await submit_batch(session, user_id, round_id, items)
+            saved = await submit_batch(session, CONTEST_ID, user_id, round_id, items)
     assert saved == 8
 
     async with sf() as session:
@@ -456,7 +473,7 @@ async def test_bt_deadline_past_deadline_raises_permission_error(minimal_db):
     async with sf() as session:
         async with session.begin():
             with pytest.raises(PermissionError):
-                await submit_batch(session, user_id, round_id, items)
+                await submit_batch(session, CONTEST_ID, user_id, round_id, items)
 
 
 @pytest.mark.asyncio
@@ -481,4 +498,4 @@ async def test_bt_deadline_non_active_round_raises_permission_error(minimal_db):
     async with sf() as session:
         async with session.begin():
             with pytest.raises(PermissionError):
-                await submit_batch(session, user_id, round_id, items)
+                await submit_batch(session, CONTEST_ID, user_id, round_id, items)

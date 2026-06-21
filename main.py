@@ -14,12 +14,24 @@ for path in (str(PROJECT_ROOT), str(SRC_ROOT)):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.v1 import admin_contest, admin_misc, admin_results, admin_rounds, auth, predictions, rounds
+from api.v1 import (
+    admin_contest,
+    admin_misc,
+    admin_results,
+    admin_rounds,
+    auth,
+    contest_ops,
+    contest_participants,
+    contest_teams,
+    contests,
+    predictions,
+    rounds,
+)
 from config.settings import get_settings
 
 settings = get_settings()
 
-app = FastAPI(title="Football Predictions API", version="1.0.0")
+app = FastAPI(title="Football Predictions API", version="1.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +44,10 @@ app.add_middleware(
 API_PREFIX = "/api/v1"
 
 app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(contests.router, prefix=API_PREFIX)
+app.include_router(contest_teams.router, prefix=API_PREFIX)
+app.include_router(contest_participants.router, prefix=API_PREFIX)
+app.include_router(contest_ops.router, prefix=API_PREFIX)
 app.include_router(rounds.router, prefix=API_PREFIX)
 app.include_router(predictions.router, prefix=API_PREFIX)
 app.include_router(admin_misc.router, prefix=API_PREFIX)

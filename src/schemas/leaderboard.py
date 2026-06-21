@@ -22,6 +22,7 @@ class ScoreDetailOut(BaseModel):
 
 
 class LeaderboardOut(BaseModel):
+    contest_id: int | None = None
     round_id: int | None = None
     round_number: int | None = None
     leaderboard: list[ScoreDetailOut]

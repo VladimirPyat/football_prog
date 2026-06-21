@@ -1,4 +1,4 @@
-"""FastAPI dependency injection: DB session, auth, RBAC."""
+"""FastAPI dependency injection: DB session, auth, RBAC, contest context."""
 
 from __future__ import annotations
 
@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.settings import get_settings
 from core.security import decode_access_token
 from database.engine import create_engine, create_session_factory
-from database.models import User, UserRole
+from database.models import Contest, ContestLifecycleStatus, User, UserRole
+from services.round_auto_close_service import auto_close_expired_rounds
 
 _engine = create_engine()
 _session_factory = create_session_factory(_engine)
@@ -100,3 +101,35 @@ def cache_control_header() -> dict[str, str]:
             f"stale-while-revalidate={settings.cache_stale_while_revalidate_seconds}"
         ),
     }
+
+
+async def resolve_default_contest_id(session: AsyncSession) -> int:
+    """Resolve default contest for legacy 1.3 shims (RUNNING first, else lowest id)."""
+    running_id = await session.scalar(
+        select(Contest.id)
+        .where(Contest.status == ContestLifecycleStatus.RUNNING)
+        .order_by(Contest.id)
+        .limit(1)
+    )
+    if running_id is not None:
+        return running_id
+
+    first_id = await session.scalar(select(Contest.id).order_by(Contest.id).limit(1))
+    if first_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No contest found")
+    return first_id
+
+
+async def get_contest_context(session: DbSession, contest_id: int) -> Contest:
+    """Load contest and auto-close expired ACTIVE rounds before handler runs."""
+    contest = await session.get(Contest, contest_id)
+    if contest is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Contest {contest_id} not found")
+    closed_ids = await auto_close_expired_rounds(session, contest_id)
+    if closed_ids:
+        await session.commit()
+        await session.refresh(contest)
+    return contest
+
+
+ContestContext = Annotated[Contest, Depends(get_contest_context)]

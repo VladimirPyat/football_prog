@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime, timezone
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import ContestSettings, Match, MatchStatus, Round, RoundStatus
+from database.models import Contest, Match, MatchStatus, Round, RoundStatus
+from services.contest_lifecycle_service import assert_contest_running
 
 
 async def _get_match(session: AsyncSession, match_id: int) -> Match:
@@ -15,11 +17,14 @@ async def _get_match(session: AsyncSession, match_id: int) -> Match:
     return match
 
 
-async def _get_settings(session: AsyncSession) -> ContestSettings:
-    settings = await session.scalar(select(ContestSettings).limit(1))
-    if settings is None:
-        raise ValueError("Contest settings not found in database")
-    return settings
+async def _get_contest_for_round(session: AsyncSession, round_id: int) -> Contest:
+    round_ = await session.get(Round, round_id)
+    if round_ is None:
+        raise ValueError(f"Round {round_id} not found")
+    contest = await session.get(Contest, round_.contest_id)
+    if contest is None:
+        raise ValueError(f"Contest {round_.contest_id} not found")
+    return contest
 
 
 def _validate_score(value: int, max_value: int, label: str) -> None:
@@ -28,16 +33,33 @@ def _validate_score(value: int, max_value: int, label: str) -> None:
 
 
 async def set_result(
-    session: AsyncSession, match_id: int, score1: int, score2: int
+    session: AsyncSession,
+    contest_id: int,
+    match_id: int,
+    score1: int,
+    score2: int,
 ) -> Match:
-    """Record a final result for a match and mark it FINISHED.
-
-    Validates both scores against the contest max_score_value.
-    Caller is responsible for wrapping in a transaction.
-    """
+    """Record a final result for a match and mark it FINISHED."""
     match = await _get_match(session, match_id)
-    settings = await _get_settings(session)
-    max_score: int = settings.rules_json["constraints"]["score_validation_range"][1]
+    round_ = await session.get(Round, match.round_id)
+    if round_ is None:
+        raise ValueError(f"Round for match {match_id} not found")
+    if round_.contest_id != contest_id:
+        raise ValueError(f"Match {match_id} does not belong to contest {contest_id}")
+
+    now = datetime.now(timezone.utc)
+    deadline = round_.deadline
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    if now < deadline:
+        raise ValueError("Results allowed only after round deadline")
+    if RoundStatus(round_.status) != RoundStatus.CLOSED:
+        raise ValueError("Round must be CLOSED before entering results")
+
+    await assert_contest_running(session, contest_id)
+
+    contest = await _get_contest_for_round(session, match.round_id)
+    max_score: int = contest.rules_json["constraints"]["score_validation_range"][1]
 
     _validate_score(score1, max_score, "score1")
     _validate_score(score2, max_score, "score2")
@@ -49,15 +71,9 @@ async def set_result(
 
 
 async def change_status(
-    session: AsyncSession, match_id: int, new_status: MatchStatus
+    session: AsyncSession, contest_id: int, match_id: int, new_status: MatchStatus
 ) -> Match:
-    """Change a match status to VOID, POSTPONED, or CANCELED.
-
-    If the match's round is CALCULATED and the new status is VOID,
-    triggers a round recalculation atomically within the same session.
-    Caller is responsible for wrapping in a transaction.
-    """
-    # Import here to avoid circular import at module level.
+    """Change a match status to VOID, POSTPONED, or CANCELED."""
     from services.scoring_persistence import recalculate_round  # noqa: PLC0415
 
     allowed_targets = {MatchStatus.VOID, MatchStatus.POSTPONED, MatchStatus.CANCELED}
@@ -67,11 +83,13 @@ async def change_status(
         )
 
     match = await _get_match(session, match_id)
+    round_ = await session.get(Round, match.round_id)
+    if round_ is None or round_.contest_id != contest_id:
+        raise ValueError(f"Match {match_id} does not belong to contest {contest_id}")
+
     match.status = new_status
 
-    if new_status == MatchStatus.VOID:
-        round_ = await session.get(Round, match.round_id)
-        if round_ is not None and round_.status == RoundStatus.CALCULATED:
-            await recalculate_round(session, match.round_id)
+    if new_status == MatchStatus.VOID and round_.status == RoundStatus.CALCULATED:
+        await recalculate_round(session, round_id=round_.id, contest_id=contest_id)
 
     return match

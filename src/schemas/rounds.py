@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 class RoundOut(BaseModel):
     id: int
+    contest_id: int
     number: int
     deadline: datetime
     status: str

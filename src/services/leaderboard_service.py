@@ -8,7 +8,7 @@ import json
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import Match, Round, RoundStatus, Score, Team, User
+from database.models import ContestParticipant, Match, Round, RoundStatus, Score, Team, User
 from scoring.standings import build_standings
 from scoring.types import UserRoundScore
 
@@ -18,9 +18,13 @@ async def _user_name_map(session: AsyncSession) -> dict[int, str]:
     return {u.id: f"{u.first_name} {u.last_name}" for u in users}
 
 
-async def _manual_overrides(session: AsyncSession) -> dict[int, int]:
-    users = (await session.scalars(select(User))).all()
-    return {u.id: u.exceptional_tiebreak_points for u in users}
+async def _manual_overrides(session: AsyncSession, contest_id: int) -> dict[int, int]:
+    participants = (
+        await session.scalars(
+            select(ContestParticipant).where(ContestParticipant.contest_id == contest_id)
+        )
+    ).all()
+    return {p.user_id: p.exceptional_tiebreak_points for p in participants}
 
 
 def _score_to_user_round(score: Score) -> UserRoundScore:
@@ -43,10 +47,14 @@ def _score_to_user_round(score: Score) -> UserRoundScore:
     )
 
 
-async def get_round_leaderboard(session: AsyncSession, round_id: int) -> dict:
+async def get_round_leaderboard(
+    session: AsyncSession, contest_id: int, round_id: int
+) -> dict:
     round_ = await session.get(Round, round_id)
     if round_ is None:
         raise ValueError(f"Round {round_id} not found")
+    if round_.contest_id != contest_id:
+        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
 
     if round_.status not in {RoundStatus.CALCULATED, RoundStatus.PUBLISHED}:
         raise ValueError(f"Round {round_id} results not available (status={round_.status})")
@@ -55,7 +63,7 @@ async def get_round_leaderboard(session: AsyncSession, round_id: int) -> dict:
         await session.scalars(select(Score).where(Score.round_id == round_id))
     ).all()
     names = await _user_name_map(session)
-    overrides = await _manual_overrides(session)
+    overrides = await _manual_overrides(session, contest_id)
 
     per_user: dict[int, list[UserRoundScore]] = {}
     for s in scores:
@@ -86,22 +94,26 @@ async def get_round_leaderboard(session: AsyncSession, round_id: int) -> dict:
         )
 
     return {
+        "contest_id": contest_id,
         "round_id": round_id,
         "round_number": round_.number,
         "leaderboard": rows,
     }
 
 
-async def get_global_leaderboard(session: AsyncSession) -> dict:
+async def get_global_leaderboard(session: AsyncSession, contest_id: int) -> dict:
     scores = (
         await session.scalars(
-            select(Score).join(Round).where(
-                Round.status.in_([RoundStatus.CALCULATED, RoundStatus.PUBLISHED])
+            select(Score)
+            .join(Round)
+            .where(
+                Round.contest_id == contest_id,
+                Round.status.in_([RoundStatus.CALCULATED, RoundStatus.PUBLISHED]),
             )
         )
     ).all()
     names = await _user_name_map(session)
-    overrides = await _manual_overrides(session)
+    overrides = await _manual_overrides(session, contest_id)
 
     per_user: dict[int, list[UserRoundScore]] = {}
     for s in scores:
@@ -137,13 +149,22 @@ async def get_global_leaderboard(session: AsyncSession) -> dict:
             }
         )
 
-    return {"round_id": None, "round_number": None, "leaderboard": rows}
+    return {
+        "contest_id": contest_id,
+        "round_id": None,
+        "round_number": None,
+        "leaderboard": rows,
+    }
 
 
-async def get_round_results(session: AsyncSession, round_id: int) -> dict:
+async def get_round_results(
+    session: AsyncSession, contest_id: int, round_id: int
+) -> dict:
     round_ = await session.get(Round, round_id)
     if round_ is None:
         raise ValueError(f"Round {round_id} not found")
+    if round_.contest_id != contest_id:
+        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
 
     if round_.status not in {RoundStatus.CALCULATED, RoundStatus.PUBLISHED}:
         raise ValueError(f"Round {round_id} results not available (status={round_.status})")
@@ -197,17 +218,28 @@ async def get_round_results(session: AsyncSession, round_id: int) -> dict:
     return {"round_id": round_id, "matches": match_out, "results": results}
 
 
-async def compute_etag(session: AsyncSession, *, round_id: int | None = None) -> str:
+async def compute_etag(
+    session: AsyncSession, *, contest_id: int, round_id: int | None = None
+) -> str:
     """Content hash for cache ETag based on score/version state."""
     if round_id is not None:
         max_score_id = await session.scalar(
             select(func.max(Score.id)).where(Score.round_id == round_id)
         )
         round_ = await session.get(Round, round_id)
-        payload = {"round_id": round_id, "status": round_.status if round_ else None, "max_score_id": max_score_id}
+        payload = {
+            "contest_id": contest_id,
+            "round_id": round_id,
+            "status": round_.status if round_ else None,
+            "max_score_id": max_score_id,
+        }
     else:
-        max_score_id = await session.scalar(select(func.max(Score.id)))
-        payload = {"global": True, "max_score_id": max_score_id}
+        max_score_id = await session.scalar(
+            select(func.max(Score.id))
+            .join(Round)
+            .where(Round.contest_id == contest_id)
+        )
+        payload = {"contest_id": contest_id, "global": True, "max_score_id": max_score_id}
 
     raw = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]

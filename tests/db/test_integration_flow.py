@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from database.base import Base
 from database.models import (
-    ContestSettings,
+    Contest,
     Match,
     MatchStatus,
     Prediction,
@@ -53,10 +53,11 @@ def _build_rules_json(data: dict) -> dict:
     }
 
 
-async def _seed_contest_settings(session: AsyncSession) -> ContestSettings:
+async def _seed_contest(session: AsyncSession) -> Contest:
     data = _load_contest_defaults()
     structure = data["contest_structure"]
-    settings = ContestSettings(
+    contest = Contest(
+        name="Default",
         is_locked=False,
         total_teams=structure["total_teams"],
         matches_per_round=structure["matches_per_round"],
@@ -64,14 +65,14 @@ async def _seed_contest_settings(session: AsyncSession) -> ContestSettings:
         is_round_robin=structure["is_round_robin"],
         rules_json=_build_rules_json(data),
     )
-    session.add(settings)
+    session.add(contest)
     await session.flush()
-    return settings
+    return contest
 
 
-async def _create_teams(session: AsyncSession, count: int) -> list[Team]:
+async def _create_teams(session: AsyncSession, contest_id: int, count: int) -> list[Team]:
     teams = [
-        Team(name=f"Team_{index:02d}", short_name=f"T{index:02d}")
+        Team(contest_id=contest_id, name=f"Team_{index:02d}", short_name=f"T{index:02d}")
         for index in range(1, count + 1)
     ]
     session.add_all(teams)
@@ -105,9 +106,10 @@ async def test_if01_full_round_lifecycle(session_factory):
 
     async with session_factory() as session:
         async with session.begin():
-            await _seed_contest_settings(session)
+            contest = await _seed_contest(session)
 
             round_ = Round(
+                contest_id=contest.id,
                 number=1,
                 deadline=base_time - timedelta(days=1),
                 status=RoundStatus.ACTIVE,
@@ -116,7 +118,7 @@ async def test_if01_full_round_lifecycle(session_factory):
             session.add(round_)
             await session.flush()
 
-            teams = await _create_teams(session, 16)
+            teams = await _create_teams(session, contest.id, 16)
             matches: list[Match] = []
             for index in range(8):
                 match = Match(
@@ -190,9 +192,10 @@ async def test_if02_batch_prediction_uniqueness(session_factory):
 
     async with session_factory() as session:
         async with session.begin():
-            await _seed_contest_settings(session)
+            contest = await _seed_contest(session)
 
             round_ = Round(
+                contest_id=contest.id,
                 number=1,
                 deadline=base_time - timedelta(days=1),
                 status=RoundStatus.ACTIVE,
@@ -201,7 +204,7 @@ async def test_if02_batch_prediction_uniqueness(session_factory):
             session.add(round_)
             await session.flush()
 
-            teams = await _create_teams(session, 16)
+            teams = await _create_teams(session, contest.id, 16)
             matches = [
                 Match(
                     round_id=round_.id,
@@ -256,7 +259,8 @@ async def test_if03_dbeaver_visual_verification_data(session_factory, capsys):
 
     async with session_factory() as session:
         async with session.begin():
-            contest = ContestSettings(
+            contest = Contest(
+                name=dbeaver_name,
                 is_locked=False,
                 total_teams=2,
                 matches_per_round=1,
@@ -270,12 +274,13 @@ async def test_if03_dbeaver_visual_verification_data(session_factory, capsys):
             session.add(contest)
             await session.flush()
 
-            home = Team(name="Test_Home", short_name="TH")
-            away = Team(name="Test_Away", short_name="TA")
+            home = Team(contest_id=contest.id, name="Test_Home", short_name="TH")
+            away = Team(contest_id=contest.id, name="Test_Away", short_name="TA")
             session.add_all([home, away])
             await session.flush()
 
             round_ = Round(
+                contest_id=contest.id,
                 number=99,
                 deadline=base_time - timedelta(days=1),
                 status=RoundStatus.ACTIVE,

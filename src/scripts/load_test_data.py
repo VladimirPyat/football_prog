@@ -37,9 +37,11 @@ from database.base import Base
 from database.engine import create_engine, create_session_factory
 from database.models import (
     Contact,
-    ContestSettings,
+    Contest,
+    ContestParticipant,
     Match,
     MatchStatus,
+    ParticipantStatus,
     Prediction,
     Round,
     RoundStatus,
@@ -84,7 +86,8 @@ async def _reset_tables(session: AsyncSession) -> None:
         "contacts",
         "users",
         "teams",
-        "contest_settings",
+        "contest_participants",
+        "contests",
     ):
         await session.execute(text(f"DELETE FROM {table}"))  # noqa: S608
     logger.info("All loaded tables cleared")
@@ -104,10 +107,12 @@ def _build_rules_json(data: dict) -> dict:
     }
 
 
-async def _seed_contest_settings(session: AsyncSession, defaults_path: Path) -> ContestSettings:
+async def _seed_contest(session: AsyncSession, defaults_path: Path) -> Contest:
     data = _load_contest_defaults(defaults_path)
     structure = data["contest_structure"]
-    settings = ContestSettings(
+    contest = Contest(
+        name="Default",
+        slug=None,
         is_locked=False,
         total_teams=structure["total_teams"],
         matches_per_round=structure["matches_per_round"],
@@ -115,10 +120,10 @@ async def _seed_contest_settings(session: AsyncSession, defaults_path: Path) -> 
         is_round_robin=structure["is_round_robin"],
         rules_json=_build_rules_json(data),
     )
-    session.add(settings)
+    session.add(contest)
     await session.flush()
-    logger.info("Seeded contest settings (id=%s)", settings.id)
-    return settings
+    logger.info("Seeded contest (id=%s)", contest.id)
+    return contest
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +153,7 @@ def _parse_dt(value: str, fmt: str, tz_name: str) -> datetime:
 
 async def _load_teams(
     session: AsyncSession,
+    contest_id: int,
     data_dir: Path,
     file_cfg: dict,
 ) -> dict[str, int]:
@@ -169,7 +175,7 @@ async def _load_teams(
             raise ValueError(f"Duplicate team short_name in CSV: {short!r}")
         seen_short.add(short)
 
-        team = Team(name=full, short_name=short, logo_url=logo)
+        team = Team(contest_id=contest_id, name=full, short_name=short, logo_url=logo)
         session.add(team)
         await session.flush()
         short_to_id[short] = team.id
@@ -234,6 +240,7 @@ async def _load_users(
 
 async def _load_matches_and_rounds(
     session: AsyncSession,
+    contest_id: int,
     data_dir: Path,
     file_cfg: dict,
     short_to_id: dict[str, int],
@@ -275,6 +282,7 @@ async def _load_matches_and_rounds(
             round_status = RoundStatus.ACTIVE
 
         round_ = Round(
+            contest_id=contest_id,
             number=round_number,
             deadline=deadline,
             status=round_status,
@@ -381,6 +389,24 @@ async def _load_predictions(
     return count
 
 
+async def _load_participants(
+    session: AsyncSession, contest_id: int, login_to_id: dict[str, int]
+) -> int:
+    """Create ACCEPTED contest_participants for all loaded users."""
+    count = 0
+    for user_id in login_to_id.values():
+        session.add(
+            ContestParticipant(
+                contest_id=contest_id,
+                user_id=user_id,
+                status=ParticipantStatus.ACCEPTED,
+            )
+        )
+        count += 1
+    await session.flush()
+    return count
+
+
 # ---------------------------------------------------------------------------
 # Main loader entry point
 # ---------------------------------------------------------------------------
@@ -429,9 +455,10 @@ async def run_load(
             if reset:
                 await _reset_tables(session)
 
-            settings = await _seed_contest_settings(session, defaults_path)
+            contest = await _seed_contest(session, defaults_path)
+            contest_id = contest.id
 
-            short_to_id = await _load_teams(session, data_dir, files["teams"])
+            short_to_id = await _load_teams(session, contest_id, data_dir, files["teams"])
             login_to_id = await _load_users(
                 session,
                 data_dir,
@@ -442,6 +469,7 @@ async def run_load(
 
             match_key_to_id = await _load_matches_and_rounds(
                 session,
+                contest_id,
                 data_dir,
                 files["matches"],
                 short_to_id=short_to_id,
@@ -467,6 +495,8 @@ async def run_load(
                 match_key_to_id=match_key_to_id,
                 round_number_to_id=round_number_to_id,
             )
+
+            await _load_participants(session, contest_id, login_to_id)
 
     await engine.dispose()
 

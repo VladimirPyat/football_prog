@@ -255,3 +255,8 @@ manual scripts, integration regression green, дефекты с [TEST-ID].
 3. Run manual scripts for sign-off.
 4. Write `manuals/MANUAL_SCORING_VERIFICATION.md`; update `manuals/README.md` index.
 5. Stage 1 complete when 1.4 `TEST_PASS` + human manual delivered.
+
+## 13. Supplemental patch
+
+Gap audit vs user scenarios → `instructions/tester_1.4.1.md` (safe delete contest-scoped,
+operational gaps, CANARY pytest). Run together with this document.

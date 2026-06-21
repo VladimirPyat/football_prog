@@ -42,6 +42,9 @@ def _load_leaderboard() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+DEFAULT_CONTEST_ID = 1
+
+
 async def _calc_rounds_1_9(sf) -> dict[int, int]:
     """Calculate scoring for rounds 1–9.  Returns {round_number: round_id}."""
     async with sf() as session:
@@ -53,7 +56,7 @@ async def _calc_rounds_1_9(sf) -> dict[int, int]:
             ).all()
             round_num_to_id = {r.number: r.id for r in rounds}
             for n in range(1, 10):
-                await calculate_round(session, round_num_to_id[n])
+                await calculate_round(session, round_num_to_id[n], DEFAULT_CONTEST_ID)
     return round_num_to_id
 
 
@@ -326,7 +329,7 @@ async def test_calc_atomic_failure_leaves_no_score_rows(loaded_db):
         with pytest.raises(RuntimeError, match="Simulated failure"):
             async with sf() as session:
                 async with session.begin():
-                    await calculate_round(session, round_1_id)
+                    await calculate_round(session, round_1_id, DEFAULT_CONTEST_ID)
 
     async with sf() as session:
         count = await session.scalar(
@@ -354,7 +357,7 @@ async def test_calc_void_triggers_recalculate_and_stays_consistent(loaded_db):
         async with session.begin():
             round_1 = await session.scalar(select(Round).where(Round.number == 1))
             round_1_id = round_1.id
-            await calculate_round(session, round_1_id)
+            await calculate_round(session, round_1_id, DEFAULT_CONTEST_ID)
 
     # Step 2: record scores before void.
     async with sf() as session:
@@ -379,7 +382,7 @@ async def test_calc_void_triggers_recalculate_and_stays_consistent(loaded_db):
     # Step 3: VOID the match — should trigger recalculate_round automatically.
     async with sf() as session:
         async with session.begin():
-            await change_status(session, match_id, MatchStatus.VOID)
+            await change_status(session, DEFAULT_CONTEST_ID, match_id, MatchStatus.VOID)
 
     # Step 4: verify post-void DB state.
     async with sf() as session:
