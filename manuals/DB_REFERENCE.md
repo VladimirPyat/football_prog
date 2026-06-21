@@ -242,6 +242,8 @@ uv run alembic downgrade base    # roll back all
 
 Migration `b3c4d5e6f7a8` backfills `status = 'RUNNING'` where `is_locked = TRUE`. Uses batch operations for SQLite compatibility.
 
+> **SQLite operational note [UPDATED]:** Columns declared `DateTime(timezone=True)` may return naive datetimes when read via aiosqlite. API handlers normalize deadlines for prediction visibility; grace-period delete logic should normalize `paused_at` to UTC-aware before comparison.
+
 Alembic uses async engine (`alembic init -t async`). Database URL resolved from `config/settings.py` — see [CONFIG.md](CONFIG.md).
 
 ## Entity Relationships

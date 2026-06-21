@@ -210,6 +210,7 @@ Managed with `uv`. Key packages from `pyproject.toml`:
 | `passlib[bcrypt]` | Listed dependency; hashing uses `bcrypt` directly [NEW] |
 | `python-multipart` | Form/file upload support [NEW] |
 | `pytest`, `pytest-asyncio` | Tests (dev group) |
+| `httpx` | ASGI client for API integration tests (dev group) [NEW] |
 
 Install:
 
@@ -221,4 +222,10 @@ Run API server:
 
 ```bash
 uv run uvicorn main:app --reload
+```
+
+Run Stage 1.3 HTTP tests:
+
+```bash
+uv run pytest tests/api/ -v
 ```

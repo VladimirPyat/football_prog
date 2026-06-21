@@ -21,4 +21,4 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | **1.2.1** — Lifecycle migration | `DB_REFERENCE.md` |
 | **1.3** — HTTP API | `API_GUIDE.md`, `CONFIG.md`, `SCORING_LOGIC.md` (tie-break source) |
 
-Last synced from staged changes: Stage 1.2.1 migration + Stage 1.3 API integration.
+Last synced from commit: Stage 1.2.1 lifecycle migration + Stage 1.3 HTTP API (TEST_PASS — 31 API tests).

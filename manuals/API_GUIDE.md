@@ -30,6 +30,7 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 | Pydantic request/response schemas | ✅ Stage 1.3 | `src/schemas/` |
 | Role-based access control | ✅ Stage 1.3 | `src/api/deps.py` — `RoleChecker` |
 | OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` |
+| HTTP integration tests | ✅ Stage 1.3 | `tests/api/` — 31 passed (loader DB + httpx ASGI) [NEW] |
 
 **Before → After:** Stage 1.2 exposed services only as Python callables. Stage 1.3 wires all contracted HTTP endpoints with thin routers (no business logic in routes).
 
@@ -54,6 +55,7 @@ Client → FastAPI (Uvicorn) → CORS → RoleChecker / auth deps → Pydantic v
 | Entry point | `main.py` | App factory, CORS, router mounting under `/api/v1` |
 | Dependencies | `src/api/deps.py` | DB session, JWT user resolution, RBAC, cache headers |
 | Routers | `src/api/v1/*.py` | HTTP mapping only — delegates to services |
+| Public reads | `src/api/v1/admin_misc.py` | Global/round leaderboard, results, admin recalculate |
 | Schemas | `src/schemas/*.py` | Pydantic request/response models |
 | Security | `src/core/security.py` | bcrypt password hash/verify, JWT encode/decode |
 | Services | `src/services/` | Business logic (unchanged from 1.2 where possible) |
@@ -68,7 +70,7 @@ JWT bearer tokens. Payload: `{sub: user_id, role, exp}`.
 | `POST` | `/api/v1/auth/change-password` | Bearer | Change password; clears `is_temp_password` |
 | `GET` | `/api/v1/auth/me` | Bearer | Return current user profile |
 
-**Temp password flow:** While `is_temp_password=true`, only `/auth/change-password` and `/auth/me` are allowed; all other authenticated endpoints return `403`.
+**Temp password flow:** While `is_temp_password=true`, only `/auth/change-password` and `/auth/me` are allowed without restriction. Mutating endpoints (e.g. `POST /rounds/{id}/predictions`) return `403` via `require_not_temp_password`.
 
 Bad credentials → `401`. Invalid/expired token → `401`.
 
@@ -105,7 +107,9 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 | Settings PATCH when locked | `403 ContestLocked` — structural fields and `rules_json` frozen |
 | Settings GET when locked | Always allowed (SUPERVISOR+) — read-only snapshot |
 | Exceptional tie-break update | Allowed by ADMIN even when locked — not part of contest rules |
-| Safe delete | ADMIN only; requires `PAUSED` + grace period elapsed (or instant flag in test env) |
+| Safe delete | ADMIN only; requires `PAUSED` + grace period elapsed (or `CONTEST_ALLOW_INSTANT_DELETE=true`) |
+
+**Safe delete wipe** (`contest_teardown.wipe_contest_data`): deletes `predictions`, `scores`, `matches`, `rounds`, `contacts`, `teams`, and `contest_settings`; keeps ADMIN users by default. Re-seeds fresh `contest_settings` row in `DRAFT` from `contest_defaults.json`.
 
 **Domain error mapping:**
 
@@ -114,7 +118,12 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 | `ContestLockedError` | 403 |
 | `GracePeriodError` | 400 |
 | `IllegalTransitionError` | 409 |
-| `ContestNotPausedError` | 400 |
+| `ContestNotPausedError` | 403 |
+| `ContestDeleteDisabledError` | 403 |
+
+**DELETE `/admin/contest` body:** `{ "confirm": "DELETE" }` (Pydantic `Literal`). Wrong confirm value → **422** (schema validation). Valid confirm but grace not elapsed → **400** (`GracePeriodError`).
+
+> **SQLite note:** `paused_at` may round-trip as naive datetime. Grace-period comparison in `assert_deletable` expects timezone-aware values; normalize to UTC in production code or use PostgreSQL for production.
 
 ## Service Layer [UPDATED]
 
