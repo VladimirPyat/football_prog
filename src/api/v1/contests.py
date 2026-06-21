@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
-from api.deps import DbSession, RoleChecker
+from api.deps import DbSession, RoleChecker, cache_control_header
 from database.models import UserRole
 from schemas.contest import (
     ContestDeleteConfirmRequest,
@@ -13,6 +13,7 @@ from schemas.contest import (
     ContestOut,
     ContestPatchRequest,
     CreateContestRequest,
+    PublicContestOut,
 )
 from services.contest_lifecycle_service import (
     assert_deletable,
@@ -25,6 +26,7 @@ from services.contest_lifecycle_service import (
     seconds_until_deletable,
 )
 from services.contest_setup_service import create_contest, update_contest
+from services.contest_discovery_service import list_public_contests
 
 router = APIRouter(prefix="/contests", tags=["contests"])
 
@@ -50,6 +52,14 @@ async def list_contests(session: DbSession) -> list[ContestOut]:
 
     contests = (await session.scalars(select(Contest).order_by(Contest.id))).all()
     return [ContestOut.model_validate(c) for c in contests]
+
+
+@router.get("/public", response_model=list[PublicContestOut])
+async def list_public(session: DbSession, response: Response) -> list[PublicContestOut]:
+    """Публичный список активных конкурсов для неавторизованных посетителей."""
+    for k, v in cache_control_header().items():
+        response.headers[k] = v
+    return await list_public_contests(session)
 
 
 @router.post("", response_model=ContestOut, dependencies=[_supervisor])

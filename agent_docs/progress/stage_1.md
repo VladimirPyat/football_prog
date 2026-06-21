@@ -176,3 +176,22 @@
 - Verified: uv run pytest tests/ --ignore=tests/manual → 276 passed, 2 skipped
 - Notes: SEED_ADMIN_PASSWORD plaintext preferred; supervisor CLI block documented for retirement when admin UI ships
 - Next: agent_docs/instructions/tester_1.6.md
+
+## 2026-06-22 — Coder (1.8 discovery & contacts)
+- STATUS: READY_FOR_TEST
+- Blockers closed: B1, B2, B3
+- Files: src/api/v1/me.py, src/services/contest_discovery_service.py, src/services/contact_service.py, src/api/v1/auth.py (contacts), src/api/v1/contests.py (/public), src/schemas/{contest,auth}.py, main.py, agent_docs/contracts/api_v1.yaml, manuals/API_GUIDE.md, tests/api/{test_me_contests,test_contests_public,test_contacts}.py
+- Contract: api_v1.yaml v1.2.0-rc
+- Verified: pytest tests/api/test_me_contests.py tests/api/test_contests_public.py tests/api/test_contacts.py → 9 passed; pytest tests/ --ignore=tests/manual → 284 passed, 2 skipped, 1 failed (pre-existing test_migration_1_2_1.py downgrade)
+- Next: agent_docs/instructions/tester_1.8.md
+
+## 2026-06-22 — Policy: SUPERVISOR pre-deadline prediction privacy
+- Removed SUPERVISOR privileged visibility in `visible_predictions` (ADMIN only); aligned manuals/contracts with `docs/03` §4 — no supervisor predictions UI on frontend.
+
+## 2026-06-22 — Tester (1.8)
+- STATUS: TEST_PASS
+- Blockers verified: B1, B2, B3
+- Report: agent_docs/reports/test_1.8.md
+- Contract: api_v1.yaml v1.2.0-rc
+- Verified: pytest 1.8 tests → 9 passed; regression → 286 passed, 2 skipped
+- Next: Coder 1.7 or 1.9 per user schedule; frontend 2.1 can start API integration

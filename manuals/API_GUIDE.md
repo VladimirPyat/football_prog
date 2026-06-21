@@ -10,6 +10,8 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 - [Authentication](#authentication)
 - [Role-Based Access Control](#role-based-access-control)
 - [Multi-Contest API](#multi-contest-api)
+- [Contest Discovery & User Contacts](#contest-discovery--user-contacts)
+- [Admin User Management](#admin-user-management)
 - [Contest Lifecycle & Immutability](#contest-lifecycle--immutability)
 - [Service Layer](#service-layer)
 - [Endpoints Reference](#endpoints-reference)
@@ -37,10 +39,13 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 | Structured logging | ✅ Stage 1.5 | `src/core/logging_config.py`, `LOG_LEVEL` |
 | Admin alert stub | ✅ Stage 1.5 | `src/services/notification_service.py` |
 | Shared HTTP handlers (DRY) | ✅ Stage 1.5 | `src/api/handlers/` |
-| OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` |
-| HTTP integration tests | ✅ Stage 1.5 | `tests/api/` — loader DB + httpx ASGI |
+| Organizer creation API | ✅ Stage 1.6 | `src/api/v1/admin_users.py`, `src/services/user_admin_service.py` |
+| User bootstrap CLI | ✅ Stage 1.6 | `src/scripts/bootstrap_users.py`, `.env.example` |
+| Contest discovery & user contacts | ✅ Stage 1.8 | `src/api/v1/me.py`, `contest_discovery_service`, `contact_service` |
+| OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` (v1.2.0-rc) |
+| HTTP integration tests | ✅ Stage 1.6 | `tests/api/` — loader DB + httpx ASGI |
 
-**Before → After (Stage 1.5):** Routers no longer map `ValueError`/`PermissionError` locally. Services raise `AppError` subclasses; `error_handlers` returns JSON `{detail, code}` with Russian `detail` for domain errors.
+**Before → After (Stage 1.6):** ADMIN can create global `SUPERVISOR` accounts via `POST /admin/users/supervisor`. Initial ADMIN/SUPERVISOR on a fresh DB via `bootstrap_users.py` + `SEED_*` env vars (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
 
 ## Running the Application [NEW]
 
@@ -69,7 +74,8 @@ Client → FastAPI (Uvicorn) → CORS → logging
 | Logging | `src/core/logging_config.py` | Root logger format; level from `LOG_LEVEL` |
 | Dependencies | `src/api/deps.py` | DB session, JWT user resolution, RBAC, contest context, auto-close hook |
 | Routers | `src/api/v1/*.py` | HTTP mapping only — delegates to services or `src/api/handlers/` |
-| Shared handlers | `src/api/handlers/` | DRY builders for predictions view and leaderboard/results [NEW] |
+| Admin users | `src/api/v1/admin_users.py` | `POST /admin/users/supervisor` (ADMIN only) [NEW] |
+| Shared handlers | `src/api/handlers/` | DRY builders for predictions view and leaderboard/results |
 | Schemas | `src/schemas/*.py` | Pydantic request/response models |
 | Security | `src/core/security.py` | bcrypt password hash/verify, JWT encode/decode |
 | Services | `src/services/` | Business logic; raise `AppError`, never `HTTPException` |
@@ -84,8 +90,10 @@ JWT bearer tokens. Payload: `{sub: user_id, role, exp}`.
 | `POST` | `/api/v1/auth/login` | None | Verify credentials → `{access_token, token_type, is_temp_password}` |
 | `POST` | `/api/v1/auth/change-password` | Bearer | Change password; clears `is_temp_password` |
 | `GET` | `/api/v1/auth/me` | Bearer | Return current user profile |
+| `GET` | `/api/v1/auth/me/contacts` | Bearer | Profile contacts (email, VK, TG, notify toggle) |
+| `PATCH` | `/api/v1/auth/me/contacts` | Bearer | Partial update / upsert contacts |
 
-**Temp password flow:** While `is_temp_password=true`, only `/auth/change-password` and `/auth/me` are allowed without restriction. Mutating endpoints (e.g. `POST /rounds/{id}/predictions`) return `403` via `require_not_temp_password`.
+**Temp password flow:** While `is_temp_password=true`, `/auth/change-password`, `/auth/me`, and `/auth/me/contacts` (GET/PATCH) are allowed without restriction. Other mutating endpoints (e.g. `POST /rounds/{id}/predictions`) return `403` via `require_not_temp_password`.
 
 Bad credentials → `401` (`Неверный логин или пароль`). Invalid/expired token → `401`. Auth/RBAC responses use Russian `detail` only (no `code` field).
 
@@ -97,12 +105,40 @@ Configuration: [CONFIG.md — JWT settings](CONFIG.md#environment-variables).
 
 | Role | Capabilities |
 |------|-------------|
-| **Visitor** (no token) | Public GET: rounds list, leaderboard, results (CALCULATED/PUBLISHED rounds only) |
-| **USER** | Own predictions read/write |
-| **SUPERVISOR** | Round/match/result/VOID, calculate, publish, read contest settings |
-| **ADMIN** | All SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete, **create organizers** |
+| **Visitor** (no token) | Public GET: rounds list, leaderboard, results (CALCULATED/PUBLISHED rounds only); **`GET /contests/public`** (RUNNING contests) |
+| **USER** | Own predictions read/write; **`GET /me/contests`** (enrolled contests only) |
+| **SUPERVISOR** | Round/match/result/VOID, calculate, publish, read contest settings; **same pre-deadline prediction privacy as USER** (own scores only) |
+| **ADMIN** | All SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete, **create organizers** (`POST /admin/users/supervisor`); **only role that may see all predictions before deadline** (support/troubleshooting) |
 
 **Contest status guards:** When `contests.status ∈ {PAUSED, FINISHED}` for the target contest, all mutating round/match/prediction operations return `403`. Public GETs remain allowed.
+
+### Organizer vs participant (same person) [NEW]
+
+The system separates two concepts:
+
+| Concept | Storage | Meaning |
+|---------|---------|---------|
+| **Global role** | `users.role` | One value per login: `USER`, `SUPERVISOR`, or `ADMIN` |
+| **Contest membership** | `contest_participants` | Whether this login plays in a given contest (`PENDING` / `ACCEPTED`) |
+
+An organizer (`SUPERVISOR`) **may** also want to submit predictions and appear on the leaderboard. There is **no** rule forbidding that in business terms, but the product model assumes **separate logins** for the two hats:
+
+| Need | Recommended approach |
+|------|----------------------|
+| Run the contest (teams, rounds, results, calculate) | `SUPERVISOR` account — `bootstrap_users.py`, `POST /admin/users/supervisor`, or admin UI |
+| Play as a participant | **`USER` account** — invite via `POST /contests/{id}/participants` like any other player |
+
+**Why not one login for both?**
+
+1. **Single global role** — `users.role` cannot be `USER` and `SUPERVISOR` at once. Invite flow always creates a new `USER`; bootstrap and organizer API create `SUPERVISOR` without enrolling them in `contest_participants`.
+2. **Prediction privacy** — before a round deadline, `USER` and `SUPERVISOR` see only their own prediction scores; others appear as submitted-only. Only `ADMIN` bypasses this filter (`prediction_service.visible_predictions`). There is no supervisor “god mode” for pre-deadline picks.
+3. **UI/API routing** — organizers pick contests via `GET /contests`; players via `GET /me/contests`. Two accounts keep flows clear.
+
+**What organizers can do without playing:** manage setup and scoring, publish results, and (ADMIN only) set `exceptional_tiebreak_points` when standings are tied — they do **not** need a participant row for that.
+
+**Operational pattern:** same human, two logins (e.g. `ivan_org` / `ivan_player`). Invite the player email through the normal participant flow; use the organizer login only for back-office work.
+
+> **Not supported:** assigning per-contest “organizer role” or dual-role on one account. Manual `contest_participants` insert for a `SUPERVISOR` user is possible at DB level but discouraged (confusing UX; use a separate `USER` invite for playing).
 
 ## Multi-Contest API [NEW]
 
@@ -143,15 +179,73 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 
 `ContestContext` dependency validates `contest_id` exists (404 if not).
 
-## Admin User Management [NEW]
+## Contest Discovery & User Contacts [NEW]
+
+Stage 1.8 closes frontend blockers B1–B3 for Stage 2.1 (Visitor home + User contest picker + profile contacts).
+
+### User contest list (B1)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/me/contests` | Bearer (any role) | Contests where the user has a `contest_participants` row |
+
+Response items include `participant_status` (`PENDING` \| `ACCEPTED`), global `role` (from `users.role`), contest `status`, and optional `slug`. Ordered by contest name. Organizers who are not enrolled use `GET /contests` (SUPERVISOR+), not this endpoint.
+
+### Public discovery (B2)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/contests/public` | None | RUNNING contests only (id, name, status, slug) |
+
+Route registered **before** `/contests/{contest_id}` to avoid path capture. Returns `Cache-Control` (same pattern as other public GETs). PAUSED and FINISHED contests are excluded by design.
+
+### User contacts (B3)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/auth/me/contacts` | Bearer | Read contacts; defaults when no row exists |
+| `PATCH` | `/auth/me/contacts` | Bearer | Partial update (upsert); empty string clears email |
+
+Allowed while `is_temp_password=true`. Invite flow (`POST /contests/{id}/participants`) pre-populates `email` on the new user's `contacts` row.
+
+## Admin User Management [UPDATED]
 
 | Method | Path | Role | Description |
 |--------|------|------|-------------|
-| `POST` | `/admin/users/supervisor` | ADMIN | Create contest organizer (`SUPERVISOR` role) |
+| `POST` | `/admin/users/supervisor` | ADMIN | Create global contest organizer (`users.role = SUPERVISOR`) |
 
-Request body: `login`, `password`, `first_name`, `last_name`, optional `is_temp_password` (default `false`).
+**Request** (`CreateSupervisorRequest`):
 
-CLI/bootstrap alternative before admin UI: [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md).
+```json
+{
+  "login": "org1",
+  "password": "initial-password",
+  "first_name": "Ivan",
+  "last_name": "Organizer",
+  "is_temp_password": false
+}
+```
+
+**Response:** `{ "user": { "id", "login", "role": "SUPERVISOR", "first_name", "last_name", "is_temp_password" } }`
+
+| Condition | HTTP | `code` |
+|-----------|------|--------|
+| Success | 200 | — |
+| Duplicate login | 400 | `VALIDATION_ERROR` |
+| Not ADMIN | 403 | (RBAC, no `code`) |
+| Invalid body | 422 | (Pydantic) |
+
+Does **not** auto-enroll the new user in `contest_participants` — organizer is a global role, not a player.
+
+**First deploy:** use CLI once per empty database — [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md). Users persist in DB; bootstrap is not run on every API restart.
+
+### `user_admin_service.py` [NEW]
+
+```python
+async def create_supervisor(session, *, login, password, first_name, last_name, is_temp_password=False) -> User
+```
+
+Hashes `password` with bcrypt; raises `ValidationError` if login taken.
 
 ## Contest Lifecycle & Immutability [UPDATED]
 
@@ -233,6 +327,8 @@ async def submit_batch(session, user_id, round_id, items: list[tuple[int,int,int
 async def visible_predictions(session, round_id, viewer_role, viewer_id) -> list[dict]
 ```
 
+Before deadline: own scores only for `USER` and `SUPERVISOR`; `ADMIN` sees all. After deadline: full table.
+
 API adds `assert_contest_running` before submit. Incomplete batch → `400`; deadline/not ACTIVE/contest not RUNNING → `403`.
 
 ### `scoring_persistence.py`
@@ -259,19 +355,23 @@ Aggregates `Score` rows, reads `contest_participants.exceptional_tiebreak_points
 
 Base path: `/api/v1`. **Preferred:** contest-scoped paths from [Multi-Contest API](#multi-contest-api). Legacy paths below are deprecated shims (default contest).
 
-### Public (no auth) — legacy shims
+### Public (no auth)
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/contests/public` | RUNNING contests for Visitor discovery |
 | `GET` | `/rounds` | List rounds (default contest) ⚠️ deprecated |
 | `GET` | `/leaderboard` | Global standings ⚠️ deprecated |
 | `GET` | `/rounds/{id}/leaderboard` | Round standings ⚠️ deprecated |
 | `GET` | `/rounds/{id}/results` | Match results + per-user points ⚠️ deprecated |
 
-### User (Bearer, USER+) — legacy shims
+### User (Bearer, USER+)
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/me/contests` | Enrolled contests with `participant_status` |
+| `GET` | `/auth/me/contacts` | Profile contacts |
+| `PATCH` | `/auth/me/contacts` | Partial contacts update |
 | `GET` | `/rounds/{id}/predictions` | Visibility-filtered predictions ⚠️ deprecated |
 | `POST` | `/rounds/{id}/predictions` | Batch prediction save ⚠️ deprecated |
 
@@ -293,7 +393,7 @@ Base path: `/api/v1`. **Preferred:** contest-scoped paths from [Multi-Contest AP
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/admin/users/supervisor` | Create organizer (SUPERVISOR) account [NEW] |
+| `POST` | `/admin/users/supervisor` | Create organizer (SUPERVISOR) account |
 
 ### Admin only (Bearer, ADMIN) — legacy shims
 
@@ -384,4 +484,5 @@ Recoverable internal issues (e.g. skipped NULL prediction rows) log `WARNING` an
 | Database tables & constraints | [DB_REFERENCE.md](DB_REFERENCE.md) |
 | Env vars & seed | [CONFIG.md](CONFIG.md) |
 | Points, bonuses & tie-breakers | [SCORING_LOGIC.md](SCORING_LOGIC.md) |
+| Initial ADMIN/SUPERVISOR bootstrap | [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) |
 | Errors & logging policy (RU) | [ERROR_LOGGING.md](ERROR_LOGGING.md) |

@@ -118,7 +118,7 @@ async def recalculate_round(session, round_id) -> int  # used after result/VOID 
   `now >= deadline` or round not `ACTIVE` (maps to 403). Save all rows in ONE transaction
   (all-or-nothing). Each score validated `0..max_score_value`; **0 is valid**.
 - `visible_predictions(round_id, viewer)`: before deadline → only viewer's own scores +
-  "submitted" flags for others (Supervisor sees all); after deadline → everyone's scores.
+  "submitted" flags for others (ADMIN only sees all); after deadline → everyone's scores.
 
 ## 7. NULL / absence invariants (critical, enforce everywhere)
 - A missing prediction is the ABSENCE of a row. Never insert NULL/0 as a sentinel.

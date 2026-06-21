@@ -30,3 +30,19 @@ class UserOut(BaseModel):
     is_temp_password: bool
 
     model_config = {"from_attributes": True}
+
+
+class ContactOut(BaseModel):
+    email: str | None = None
+    vk_id: str | None = None
+    tg_id: str | None = None
+    notify_enabled: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class ContactPatchRequest(BaseModel):
+    email: str | None = None
+    vk_id: str | None = Field(default=None, max_length=255)
+    tg_id: str | None = Field(default=None, max_length=255)
+    notify_enabled: bool | None = None

@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
   title: Football Predictions API
-  version: 1.1.0
+  version: 1.2.0-rc
   description: >-
-    Stage 1.4 contract — multi-contest backend.
+    Stage 1.8 contract — contest discovery (B1/B2) and user contacts (B3).
     Primary prefix: /api/v1/contests/{contest_id}/...
     Legacy paths without contest_id are DEPRECATED shims (resolve default contest for loader regression).
     Auth via JWT (Bearer). Score fields integers [0, max_score_value]; MISSING prediction = absent row, never 0.
@@ -17,6 +17,7 @@ servers:
 
 tags:
   - name: auth
+  - name: user
   - name: contests
   - name: contest setup
   - name: predictions
@@ -70,6 +71,49 @@ paths:
               schema: { $ref: '#/components/schemas/UserOut' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /api/v1/auth/me/contacts:
+    get:
+      tags: [auth]
+      summary: Current user contact profile
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactOut' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [auth]
+      summary: Partial update of contact profile (upsert)
+      description: Allowed while is_temp_password=true.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactPatchRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactOut' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/me/contests:
+    get:
+      tags: [user]
+      summary: Contests the current user is enrolled in
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserContestOut' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   # ─── Contests ───
   /api/v1/contests:
     get:
@@ -98,6 +142,21 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ContestOut' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/contests/public:
+    get:
+      tags: [contests]
+      summary: Public list of RUNNING contests (no auth)
+      description: >-
+        Must be registered before /contests/{contest_id} to avoid path capture.
+        Returns only contests with status RUNNING.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PublicContestOut' }
 
   /api/v1/contests/{contest_id}:
     get:
@@ -320,7 +379,10 @@ paths:
   /api/v1/contests/{contest_id}/rounds/{id}/predictions:
     get:
       tags: [predictions]
-      summary: Get predictions for round (privacy rules unchanged)
+      summary: Get predictions for round (pre-deadline privacy)
+      description: >-
+        Before deadline: USER and SUPERVISOR see only own scores; others show submitted-only.
+        ADMIN sees all (support). After deadline: full table for any authenticated caller.
       security: [{ bearerAuth: [] }]
       parameters:
         - { $ref: '#/components/parameters/contest_id' }
@@ -694,6 +756,36 @@ components:
         first_name: { type: string }
         last_name: { type: string }
         is_temp_password: { type: boolean }
+    ContactOut:
+      type: object
+      properties:
+        email: { type: string, format: email, nullable: true }
+        vk_id: { type: string, nullable: true }
+        tg_id: { type: string, nullable: true }
+        notify_enabled: { type: boolean, default: false }
+    ContactPatchRequest:
+      type: object
+      properties:
+        email: { type: string, format: email, nullable: true }
+        vk_id: { type: string, maxLength: 255, nullable: true }
+        tg_id: { type: string, maxLength: 255, nullable: true }
+        notify_enabled: { type: boolean, nullable: true }
+    UserContestOut:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/ContestStatus' }
+        participant_status: { type: string, enum: [PENDING, ACCEPTED] }
+        role: { type: string, enum: [USER, SUPERVISOR, ADMIN] }
+        slug: { type: string, nullable: true }
+    PublicContestOut:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/ContestStatus' }
+        slug: { type: string, nullable: true }
     CreateSupervisorRequest:
       type: object
       required: [login, password, first_name, last_name]

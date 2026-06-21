@@ -8,6 +8,7 @@ Environment variables, application settings, seed workflow, and contest defaults
 - [Environment Variables](#environment-variables)
 - [Contest Defaults](#contest-defaults)
 - [Seed Script](#seed-script)
+- [Bootstrap Users Script](#bootstrap-users-script)
 - [Database URL](#database-url)
 - [Project Dependencies](#project-dependencies)
 
@@ -78,6 +79,8 @@ Access via `get_settings()` (cached singleton).
 | `LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) [NEW] |
 
 > `contest_defaults_path` is a code default pointing to `docs/test_data/config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
+>
+> **Env template:** copy [`.env.example`](../.env.example) to `.env` (gitignored). Prefer `SEED_ADMIN_PASSWORD` (plaintext); scripts hash at runtime. Precomputed hash: `uv run python src/scripts/hash_password.py 'your-password'`.
 
 ## Contest Defaults [NEW]
 
@@ -120,15 +123,15 @@ See [API_GUIDE.md — Contest Lifecycle](API_GUIDE.md#contest-lifecycle--immutab
 
 ## Seed Script [UPDATED]
 
-**Path:** `src/scripts/seed.py` — contest defaults + optional ADMIN.
+**Path:** `src/scripts/seed.py` — contest defaults + optional ADMIN (if login missing).
 
-**Bootstrap users:** `src/scripts/bootstrap_users.py` — ADMIN and optional SUPERVISOR from `.env`. See [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) and [.env.example](../.env.example).
+Uses `SEED_ADMIN_PASSWORD` when set (hashed at runtime); else `SEED_ADMIN_PASSWORD_HASH`; else dev placeholder hash (login will not work until bootstrap).
 
 ### What it does
 
 1. Ensures tables exist (`Base.metadata.create_all`)
 2. Inserts default `contests` row from `contest_defaults.json` (skips if contest exists)
-3. Inserts ADMIN user from env/settings (skips if login exists)
+3. Inserts ADMIN user from env (skips if login exists)
 
 ### Usage
 
@@ -143,6 +146,37 @@ uv run python src/scripts/seed.py --defaults-path docs/test_data/config/contest_
 - Second run logs "already exist, skipping" for both default contest and ADMIN user.
 - Safe to re-run after migrations.
 
+## Bootstrap Users Script [NEW]
+
+**Path:** `src/scripts/bootstrap_users.py`
+
+One-time (or fresh-DB) creation of **ADMIN** and optional **SUPERVISOR** from `.env`. Users remain in the database — **do not re-run** on every app start (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
+
+```bash
+uv run alembic upgrade head
+uv run python src/scripts/seed.py              # contest row, optional admin
+uv run python src/scripts/bootstrap_users.py   # ADMIN + SUPERVISOR from .env
+```
+
+| Flag | Description |
+|------|-------------|
+| `--database-url` | Override `DATABASE_URL` |
+| `--no-contest-enroll` | Skip adding ADMIN to `contest_participants` |
+
+**Requires** `SEED_ADMIN_PASSWORD` or `SEED_ADMIN_PASSWORD_HASH`. Supervisor block runs only when `SEED_SUPERVISOR_LOGIN` and password/hash are set.
+
+**Idempotent:** existing logins skipped; passwords **not** updated on re-run.
+
+### Password hash helper [NEW]
+
+**Path:** `src/scripts/hash_password.py`
+
+```bash
+uv run python src/scripts/hash_password.py 'your-password'
+```
+
+Prints bcrypt string for `SEED_*_PASSWORD_HASH` in `.env`. Use from project root (`core` lives under `src/`).
+
 ### Bootstrap flow
 
 ```mermaid
@@ -151,8 +185,11 @@ flowchart TD
     C[config/settings.py] --> B
     B --> D[contests row]
     B --> E[users row ADMIN]
+    H[bootstrap_users.py] --> I[users ADMIN + SUPERVISOR]
+    C --> H
     F[alembic upgrade head] --> G[(football.db)]
     B --> G
+    H --> G
 ```
 
 ## Database URL [NEW]

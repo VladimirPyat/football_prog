@@ -8,7 +8,15 @@ from sqlalchemy import select
 from api.deps import CurrentUser, DbSession
 from core.security import create_access_token, hash_password, verify_password
 from database.models import User
-from schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse, UserOut
+from schemas.auth import (
+    ChangePasswordRequest,
+    ContactOut,
+    ContactPatchRequest,
+    LoginRequest,
+    TokenResponse,
+    UserOut,
+)
+from services.contact_service import get_contacts, upsert_contacts
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,3 +55,24 @@ async def change_password(
 async def me(user: CurrentUser) -> UserOut:
     """Профиль текущего авторизованного пользователя."""
     return UserOut.model_validate(user)
+
+
+@router.get("/me/contacts", response_model=ContactOut)
+async def get_my_contacts(user: CurrentUser, session: DbSession) -> ContactOut:
+    """Контактные данные текущего пользователя."""
+    return await get_contacts(session, user.id)
+
+
+@router.patch("/me/contacts", response_model=ContactOut)
+async def patch_my_contacts(
+    body: ContactPatchRequest,
+    user: CurrentUser,
+    session: DbSession,
+) -> ContactOut:
+    """Обновить контактные данные (частичное обновление)."""
+    patch = body.model_dump(exclude_unset=True)
+    if "email" in patch and patch["email"] == "":
+        patch["email"] = None
+    result = await upsert_contacts(session, user.id, patch)
+    await session.commit()
+    return result

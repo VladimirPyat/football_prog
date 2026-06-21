@@ -175,12 +175,12 @@ def downgrade() -> None:
     op.execute(
         """
         UPDATE users
-        SET exceptional_tiebreak_points = (
+        SET exceptional_tiebreak_points = COALESCE((
             SELECT exceptional_tiebreak_points
             FROM contest_participants
             WHERE contest_participants.user_id = users.id
               AND contest_participants.contest_id = 1
-        )
+        ), 0)
         """
     )
 

@@ -25,6 +25,7 @@ from api.v1 import (
     contest_participants,
     contest_teams,
     contests,
+    me,
     predictions,
     rounds,
 )
@@ -49,6 +50,7 @@ app.add_middleware(
 API_PREFIX = "/api/v1"
 
 app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(me.router, prefix=API_PREFIX)
 app.include_router(contests.router, prefix=API_PREFIX)
 app.include_router(contest_teams.router, prefix=API_PREFIX)
 app.include_router(contest_participants.router, prefix=API_PREFIX)

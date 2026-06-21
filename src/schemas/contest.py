@@ -131,3 +131,21 @@ class FreeTourMatchItem(BaseModel):
 class FreeTourRequest(BaseModel):
     deadline: datetime
     matches: list[FreeTourMatchItem]
+
+
+class UserContestOut(BaseModel):
+    id: int
+    name: str
+    status: str
+    participant_status: str
+    role: str
+    slug: str | None = None
+
+
+class PublicContestOut(BaseModel):
+    id: int
+    name: str
+    status: str
+    slug: str | None = None
+
+    model_config = {"from_attributes": True}

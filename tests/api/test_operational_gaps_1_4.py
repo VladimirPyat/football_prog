@@ -64,6 +64,32 @@ async def test_op_pred_privacy(loaded_api):
             assert entry["predictions"] is not None
 
 
+@pytest.mark.asyncio
+async def test_op_supervisor_pred_privacy(loaded_api):
+    """[OP-PRED-PRIVACY-SUP] SUPERVISOR has same pre-deadline privacy as USER."""
+    client, sf, _ = loaded_api
+    shutov = await api_login(client, "shutov")
+    sup = await api_login(client, "supervisor_api")
+    rid = await get_round_id(sf, 10, DEFAULT_CONTEST_ID)
+    mids = await get_round10_match_ids(sf, DEFAULT_CONTEST_ID)
+
+    await client.post(
+        contest_url(DEFAULT_CONTEST_ID, f"/rounds/{rid}/predictions"),
+        headers=auth_header(shutov),
+        json={"predictions": [{"match_id": m, "score1": 3, "score2": 0} for m in mids]},
+    )
+
+    resp = await client.get(
+        contest_url(DEFAULT_CONTEST_ID, f"/rounds/{rid}/predictions"),
+        headers=auth_header(sup),
+    )
+    assert resp.status_code == 200
+    shutov_id = await _user_id(sf, "shutov")
+    for entry in resp.json()["entries"]:
+        if entry["user_id"] == shutov_id:
+            assert entry["predictions"] is None
+
+
 async def _user_id(sf, login: str) -> int:
     async with sf() as session:
         from database.models import User
