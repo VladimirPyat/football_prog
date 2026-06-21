@@ -609,6 +609,25 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ContestOut' }
 
+  /api/v1/admin/users/supervisor:
+    post:
+      tags: [admin (users)]
+      summary: Create contest organizer (SUPERVISOR role; ADMIN only)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSupervisorRequest' }
+      responses:
+        '200':
+          description: Organizer created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateSupervisorResponse' }
+        '400': { description: Duplicate login or validation error }
+        '403': { description: Not ADMIN }
+
   /api/v1/admin/users/{user_id}/exceptional-tiebreak:
     put:
       tags: [legacy (deprecated)]
@@ -675,6 +694,19 @@ components:
         first_name: { type: string }
         last_name: { type: string }
         is_temp_password: { type: boolean }
+    CreateSupervisorRequest:
+      type: object
+      required: [login, password, first_name, last_name]
+      properties:
+        login: { type: string }
+        password: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        is_temp_password: { type: boolean, default: false }
+    CreateSupervisorResponse:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/UserOut' }
     ContestStatus:
       type: string
       enum: [DRAFT, RUNNING, PAUSED, FINISHED]

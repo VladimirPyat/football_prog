@@ -22,9 +22,16 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./football.db"
     contest_defaults_path: Path = PROJECT_ROOT / "docs/test_data/config/contest_defaults.json"
     seed_admin_login: str = "admin"
-    seed_admin_password_hash: str = "dev-only-placeholder-hash"
+    seed_admin_password: str | None = None
+    seed_admin_password_hash: str | None = None
     seed_admin_first_name: str = "Admin"
     seed_admin_last_name: str = "User"
+
+    seed_supervisor_login: str | None = None
+    seed_supervisor_password: str | None = None
+    seed_supervisor_password_hash: str | None = None
+    seed_supervisor_first_name: str = "Supervisor"
+    seed_supervisor_last_name: str = "User"
 
     jwt_secret_key: str = "dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
@@ -49,10 +56,16 @@ Access via `get_settings()` (cached singleton).
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite+aiosqlite:///./football.db` | Async SQLAlchemy connection URL |
-| `SEED_ADMIN_LOGIN` | `admin` | Login for initial ADMIN user created by seed |
-| `SEED_ADMIN_PASSWORD_HASH` | `dev-only-placeholder-hash` | Password hash for seed ADMIN (replace in production) |
+| `SEED_ADMIN_LOGIN` | `admin` | Login for bootstrap ADMIN |
+| `SEED_ADMIN_PASSWORD` | — | Plaintext admin password (hashed at runtime by bootstrap/seed) [NEW] |
+| `SEED_ADMIN_PASSWORD_HASH` | — | Precomputed bcrypt hash (alternative to `SEED_ADMIN_PASSWORD`) |
 | `SEED_ADMIN_FIRST_NAME` | `Admin` | ADMIN first name |
 | `SEED_ADMIN_LAST_NAME` | `User` | ADMIN last name |
+| `SEED_SUPERVISOR_LOGIN` | — | Optional organizer login for `bootstrap_users.py` [NEW] |
+| `SEED_SUPERVISOR_PASSWORD` | — | Plaintext supervisor password [NEW] |
+| `SEED_SUPERVISOR_PASSWORD_HASH` | — | Precomputed bcrypt hash for supervisor [NEW] |
+| `SEED_SUPERVISOR_FIRST_NAME` | `Supervisor` | SUPERVISOR first name [NEW] |
+| `SEED_SUPERVISOR_LAST_NAME` | `User` | SUPERVISOR last name [NEW] |
 | `JWT_SECRET_KEY` | `dev-secret-change-in-production` | HS256 signing key for access tokens [NEW] |
 | `JWT_ALGORITHM` | `HS256` | JWT algorithm [NEW] |
 | `JWT_EXPIRE_MINUTES` | `1440` | Token lifetime in minutes (24 h) [NEW] |
@@ -105,9 +118,11 @@ Scoring rule values are documented in [SCORING_LOGIC.md](SCORING_LOGIC.md). DB s
 
 See [API_GUIDE.md — Contest Lifecycle](API_GUIDE.md#contest-lifecycle--immutability).
 
-## Seed Script [NEW]
+## Seed Script [UPDATED]
 
-**Path:** `src/scripts/seed.py`
+**Path:** `src/scripts/seed.py` — contest defaults + optional ADMIN.
+
+**Bootstrap users:** `src/scripts/bootstrap_users.py` — ADMIN and optional SUPERVISOR from `.env`. See [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) and [.env.example](../.env.example).
 
 ### What it does
 

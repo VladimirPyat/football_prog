@@ -5,10 +5,13 @@
   Scoring fully verified on contracted data: base 90/90, total 90/90, bonus3 90/90,
   expected_rank 90/90, leaderboard 10/10.
 
-## Sub-stage split (sequential): 1.1 → 1.2 → 1.3
+## Sub-stage split (sequential): 1.1 → 1.2 → 1.3 → … → 1.6
 - 1.1 Scoring Engine (pure math): `instructions/coder_1.1.md`, `instructions/tester_1.1.md`
 - 1.2 Setup, Deadlines & Data Loader: `instructions/coder_1.2.md`, `instructions/tester_1.2.md`
 - 1.3 API Integration & Triggers: `instructions/coder_1.3.md`, `instructions/tester_1.3.md`
+- 1.4 Multi-contest & setup phase: `instructions/coder_1.4.md`, `instructions/tester_1.4.md`
+- 1.5 Errors, logging, docstrings: `instructions/coder_1.5.md`, `instructions/tester_1.5.md`
+- 1.6 Bootstrap users & organizer API: `instructions/coder_1.6.md`, `instructions/tester_1.6.md`, `plans/draft_1.6_bootstrap_users.md`
 
 ## Contracts backing Stage 1
 - `contracts/api_v1.yaml`, `contracts/bonus_rules.md`, `contracts/leaderboard_tiebreakers.md`,
@@ -159,3 +162,17 @@
 - Verified: all [EXC-*], [ERR-*], [REC-*], [LOG-*]; static audit PASS; 90/90 + 10/10 regression PASS
 - Report: agent_docs/reports/test_1.5.md
 - Next: Stage 1.5 sign-off
+
+## 2026-06-21 — Planner (1.6 bootstrap users)
+- STATUS: INSTRUCTIONS_READY
+- Artifacts: plans/draft_1.6_bootstrap_users.md, instructions/coder_1.6.md, instructions/tester_1.6.md
+- Scope: POST /admin/users/supervisor, bootstrap_users.py, .env.example, manuals/BOOTSTRAP_USERS.md
+- Prerequisite: Stage 1.5 TEST_PASS
+- Next: @Coder implements per coder_1.6.md (gap: ADMIN assigns SUPERVISOR; secrets via .env)
+
+## 2026-06-21 — Coder (1.6 bootstrap users)
+- STATUS: READY_FOR_TEST
+- Files: src/services/user_admin_service.py, src/schemas/users.py, src/api/v1/admin_users.py, main.py, config/settings.py, src/scripts/bootstrap_users.py, src/scripts/seed.py, .env.example, manuals/BOOTSTRAP_USERS.md, manuals/{CONFIG,API_GUIDE,README}.md, agent_docs/contracts/api_v1.yaml, tests/api/test_admin_users.py
+- Verified: uv run pytest tests/ --ignore=tests/manual → 276 passed, 2 skipped
+- Notes: SEED_ADMIN_PASSWORD plaintext preferred; supervisor CLI block documented for retirement when admin UI ships
+- Next: agent_docs/instructions/tester_1.6.md

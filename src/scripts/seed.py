@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import get_settings
+from core.security import hash_password
 from database.base import Base
 from database.engine import create_engine, create_session_factory
 from database.models import Contest, ContestParticipant, ParticipantStatus, User, UserRole
@@ -64,6 +65,15 @@ async def seed_contest(session: AsyncSession, defaults_path: Path) -> Contest:
     return contest
 
 
+def _admin_password_hash() -> str:
+    settings = get_settings()
+    if settings.seed_admin_password:
+        return hash_password(settings.seed_admin_password)
+    if settings.seed_admin_password_hash:
+        return settings.seed_admin_password_hash
+    return "dev-only-placeholder-hash"
+
+
 async def seed_admin_user(session: AsyncSession, contest_id: int) -> User:
     settings = get_settings()
     existing = await session.scalar(select(User).where(User.login == settings.seed_admin_login))
@@ -82,7 +92,7 @@ async def seed_admin_user(session: AsyncSession, contest_id: int) -> User:
 
     user = User(
         login=settings.seed_admin_login,
-        password_hash=settings.seed_admin_password_hash,
+        password_hash=_admin_password_hash(),
         role=UserRole.ADMIN,
         first_name=settings.seed_admin_first_name,
         last_name=settings.seed_admin_last_name,

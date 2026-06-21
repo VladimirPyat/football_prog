@@ -100,7 +100,7 @@ Configuration: [CONFIG.md — JWT settings](CONFIG.md#environment-variables).
 | **Visitor** (no token) | Public GET: rounds list, leaderboard, results (CALCULATED/PUBLISHED rounds only) |
 | **USER** | Own predictions read/write |
 | **SUPERVISOR** | Round/match/result/VOID, calculate, publish, read contest settings |
-| **ADMIN** | All SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete |
+| **ADMIN** | All SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete, **create organizers** |
 
 **Contest status guards:** When `contests.status ∈ {PAUSED, FINISHED}` for the target contest, all mutating round/match/prediction operations return `403`. Public GETs remain allowed.
 
@@ -142,6 +142,16 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | `POST` | `/contests/{id}/admin/recalculate` | ADMIN | Recalculate all CALCULATED rounds |
 
 `ContestContext` dependency validates `contest_id` exists (404 if not).
+
+## Admin User Management [NEW]
+
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| `POST` | `/admin/users/supervisor` | ADMIN | Create contest organizer (`SUPERVISOR` role) |
+
+Request body: `login`, `password`, `first_name`, `last_name`, optional `is_temp_password` (default `false`).
+
+CLI/bootstrap alternative before admin UI: [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md).
 
 ## Contest Lifecycle & Immutability [UPDATED]
 
@@ -278,6 +288,12 @@ Base path: `/api/v1`. **Preferred:** contest-scoped paths from [Multi-Contest AP
 | `POST` | `/admin/rounds/{id}/publish` | CALCULATED → PUBLISHED ⚠️ deprecated |
 | `PUT` | `/admin/matches/{id}/result` | Enter final score ⚠️ deprecated |
 | `PATCH` | `/admin/matches/{id}/status` | VOID / POSTPONED / CANCELED ⚠️ deprecated |
+
+### Admin only (Bearer, ADMIN)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/admin/users/supervisor` | Create organizer (SUPERVISOR) account [NEW] |
 
 ### Admin only (Bearer, ADMIN) — legacy shims
 

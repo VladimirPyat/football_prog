@@ -13,9 +13,16 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./football.db"
     contest_defaults_path: Path = DEFAULT_CONTEST_DEFAULTS_PATH
     seed_admin_login: str = "admin"
-    seed_admin_password_hash: str = "dev-only-placeholder-hash"
+    seed_admin_password: str | None = None
+    seed_admin_password_hash: str | None = None
     seed_admin_first_name: str = "Admin"
     seed_admin_last_name: str = "User"
+
+    seed_supervisor_login: str | None = None
+    seed_supervisor_password: str | None = None
+    seed_supervisor_password_hash: str | None = None
+    seed_supervisor_first_name: str = "Supervisor"
+    seed_supervisor_last_name: str = "User"
 
     jwt_secret_key: str = "dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"

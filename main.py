@@ -19,6 +19,7 @@ from api.v1 import (
     admin_misc,
     admin_results,
     admin_rounds,
+    admin_users,
     auth,
     contest_ops,
     contest_participants,
@@ -58,6 +59,7 @@ app.include_router(admin_misc.router, prefix=API_PREFIX)
 app.include_router(admin_rounds.router, prefix=API_PREFIX)
 app.include_router(admin_results.router, prefix=API_PREFIX)
 app.include_router(admin_contest.router, prefix=API_PREFIX)
+app.include_router(admin_users.router, prefix=API_PREFIX)
 
 
 @app.get("/health")
