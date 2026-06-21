@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.exceptions import ContestRuleError, NotFoundError
 from database.models import ContestParticipant, Match, Round, RoundStatus, Score, Team, User
 from scoring.standings import build_standings
 from scoring.types import UserRoundScore
+
+logger = logging.getLogger(__name__)
 
 
 async def _user_name_map(session: AsyncSession) -> dict[int, str]:
@@ -25,6 +29,19 @@ async def _manual_overrides(session: AsyncSession, contest_id: int) -> dict[int,
         )
     ).all()
     return {p.user_id: p.exceptional_tiebreak_points for p in participants}
+
+
+def _tiebreak_points(
+    user_id: int, overrides: dict[int, int], *, context: str
+) -> int:
+    if user_id not in overrides:
+        logger.warning(
+            "participant missing for tiebreak user_id=%s context=%s — using 0",
+            user_id,
+            context,
+        )
+        return 0
+    return overrides[user_id]
 
 
 def _score_to_user_round(score: Score) -> UserRoundScore:
@@ -52,12 +69,15 @@ async def get_round_leaderboard(
 ) -> dict:
     round_ = await session.get(Round, round_id)
     if round_ is None:
-        raise ValueError(f"Round {round_id} not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     if round_.contest_id != contest_id:
-        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
+        raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
     if round_.status not in {RoundStatus.CALCULATED, RoundStatus.PUBLISHED}:
-        raise ValueError(f"Round {round_id} results not available (status={round_.status})")
+        raise ContestRuleError(
+            f"Таблица тура недоступна (статус: {round_.status})",
+            code="RESULTS_NOT_AVAILABLE",
+        )
 
     scores = (
         await session.scalars(select(Score).where(Score.round_id == round_id))
@@ -88,7 +108,9 @@ async def get_round_leaderboard(
                 "correct_outcomes": sr.correct_outcomes if sr else 0,
                 "rank": row.rank,
                 "predictions_count": row.total_predictions,
-                "exceptional_tiebreak_points": overrides.get(uid, 0),
+                "exceptional_tiebreak_points": _tiebreak_points(
+                    uid, overrides, context=f"round_leaderboard round={round_id}"
+                ),
                 "tiebreaker_status": row.tiebreaker_status,
             }
         )
@@ -144,7 +166,9 @@ async def get_global_leaderboard(session: AsyncSession, contest_id: int) -> dict
                 "correct_outcomes": total_co,
                 "rank": row.rank,
                 "predictions_count": row.total_predictions,
-                "exceptional_tiebreak_points": overrides.get(uid, 0),
+                "exceptional_tiebreak_points": _tiebreak_points(
+                    uid, overrides, context=f"global_leaderboard contest={contest_id}"
+                ),
                 "tiebreaker_status": row.tiebreaker_status,
             }
         )
@@ -162,12 +186,15 @@ async def get_round_results(
 ) -> dict:
     round_ = await session.get(Round, round_id)
     if round_ is None:
-        raise ValueError(f"Round {round_id} not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     if round_.contest_id != contest_id:
-        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
+        raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
     if round_.status not in {RoundStatus.CALCULATED, RoundStatus.PUBLISHED}:
-        raise ValueError(f"Round {round_id} results not available (status={round_.status})")
+        raise ContestRuleError(
+            f"Таблица тура недоступна (статус: {round_.status})",
+            code="RESULTS_NOT_AVAILABLE",
+        )
 
     matches = (
         await session.scalars(select(Match).where(Match.round_id == round_id))

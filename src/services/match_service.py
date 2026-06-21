@@ -6,6 +6,12 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.exceptions import (
+    ContestRuleError,
+    NotFoundError,
+    ScoreOutOfRangeError,
+    ValidationError,
+)
 from database.models import Contest, Match, MatchStatus, Round, RoundStatus
 from services.contest_lifecycle_service import assert_contest_running
 
@@ -13,23 +19,25 @@ from services.contest_lifecycle_service import assert_contest_running
 async def _get_match(session: AsyncSession, match_id: int) -> Match:
     match = await session.get(Match, match_id)
     if match is None:
-        raise ValueError(f"Match {match_id} not found")
+        raise NotFoundError(f"Матч {match_id} не найден")
     return match
 
 
 async def _get_contest_for_round(session: AsyncSession, round_id: int) -> Contest:
     round_ = await session.get(Round, round_id)
     if round_ is None:
-        raise ValueError(f"Round {round_id} not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     contest = await session.get(Contest, round_.contest_id)
     if contest is None:
-        raise ValueError(f"Contest {round_.contest_id} not found")
+        raise NotFoundError(f"Конкурс {round_.contest_id} не найден")
     return contest
 
 
 def _validate_score(value: int, max_value: int, label: str) -> None:
     if not (0 <= value <= max_value):
-        raise ValueError(f"{label} score {value} out of valid range [0, {max_value}]")
+        raise ScoreOutOfRangeError(
+            f"Счёт {value} вне диапазона [0, {max_value}] ({label})"
+        )
 
 
 async def set_result(
@@ -43,18 +51,24 @@ async def set_result(
     match = await _get_match(session, match_id)
     round_ = await session.get(Round, match.round_id)
     if round_ is None:
-        raise ValueError(f"Round for match {match_id} not found")
+        raise NotFoundError(f"Тур для матча {match_id} не найден")
     if round_.contest_id != contest_id:
-        raise ValueError(f"Match {match_id} does not belong to contest {contest_id}")
+        raise NotFoundError(f"Матч {match_id} не принадлежит конкурсу {contest_id}")
 
     now = datetime.now(timezone.utc)
     deadline = round_.deadline
     if deadline.tzinfo is None:
         deadline = deadline.replace(tzinfo=timezone.utc)
     if now < deadline:
-        raise ValueError("Results allowed only after round deadline")
+        raise ContestRuleError(
+            "Результат можно внести только после дедлайна тура",
+            code="DEADLINE_NOT_PASSED",
+        )
     if RoundStatus(round_.status) != RoundStatus.CLOSED:
-        raise ValueError("Round must be CLOSED before entering results")
+        raise ContestRuleError(
+            "Результат можно внести только на закрытом туре",
+            code="ROUND_NOT_CLOSED",
+        )
 
     await assert_contest_running(session, contest_id)
 
@@ -78,18 +92,18 @@ async def change_status(
 
     allowed_targets = {MatchStatus.VOID, MatchStatus.POSTPONED, MatchStatus.CANCELED}
     if new_status not in allowed_targets:
-        raise ValueError(
-            f"change_status only accepts {allowed_targets}, got {new_status}"
+        raise ValidationError(
+            f"Допустимые статусы: VOID, POSTPONED, CANCELED (получено: {new_status})"
         )
 
     match = await _get_match(session, match_id)
     round_ = await session.get(Round, match.round_id)
     if round_ is None or round_.contest_id != contest_id:
-        raise ValueError(f"Match {match_id} does not belong to contest {contest_id}")
+        raise NotFoundError(f"Матч {match_id} не принадлежит конкурсу {contest_id}")
 
     match.status = new_status
 
-    if new_status == MatchStatus.VOID and round_.status == RoundStatus.CALCULATED:
+    if new_status == MatchStatus.VOID and RoundStatus(round_.status) == RoundStatus.CALCULATED:
         await recalculate_round(session, round_id=round_.id, contest_id=contest_id)
 
     return match

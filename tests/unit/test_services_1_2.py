@@ -16,6 +16,12 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from core.exceptions import (
+    ContestRuleError,
+    IllegalTransitionError,
+    ScoreOutOfRangeError,
+    ValidationError,
+)
 from database.base import Base
 from database.models import (
     Contest,
@@ -415,7 +421,7 @@ async def test_deadline_equal_to_cutoff_rejected(session: AsyncSession):
         await _make_match(session, r.id, t1.id, t2.id, date_time=first_match_dt, status=MatchStatus.SCHEDULED, score1=None, score2=None)
 
     bad_deadline = first_match_dt - timedelta(hours=24)  # exactly at cutoff
-    with pytest.raises(ValueError, match="must be strictly before"):
+    with pytest.raises(ValidationError, match="раньше"):
         async with session.begin():
             await set_deadline(session, r.id, bad_deadline)
 
@@ -431,7 +437,7 @@ async def test_deadline_after_cutoff_rejected(session: AsyncSession):
         await _make_match(session, r.id, t1.id, t2.id, date_time=first_match_dt, status=MatchStatus.SCHEDULED, score1=None, score2=None)
 
     bad_deadline = first_match_dt - timedelta(hours=12)  # after cutoff
-    with pytest.raises(ValueError, match="must be strictly before"):
+    with pytest.raises(ValidationError, match="раньше"):
         async with session.begin():
             await set_deadline(session, r.id, bad_deadline)
 
@@ -448,7 +454,7 @@ async def test_deadline_window_closed_rejected(session: AsyncSession):
         await _make_match(session, r.id, t1.id, t2.id, date_time=first_match_dt, status=MatchStatus.SCHEDULED, score1=None, score2=None)
 
     new_deadline = first_match_dt - timedelta(hours=36)
-    with pytest.raises(ValueError, match="window has closed"):
+    with pytest.raises(ContestRuleError, match="закрыто"):
         async with session.begin():
             await set_deadline(session, r.id, new_deadline)
 
@@ -488,7 +494,7 @@ async def test_batch_wrong_count_rejected(session: AsyncSession):
         uid, rid, mids = await _setup_batch_env(session)
 
     items_7 = [(mids[i], 1, 0) for i in range(7)]
-    with pytest.raises(ValueError, match="exactly"):
+    with pytest.raises(ValidationError, match="ожидается"):
         async with session.begin():
             await submit_batch(session, CONTEST_ID, uid, rid, items_7)
 
@@ -542,7 +548,7 @@ async def test_batch_after_deadline_rejected(session: AsyncSession):
         uid, rid, mids = await _setup_batch_env(session, deadline=past_deadline)
 
     items = [(mid, 1, 0) for mid in mids]
-    with pytest.raises(PermissionError, match="Deadline has passed"):
+    with pytest.raises(ContestRuleError, match="истёк"):
         async with session.begin():
             await submit_batch(session, CONTEST_ID, uid, rid, items)
 
@@ -554,7 +560,7 @@ async def test_batch_invalid_score_no_partial_save(session: AsyncSession):
 
     # score2=999 is invalid
     items = [(mids[0], 1, 999)] + [(mids[i], 1, 0) for i in range(1, 8)]
-    with pytest.raises(ValueError, match="out of range"):
+    with pytest.raises(ScoreOutOfRangeError, match="диапазона"):
         async with session.begin():
             await submit_batch(session, CONTEST_ID, uid, rid, items)
 
@@ -584,7 +590,7 @@ async def test_batch_round_not_active_rejected(session: AsyncSession):
             match_ids.append(m.id)
 
     items = [(mid, 1, 0) for mid in match_ids]
-    with pytest.raises(PermissionError, match="must be ACTIVE"):
+    with pytest.raises(ContestRuleError, match="активный"):
         async with session.begin():
             await submit_batch(session, CONTEST_ID, user.id, r.id, items)
 
@@ -600,7 +606,7 @@ async def test_illegal_transition_rejected(session: AsyncSession):
         await _seed_settings(session)
         r = await _make_round(session, status=RoundStatus.DRAFT)
 
-    with pytest.raises(ValueError, match="Illegal"):
+    with pytest.raises(IllegalTransitionError, match="Недопустимый"):
         async with session.begin():
             await transition_round(session, r.id, RoundStatus.CALCULATED)
 
@@ -644,7 +650,7 @@ async def test_published_to_any_rejected(session: AsyncSession):
         round_id = r.id  # capture id before session closes
 
     for target in RoundStatus:
-        with pytest.raises(ValueError):
+        with pytest.raises(IllegalTransitionError):
             async with session.begin():
                 await transition_round(session, round_id, target)
 
@@ -734,7 +740,7 @@ async def test_calculate_round_non_closed_raises(session: AsyncSession):
         await _seed_settings(session)
         r = await _make_round(session, status=RoundStatus.ACTIVE)
 
-    with pytest.raises(ValueError, match="CLOSED"):
+    with pytest.raises(ContestRuleError, match="закрытого"):
         async with session.begin():
             await calculate_round(session, r.id, CONTEST_ID)
 
@@ -794,7 +800,7 @@ async def test_recalculate_non_calculated_round_raises(session: AsyncSession):
         await _seed_settings(session)
         r = await _make_round(session, status=RoundStatus.CLOSED)
 
-    with pytest.raises(ValueError, match="CALCULATED"):
+    with pytest.raises(ValidationError, match="рассчитанного"):
         async with session.begin():
             await recalculate_round(session, r.id, CONTEST_ID)
 

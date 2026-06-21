@@ -9,10 +9,13 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 - [Architecture](#architecture)
 - [Authentication](#authentication)
 - [Role-Based Access Control](#role-based-access-control)
+- [Multi-Contest API](#multi-contest-api)
 - [Contest Lifecycle & Immutability](#contest-lifecycle--immutability)
 - [Service Layer](#service-layer)
 - [Endpoints Reference](#endpoints-reference)
 - [HTTP Caching](#http-caching)
+- [Error Response Format](#error-response-format)
+- [Logging](#logging)
 - [Related Documentation](#related-documentation)
 
 ## Implementation Status [UPDATED]
@@ -25,14 +28,19 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 | Scoring persistence (calculate/recalculate) | ✅ Stage 1.2 | `src/services/scoring_persistence.py` |
 | Contest lifecycle (pause/finish/delete guards) | ✅ Stage 1.3 | `src/services/contest_lifecycle_service.py` |
 | Leaderboard aggregation + ETag | ✅ Stage 1.3 | `src/services/leaderboard_service.py` |
+| Multi-contest API + setup phase | ✅ Stage 1.4 | `src/api/v1/contests.py`, `contest_ops.py`, … |
 | FastAPI application | ✅ Stage 1.3 | `main.py` |
 | JWT authentication (bcrypt + python-jose) | ✅ Stage 1.3 | `src/core/security.py`, `src/api/v1/auth.py` |
 | Pydantic request/response schemas | ✅ Stage 1.3 | `src/schemas/` |
 | Role-based access control | ✅ Stage 1.3 | `src/api/deps.py` — `RoleChecker` |
+| Typed errors + centralized handlers | ✅ Stage 1.5 | `src/core/exceptions.py`, `src/api/error_handlers.py` |
+| Structured logging | ✅ Stage 1.5 | `src/core/logging_config.py`, `LOG_LEVEL` |
+| Admin alert stub | ✅ Stage 1.5 | `src/services/notification_service.py` |
+| Shared HTTP handlers (DRY) | ✅ Stage 1.5 | `src/api/handlers/` |
 | OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` |
-| HTTP integration tests | ✅ Stage 1.3 | `tests/api/` — 31 passed (loader DB + httpx ASGI) [NEW] |
+| HTTP integration tests | ✅ Stage 1.5 | `tests/api/` — loader DB + httpx ASGI |
 
-**Before → After:** Stage 1.2 exposed services only as Python callables. Stage 1.3 wires all contracted HTTP endpoints with thin routers (no business logic in routes).
+**Before → After (Stage 1.5):** Routers no longer map `ValueError`/`PermissionError` locally. Services raise `AppError` subclasses; `error_handlers` returns JSON `{detail, code}` with Russian `detail` for domain errors.
 
 ## Running the Application [NEW]
 
@@ -47,18 +55,25 @@ Interactive docs: `http://localhost:8000/docs`
 ## Architecture [UPDATED]
 
 ```
-Client → FastAPI (Uvicorn) → CORS → RoleChecker / auth deps → Pydantic validation → Services → SQLAlchemy async
+Client → FastAPI (Uvicorn) → CORS → logging
+       → RoleChecker / auth deps → Pydantic validation
+       → Router (thin) → Services → SQLAlchemy async
+       → AppError → error_handlers → JSON {detail, code}
 ```
 
 | Layer | Path | Role |
 |-------|------|------|
-| Entry point | `main.py` | App factory, CORS, router mounting under `/api/v1` |
-| Dependencies | `src/api/deps.py` | DB session, JWT user resolution, RBAC, cache headers |
-| Routers | `src/api/v1/*.py` | HTTP mapping only — delegates to services |
-| Public reads | `src/api/v1/admin_misc.py` | Global/round leaderboard, results, admin recalculate |
+| Entry point | `main.py` | App factory, CORS, `setup_logging()`, `register_error_handlers()`, routers under `/api/v1` |
+| Error mapping | `src/api/error_handlers.py` | `AppError` → HTTP JSON; unhandled → 500 + `notify_admin()` |
+| Exceptions | `src/core/exceptions.py` | `AppError` hierarchy (`NotFoundError`, `ValidationError`, `ContestRuleError`, …) |
+| Logging | `src/core/logging_config.py` | Root logger format; level from `LOG_LEVEL` |
+| Dependencies | `src/api/deps.py` | DB session, JWT user resolution, RBAC, contest context, auto-close hook |
+| Routers | `src/api/v1/*.py` | HTTP mapping only — delegates to services or `src/api/handlers/` |
+| Shared handlers | `src/api/handlers/` | DRY builders for predictions view and leaderboard/results [NEW] |
 | Schemas | `src/schemas/*.py` | Pydantic request/response models |
 | Security | `src/core/security.py` | bcrypt password hash/verify, JWT encode/decode |
-| Services | `src/services/` | Business logic (unchanged from 1.2 where possible) |
+| Services | `src/services/` | Business logic; raise `AppError`, never `HTTPException` |
+| Alerts | `src/services/notification_service.py` | `notify_admin()` stub for critical failures [NEW] |
 
 ## Authentication [NEW]
 
@@ -72,7 +87,7 @@ JWT bearer tokens. Payload: `{sub: user_id, role, exp}`.
 
 **Temp password flow:** While `is_temp_password=true`, only `/auth/change-password` and `/auth/me` are allowed without restriction. Mutating endpoints (e.g. `POST /rounds/{id}/predictions`) return `403` via `require_not_temp_password`.
 
-Bad credentials → `401`. Invalid/expired token → `401`.
+Bad credentials → `401` (`Неверный логин или пароль`). Invalid/expired token → `401`. Auth/RBAC responses use Russian `detail` only (no `code` field).
 
 Configuration: [CONFIG.md — JWT settings](CONFIG.md#environment-variables).
 
@@ -87,11 +102,50 @@ Configuration: [CONFIG.md — JWT settings](CONFIG.md#environment-variables).
 | **SUPERVISOR** | Round/match/result/VOID, calculate, publish, read contest settings |
 | **ADMIN** | All SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete |
 
-**Contest status guards:** When `contest_settings.status ∈ {PAUSED, FINISHED}`, all mutating round/match/prediction operations return `403`. Public GETs remain allowed.
+**Contest status guards:** When `contests.status ∈ {PAUSED, FINISHED}` for the target contest, all mutating round/match/prediction operations return `403`. Public GETs remain allowed.
 
-## Contest Lifecycle & Immutability [NEW]
+## Multi-Contest API [NEW]
 
-Status machine on `contest_settings.status` (managed by `contest_lifecycle_service.py`):
+Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/…`. Legacy 1.3 paths (no `contest_id`) remain as **deprecated shims** resolving the default contest (`resolve_default_contest_id`).
+
+### Contest management (SUPERVISOR+ / ADMIN)
+
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| `GET` | `/contests` | SUPERVISOR+ | List all contests |
+| `POST` | `/contests` | SUPERVISOR+ | Create contest (setup phase) |
+| `GET` | `/contests/{id}` | SUPERVISOR+ | Contest details |
+| `PATCH` | `/contests/{id}` | SUPERVISOR+ | Update settings (blocked when `is_locked`) |
+| `POST` | `/contests/{id}/pause` | ADMIN | RUNNING → PAUSED |
+| `POST` | `/contests/{id}/resume` | ADMIN | PAUSED → RUNNING |
+| `POST` | `/contests/{id}/finish` | ADMIN | RUNNING\|PAUSED → FINISHED |
+| `DELETE` | `/contests/{id}` | ADMIN | FK-safe wipe; body `{confirm: "DELETE"}` |
+
+### Setup phase (SUPERVISOR+)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET/POST/PATCH/DELETE` | `/contests/{id}/teams` | Team CRUD |
+| `GET/POST/DELETE` | `/contests/{id}/participants` | Invite/list/remove participants |
+| `PUT` | `/contests/{id}/participants/{user_id}/exceptional-tiebreak` | Per-contest tie-break (ADMIN) |
+
+### Contest operations
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/contests/{id}/rounds` | Public | List rounds |
+| `GET/POST` | `/contests/{id}/rounds/{rid}/predictions` | USER+ | Predictions view / batch save |
+| `GET` | `/contests/{id}/rounds/{rid}/leaderboard` | Public | Round standings |
+| `GET` | `/contests/{id}/rounds/{rid}/results` | Public | Results + points |
+| `GET` | `/contests/{id}/leaderboard` | Public | Global standings |
+| `POST/PATCH/…` | `/contests/{id}/admin/rounds`, `/admin/matches/…` | SUPERVISOR+ | Round/match admin (same semantics as legacy) |
+| `POST` | `/contests/{id}/admin/recalculate` | ADMIN | Recalculate all CALCULATED rounds |
+
+`ContestContext` dependency validates `contest_id` exists (404 if not).
+
+## Contest Lifecycle & Immutability [UPDATED]
+
+Status machine on `contests.status` (managed by `contest_lifecycle_service.py`):
 
 ```
 DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSED
@@ -109,19 +163,28 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 | Exceptional tie-break update | Allowed by ADMIN even when locked — not part of contest rules |
 | Safe delete | ADMIN only; requires `PAUSED` + grace period elapsed (or `CONTEST_ALLOW_INSTANT_DELETE=true`) |
 
-**Safe delete wipe** (`contest_teardown.wipe_contest_data`): deletes `predictions`, `scores`, `matches`, `rounds`, `contacts`, `teams`, and `contest_settings`; keeps ADMIN users by default. Re-seeds fresh `contest_settings` row in `DRAFT` from `contest_defaults.json`.
+**Safe delete wipe** (`contest_teardown.wipe_contest_data`): deletes contest-scoped `predictions`, `scores`, `matches`, `rounds`, `teams`, `contest_participants`, and the `contests` row; keeps ADMIN users by default.
 
-**Domain error mapping:**
+**Domain error mapping** (defined in `src/core/exceptions.py`, mapped in `src/api/error_handlers.py`):
 
-| Exception | HTTP |
-|-----------|------|
-| `ContestLockedError` | 403 |
-| `GracePeriodError` | 400 |
-| `IllegalTransitionError` | 409 |
-| `ContestNotPausedError` | 403 |
-| `ContestDeleteDisabledError` | 403 |
+| Exception | HTTP | `code` (typical) |
+|-----------|------|------------------|
+| `NotFoundError` | 404 | `NOT_FOUND` |
+| `ValidationError` | 400 | `VALIDATION_ERROR` |
+| `ScoreOutOfRangeError` | 422 | `SCORE_OUT_OF_RANGE` |
+| `ContestRuleError` | 403 | `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / … |
+| `ContestLockedError` | 403 | `CONTEST_LOCKED` |
+| `GracePeriodError` | 400 | `GRACE_PERIOD_ACTIVE` |
+| `IllegalTransitionError` | 409 | `ILLEGAL_TRANSITION` |
+| `ContestNotPausedError` | 403 | `CONTEST_NOT_PAUSED` |
+| `ContestDeleteDisabledError` | 403 | `CONTEST_DELETE_DISABLED` |
+| Unhandled / `CriticalError` | 500 | `INTERNAL_ERROR` |
 
-**DELETE `/admin/contest` body:** `{ "confirm": "DELETE" }` (Pydantic `Literal`). Wrong confirm value → **422** (schema validation). Valid confirm but grace not elapsed → **400** (`GracePeriodError`).
+Response body: `{"detail": "<Russian message>", "code": "<CODE>"}`. See [Error Response Format](#error-response-format) and [ERROR_LOGGING.md](ERROR_LOGGING.md).
+
+**DELETE `/contests/{id}` body:** `{ "confirm": "DELETE" }` (Pydantic `Literal`). Wrong confirm value → **422** (schema validation). Valid confirm but grace not elapsed → **400** (`GracePeriodError`).
+
+Legacy shim: `DELETE /admin/contest` (default contest only, deprecated).
 
 > **SQLite note:** `paused_at` may round-trip as naive datetime. Grace-period comparison in `assert_deletable` expects timezone-aware values; normalize to UTC in production code or use PostgreSQL for production.
 
@@ -136,12 +199,12 @@ async def transition_round(session, round_id, target_status: RoundStatus) -> Rou
 async def set_deadline(session, round_id, new_deadline: datetime) -> Round
 ```
 
-**Status machine** (one-step only, illegal transitions raise `ValueError`):
+**Status machine** (one-step only; illegal transitions raise `IllegalTransitionError`):
 ```
 DRAFT → ACTIVE → CLOSED → CALCULATED → PUBLISHED
 ```
 
-**Activation side-effect:** `contest_settings.is_locked = True` when transitioning to `ACTIVE`. API hook then calls `ensure_running_on_first_activation` → `status=RUNNING`.
+**Activation side-effect:** `contests.is_locked = True` when transitioning to `ACTIVE`. API hook then calls `ensure_running_on_first_activation` → `status=RUNNING`.
 
 ### `match_service.py`
 
@@ -169,65 +232,63 @@ See [SCORING_LOGIC.md — Scoring Persistence](SCORING_LOGIC.md#scoring-persiste
 ### `contest_lifecycle_service.py` [NEW]
 
 ```python
-async def require_unlocked(session) -> ContestSettings
-async def assert_contest_running(session) -> ContestSettings
-async def ensure_running_on_first_activation(session) -> ContestSettings
-async def pause_contest(session) / resume_contest(session) / finish_contest(session)
-async def assert_deletable(session, *, instant: bool) -> ContestSettings
-async def delete_contest_data(session, *, keep_admin_users: bool) -> ContestSettings
-async def update_exceptional_tiebreak(session, user_id, points) -> int
+async def require_unlocked(session, contest_id: int) -> Contest
+async def assert_contest_running(session, contest_id: int) -> Contest
+async def ensure_running_on_first_activation(session, contest_id: int) -> Contest
+async def pause_contest(session, contest_id: int) / resume_contest(session, contest_id: int) / finish_contest(session, contest_id: int)
+async def assert_deletable(session, contest_id: int, *, instant: bool) -> Contest
+async def delete_contest_data(session, contest_id: int, *, keep_admin_users: bool) -> None
+async def update_exceptional_tiebreak(session, contest_id: int, user_id, points) -> int
 ```
 
-### `leaderboard_service.py` [NEW]
+### `leaderboard_service.py` [UPDATED]
 
-Aggregates `Score` rows, calls `build_standings(manual_overrides=users.exceptional_tiebreak_points)`, and builds ETag hashes for cache headers.
+Aggregates `Score` rows, reads `contest_participants.exceptional_tiebreak_points`, calls `build_standings(manual_overrides=…)`, and builds ETag hashes for cache headers.
 
 ## Endpoints Reference [UPDATED]
 
-Base path: `/api/v1`
+Base path: `/api/v1`. **Preferred:** contest-scoped paths from [Multi-Contest API](#multi-contest-api). Legacy paths below are deprecated shims (default contest).
 
-### Public (no auth)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/rounds` | List all rounds |
-| `GET` | `/leaderboard` | Global standings (CALCULATED/PUBLISHED rounds) |
-| `GET` | `/rounds/{id}/leaderboard` | Round standings |
-| `GET` | `/rounds/{id}/results` | Match results + per-user points |
-
-### User (Bearer, USER+)
+### Public (no auth) — legacy shims
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/rounds/{id}/predictions` | Visibility-filtered predictions (auth required) |
-| `POST` | `/rounds/{id}/predictions` | Batch prediction save (all matches required) |
+| `GET` | `/rounds` | List rounds (default contest) ⚠️ deprecated |
+| `GET` | `/leaderboard` | Global standings ⚠️ deprecated |
+| `GET` | `/rounds/{id}/leaderboard` | Round standings ⚠️ deprecated |
+| `GET` | `/rounds/{id}/results` | Match results + per-user points ⚠️ deprecated |
 
-### Supervisor (Bearer, SUPERVISOR or ADMIN)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/admin/contest-settings` | Read contest configuration |
-| `PATCH` | `/admin/contest-settings` | Update settings (blocked when `is_locked`) |
-| `POST` | `/admin/rounds` | Create round with matches |
-| `PATCH` | `/admin/rounds/{id}` | Update round deadline |
-| `POST` | `/admin/rounds/{id}/activate` | DRAFT → ACTIVE |
-| `POST` | `/admin/rounds/{id}/calculate` | CLOSED → CALCULATED |
-| `POST` | `/admin/rounds/{id}/publish` | CALCULATED → PUBLISHED |
-| `PUT` | `/admin/matches/{id}/result` | Enter final score |
-| `PATCH` | `/admin/matches/{id}/status` | VOID / POSTPONED / CANCELED |
-
-### Admin only (Bearer, ADMIN)
+### User (Bearer, USER+) — legacy shims
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/admin/contest/pause` | RUNNING → PAUSED |
-| `POST` | `/admin/contest/resume` | PAUSED → RUNNING |
-| `POST` | `/admin/contest/finish` | RUNNING\|PAUSED → FINISHED |
-| `DELETE` | `/admin/contest` | FK-safe wipe; body `{confirm: "DELETE"}` |
-| `PUT` | `/admin/users/{user_id}/exceptional-tiebreak` | Set tie-break points (allowed when locked) |
-| `POST` | `/admin/recalculate` | Re-run scoring for all CALCULATED rounds |
+| `GET` | `/rounds/{id}/predictions` | Visibility-filtered predictions ⚠️ deprecated |
+| `POST` | `/rounds/{id}/predictions` | Batch prediction save ⚠️ deprecated |
 
-> Legacy `POST /admin/leaderboard/{round_id}/override` removed — replaced by per-user exceptional tie-break endpoint.
+### Supervisor (Bearer, SUPERVISOR or ADMIN) — legacy shims
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/admin/contest-settings` | Read contest configuration ⚠️ deprecated |
+| `PATCH` | `/admin/contest-settings` | Update settings ⚠️ deprecated |
+| `POST` | `/admin/rounds` | Create round with matches ⚠️ deprecated |
+| `PATCH` | `/admin/rounds/{id}` | Update round deadline ⚠️ deprecated |
+| `POST` | `/admin/rounds/{id}/activate` | DRAFT → ACTIVE ⚠️ deprecated |
+| `POST` | `/admin/rounds/{id}/calculate` | CLOSED → CALCULATED ⚠️ deprecated |
+| `POST` | `/admin/rounds/{id}/publish` | CALCULATED → PUBLISHED ⚠️ deprecated |
+| `PUT` | `/admin/matches/{id}/result` | Enter final score ⚠️ deprecated |
+| `PATCH` | `/admin/matches/{id}/status` | VOID / POSTPONED / CANCELED ⚠️ deprecated |
+
+### Admin only (Bearer, ADMIN) — legacy shims
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/admin/contest/pause` | RUNNING → PAUSED ⚠️ deprecated |
+| `POST` | `/admin/contest/resume` | PAUSED → RUNNING ⚠️ deprecated |
+| `POST` | `/admin/contest/finish` | RUNNING\|PAUSED → FINISHED ⚠️ deprecated |
+| `DELETE` | `/admin/contest` | FK-safe wipe ⚠️ deprecated |
+| `PUT` | `/admin/users/{user_id}/exceptional-tiebreak` | Tie-break (default contest) ⚠️ deprecated |
+| `POST` | `/admin/recalculate` | Re-run scoring ⚠️ deprecated |
 
 ### `POST /rounds/{id}/predictions`
 
@@ -256,9 +317,49 @@ ETag: <16-char sha256 hash of score state>
 
 ETag derived from `max(Score.id)` and round status — changes after calculate/VOID/recalculate.
 
-**Not cached:** predictions GET/POST, all admin routes, contest-settings PATCH.
+**Not cached:** predictions GET/POST, all admin routes, contest PATCH.
 
 TTL configurable via [CONFIG.md](CONFIG.md#environment-variables).
+
+## Error Response Format [NEW]
+
+Domain errors (`AppError` subclasses from `src/core/exceptions.py`) return:
+
+```json
+{ "detail": "Дедлайн тура истёк", "code": "DEADLINE_PASSED" }
+```
+
+| `code` | Typical HTTP |
+|--------|----------------|
+| `NOT_FOUND` | 404 |
+| `VALIDATION_ERROR` | 400 |
+| `SCORE_OUT_OF_RANGE` | 422 |
+| `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `CONTEST_NOT_RUNNING` | 403 |
+| `CONTEST_LOCKED` | 403 |
+| `GRACE_PERIOD_ACTIVE` | 400 |
+| `ILLEGAL_TRANSITION` | 409 |
+| `INTERNAL_ERROR` | 500 |
+
+- Pydantic validation: **422**, FastAPI default body (no `code`).
+- Auth/RBAC (`deps.py`): `detail` only, Russian text, no `code`.
+- Full policy (RU): [ERROR_LOGGING.md](ERROR_LOGGING.md).
+
+## Logging [NEW]
+
+Configured at startup in `main.py` via `setup_logging(settings.log_level)`.
+
+| Level | Typical use |
+|-------|-------------|
+| `ERROR` | Unhandled exceptions, `notify_admin` alerts |
+| `WARNING` | Recoverable fallbacks, 4xx `AppError` at HTTP boundary |
+| `INFO` | Predictions saved, round calculated, contest pause/resume/finish |
+| `DEBUG` | Scoring data counts, auto-close details |
+
+Log format: `%(asctime)s %(levelname)s [%(name)s] %(message)s`
+
+Set level with env var `LOG_LEVEL` (default `INFO`). See [CONFIG.md](CONFIG.md#environment-variables).
+
+Recoverable internal issues (e.g. skipped NULL prediction rows) log `WARNING` and apply defaults without failing the request — see [ERROR_LOGGING.md](ERROR_LOGGING.md#категории-ошибок).
 
 ## Related Documentation
 
@@ -267,3 +368,4 @@ TTL configurable via [CONFIG.md](CONFIG.md#environment-variables).
 | Database tables & constraints | [DB_REFERENCE.md](DB_REFERENCE.md) |
 | Env vars & seed | [CONFIG.md](CONFIG.md) |
 | Points, bonuses & tie-breakers | [SCORING_LOGIC.md](SCORING_LOGIC.md) |
+| Errors & logging policy (RU) | [ERROR_LOGGING.md](ERROR_LOGGING.md) |

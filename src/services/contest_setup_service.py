@@ -22,6 +22,7 @@ from database.models import (
     User,
     UserRole,
 )
+from core.exceptions import NotFoundError, ValidationError
 from services.contest_lifecycle_service import require_unlocked
 
 
@@ -129,7 +130,13 @@ async def create_team(
         select(func.count()).select_from(Team).where(Team.contest_id == contest_id)
     )
     if team_count is not None and team_count >= contest.total_teams:
-        raise ValueError(f"Contest team cap reached ({contest.total_teams})")
+        raise ValidationError(f"Достигнут лимит команд в конкурсе ({contest.total_teams})")
+
+    dup = await session.scalar(
+        select(Team).where(Team.contest_id == contest_id, Team.name == name)
+    )
+    if dup is not None:
+        raise ValidationError(f"Команда с именем «{name}» уже существует")
 
     team = Team(
         contest_id=contest_id,
@@ -151,7 +158,7 @@ async def update_team(
     await require_unlocked(session, contest_id)
     team = await session.get(Team, team_id)
     if team is None or team.contest_id != contest_id:
-        raise ValueError(f"Team {team_id} not found in contest {contest_id}")
+        raise NotFoundError(f"Команда {team_id} не найдена в конкурсе {contest_id}")
 
     for field in ("name", "short_name", "logo_url"):
         if field in patch and patch[field] is not None:
@@ -163,7 +170,7 @@ async def delete_team(session: AsyncSession, contest_id: int, team_id: int) -> N
     await require_unlocked(session, contest_id)
     team = await session.get(Team, team_id)
     if team is None or team.contest_id != contest_id:
-        raise ValueError(f"Team {team_id} not found in contest {contest_id}")
+        raise NotFoundError(f"Команда {team_id} не найдена в конкурсе {contest_id}")
     await session.delete(team)
 
 
@@ -250,7 +257,7 @@ async def remove_participant(
     await require_unlocked(session, contest_id)
     participant = await session.get(ContestParticipant, (contest_id, user_id))
     if participant is None:
-        raise ValueError(f"Participant {user_id} not found in contest {contest_id}")
+        raise NotFoundError(f"Участник {user_id} не найден в конкурсе {contest_id}")
 
     other_enrollments = await session.scalar(
         select(func.count())

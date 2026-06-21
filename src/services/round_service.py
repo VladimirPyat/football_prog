@@ -7,6 +7,12 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.exceptions import (
+    ContestRuleError,
+    IllegalTransitionError,
+    NotFoundError,
+    ValidationError,
+)
 from database.models import Contest, Match, MatchStatus, Round, RoundStatus
 
 _VALID_TRANSITIONS: dict[RoundStatus, set[RoundStatus]] = {
@@ -21,21 +27,21 @@ _VALID_TRANSITIONS: dict[RoundStatus, set[RoundStatus]] = {
 async def _get_round(session: AsyncSession, round_id: int) -> Round:
     round_ = await session.get(Round, round_id)
     if round_ is None:
-        raise ValueError(f"Round {round_id} not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     return round_
 
 
 async def _get_contest(session: AsyncSession, contest_id: int) -> Contest:
     contest = await session.get(Contest, contest_id)
     if contest is None:
-        raise ValueError(f"Contest {contest_id} not found")
+        raise NotFoundError(f"Конкурс {contest_id} не найден")
     return contest
 
 
 async def _earliest_match_dt(session: AsyncSession, round_id: int) -> datetime:
     matches = (await session.scalars(select(Match).where(Match.round_id == round_id))).all()
     if not matches:
-        raise ValueError(f"No matches found for round {round_id}")
+        raise NotFoundError(f"Матчи для тура {round_id} не найдены")
     return min(m.date_time for m in matches)
 
 
@@ -48,9 +54,8 @@ async def transition_round(
     allowed = _VALID_TRANSITIONS.get(current, set())
 
     if target_status not in allowed:
-        raise ValueError(
-            f"Illegal round status transition: {current} → {target_status}. "
-            f"Allowed from {current}: {allowed or 'none'}"
+        raise IllegalTransitionError(
+            f"Недопустимый переход статуса тура: {current} → {target_status}"
         )
 
     if target_status == RoundStatus.ACTIVE:
@@ -66,7 +71,7 @@ async def set_deadline(
 ) -> Round:
     """Update the round deadline, enforcing the deadline_rule_hours constraint."""
     if new_deadline.tzinfo is None:
-        raise ValueError("new_deadline must be timezone-aware")
+        raise ValidationError("Дедлайн должен содержать информацию о часовом поясе")
 
     round_ = await _get_round(session, round_id)
     contest = await _get_contest(session, round_.contest_id)
@@ -80,15 +85,15 @@ async def set_deadline(
     now = datetime.now(timezone.utc)
 
     if now > cutoff:
-        raise ValueError(
-            f"Deadline change window has closed: now ({now}) > cutoff ({cutoff}). "
-            "No more changes allowed."
+        raise ContestRuleError(
+            "Окно изменения дедлайна закрыто",
+            code="DEADLINE_CHANGE_CLOSED",
         )
 
     if new_deadline >= cutoff:
-        raise ValueError(
-            f"New deadline ({new_deadline}) must be strictly before "
-            f"earliest_match − {deadline_rule_hours}h = {cutoff}"
+        raise ValidationError(
+            f"Новый дедлайн должен быть раньше {cutoff} "
+            f"(первый матч минус {deadline_rule_hours} ч)"
         )
 
     round_.deadline = new_deadline
@@ -99,19 +104,22 @@ async def close_round(session: AsyncSession, contest_id: int, round_id: int) -> 
     """Transition ACTIVE → CLOSED when now >= deadline."""
     round_ = await _get_round(session, round_id)
     if round_.contest_id != contest_id:
-        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
+        raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
     if round_.status == RoundStatus.CLOSED.value:
         return round_
 
     if round_.status != RoundStatus.ACTIVE.value:
-        raise ValueError(f"Round {round_id} must be ACTIVE to close (got {round_.status})")
+        raise ContestRuleError(
+            f"Закрыть можно только активный тур (текущий статус: {round_.status})",
+            code="ROUND_NOT_ACTIVE",
+        )
 
     deadline = round_.deadline
     if deadline.tzinfo is None:
         deadline = deadline.replace(tzinfo=timezone.utc)
     now = datetime.now(timezone.utc)
     if now < deadline:
-        raise ValueError("Round deadline has not passed yet")
+        raise ValidationError("Дедлайн тура ещё не наступил")
 
     return await transition_round(session, round_id, RoundStatus.CLOSED)
 
@@ -124,7 +132,7 @@ async def create_free_tour(
 ) -> Round:
     """Move POSTPONED matches into a new DRAFT round."""
     if deadline.tzinfo is None:
-        raise ValueError("deadline must be timezone-aware")
+        raise ValidationError("Дедлайн должен содержать информацию о часовом поясе")
 
     contest = await _get_contest(session, contest_id)
     max_number = await session.scalar(
@@ -152,13 +160,15 @@ async def create_free_tour(
 
         match = await session.get(Match, match_id)
         if match is None:
-            raise ValueError(f"Match {match_id} not found")
+            raise NotFoundError(f"Матч {match_id} не найден")
 
         source_round = await session.get(Round, match.round_id)
         if source_round is None or source_round.contest_id != contest_id:
-            raise ValueError(f"Match {match_id} does not belong to contest {contest_id}")
+            raise NotFoundError(f"Матч {match_id} не принадлежит конкурсу {contest_id}")
         if match.status != MatchStatus.POSTPONED.value:
-            raise ValueError(f"Match {match_id} must be POSTPONED (got {match.status})")
+            raise ValidationError(
+                f"Матч {match_id} должен быть в статусе POSTPONED (текущий: {match.status})"
+            )
 
         source_round_counts[match.round_id] = source_round_counts.get(match.round_id, 0) + 1
         match.round_id = new_round.id

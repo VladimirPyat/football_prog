@@ -25,6 +25,7 @@ from database.models import (
     User,
     UserRole,
 )
+from core.exceptions import ContestRuleError, IllegalTransitionError, ValidationError
 from services.prediction_service import submit_batch
 from services.round_service import set_deadline, transition_round
 
@@ -156,7 +157,7 @@ async def test_dl_24h_fail_at_exact_cutoff(minimal_db):
             _, round_, _, _ = await _create_synthetic_round(session)
             round_id = round_.id
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         async with sf() as session:
             async with session.begin():
                 await set_deadline(session, round_id, _CUTOFF_DT)
@@ -171,7 +172,7 @@ async def test_dl_24h_fail_within_23h_of_match(minimal_db):
             _, round_, _, _ = await _create_synthetic_round(session)
             round_id = round_.id
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         async with sf() as session:
             async with session.begin():
                 await set_deadline(
@@ -230,7 +231,7 @@ async def test_st_illegal_published_to_active(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            with pytest.raises(ValueError, match="Illegal round status transition"):
+            with pytest.raises(IllegalTransitionError, match="Недопустимый"):
                 await transition_round(session, round_id, RoundStatus.ACTIVE)
 
 
@@ -247,7 +248,7 @@ async def test_st_illegal_draft_to_calculated(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            with pytest.raises(ValueError, match="Illegal round status transition"):
+            with pytest.raises(IllegalTransitionError, match="Недопустимый"):
                 await transition_round(session, round_id, RoundStatus.CALCULATED)
 
 
@@ -306,7 +307,7 @@ async def test_bt_partial_7_of_8_rejected(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 await submit_batch(session, CONTEST_ID, user_id, round_id, partial_items)
 
     async with sf() as session:
@@ -472,7 +473,7 @@ async def test_bt_deadline_past_deadline_raises_permission_error(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            with pytest.raises(PermissionError):
+            with pytest.raises(ContestRuleError):
                 await submit_batch(session, CONTEST_ID, user_id, round_id, items)
 
 
@@ -497,5 +498,5 @@ async def test_bt_deadline_non_active_round_raises_permission_error(minimal_db):
 
     async with sf() as session:
         async with session.begin():
-            with pytest.raises(PermissionError):
+            with pytest.raises(ContestRuleError):
                 await submit_batch(session, CONTEST_ID, user_id, round_id, items)

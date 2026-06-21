@@ -20,7 +20,7 @@ Contest scoring rules, bonuses, tie-breakers, and engine implementation.
 
 | Layer | Status |
 |-------|--------|
-| Rules stored in DB (`contest_settings.rules_json`) | ✅ Seeded via [CONFIG.md](CONFIG.md) |
+| Rules stored in DB (`contests.rules_json`) | ✅ Seeded via [CONFIG.md](CONFIG.md) |
 | Pure scoring engine (`src/scoring/`) | ✅ Stage 1.1 — implemented and verified (90/90) |
 | Scoring persistence (`src/services/scoring_persistence.py`) | ✅ Stage 1.2 — implemented and verified (90/90) |
 | Leaderboard service (`src/services/leaderboard_service.py`) | ✅ Stage 1.3 — aggregates scores + tie-break [NEW] |
@@ -28,12 +28,12 @@ Contest scoring rules, bonuses, tie-breakers, and engine implementation.
 
 ## Configuration Source [UPDATED]
 
-Default values from `docs/test_data/config/contest_defaults.json`, persisted by `src/scripts/seed.py` into `contest_settings.rules_json`.
+Default values from `docs/test_data/config/contest_defaults.json`, persisted by `src/scripts/seed.py` into `contests.rules_json`.
 
 Runtime access path:
 
 ```
-contest_settings.rules_json → ScoringRules accessor → score_round() → Score rows in DB
+contests.rules_json → ScoringRules accessor → score_round() → Score rows in DB
 ```
 
 See [DB_REFERENCE.md](DB_REFERENCE.md) for the `scores` table schema.
@@ -178,9 +178,9 @@ On VOID or result change: re-run the full round in one atomic transaction.
 2. `exact_scores_count DESC` — sum of `count_exact_high + count_exact`
 3. `total_without_bonuses DESC` — sum of `base_points` only (no bonuses)
 4. `correct_diffs_count DESC` — sum of `count_diff`
-5. `manual_override DESC` — `users.exceptional_tiebreak_points` (admin-set; default 0) [UPDATED]
+5. `manual_override DESC` — `contest_participants.exceptional_tiebreak_points` (admin-set per contest; default 0) [UPDATED]
 
-**Before → After:** Criterion 5 was previously documented as `rules_json.tiebreakers.manual_overrides`. Stage 1.2.1 moved this to `users.exceptional_tiebreak_points` — a per-user DB column updatable by ADMIN at any time (even when contest is locked). `LeaderboardService` reads the column and passes it as `manual_overrides` to `build_standings()`.
+**Before → After:** Criterion 5 was on `users.exceptional_tiebreak_points` (Stage 1.2.1). Stage 1.4 moved it to `contest_participants.exceptional_tiebreak_points` — per-user **per-contest**, updatable by ADMIN at any time (even when contest is locked). `LeaderboardService` loads participants for the contest and passes `manual_overrides` to `build_standings()`.
 
 `tiebreaker_status = "manual_override"` is set on rows whose position was decided by criterion 5.
 
@@ -204,7 +204,7 @@ async def recalculate_round(session, round_id) -> int # re-run after VOID/result
 **Flow:**
 1. Load FINISHED matches (non-NULL scores; VOID/SCHEDULED excluded) + all predictions + all participant IDs from DB.
 2. Convert to engine types (`MatchResult`, `UserPrediction`).
-3. Call `score_round(results, predictions, participant_ids, rules=contest_settings.rules_json)`.
+3. Call `score_round(results, predictions, participant_ids, rules=contest.rules_json)`.
 4. Map `UserRoundScore` → `Score` DB row (including `count_*` columns).
 5. Upsert all rows in **one atomic transaction**.
 6. Transition round `CLOSED → CALCULATED`.

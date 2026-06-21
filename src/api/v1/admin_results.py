@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
 from api.deps import DbSession, RoleChecker, resolve_default_contest_id
-from database.models import MatchStatus, RoundStatus, UserRole
+from core.exceptions import NotFoundError
+from database.models import Match, MatchStatus, Round, RoundStatus, UserRole
 from schemas.admin import MatchResultRequest, MatchResultResponse, MatchStatusPatch, MatchStatusResponse
 from services.contest_lifecycle_service import assert_contest_running
 from services.match_service import change_status, set_result
@@ -17,43 +18,31 @@ _supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
 
 @router.put("/{match_id}/result", response_model=MatchResultResponse, dependencies=[_supervisor], deprecated=True)
 async def apply_result(match_id: int, body: MatchResultRequest, session: DbSession) -> MatchResultResponse:
+    """Внести результат матча. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
-    try:
-        match = await set_result(session, contest_id, match_id, body.score1, body.score2)
-        await session.commit()
-    except PermissionError as exc:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except ValueError as exc:
-        msg = str(exc)
-        if "deadline" in msg.lower() or "closed" in msg.lower():
-            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=msg) from exc
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=msg) from exc
+    match = await set_result(session, contest_id, match_id, body.score1, body.score2)
+    await session.commit()
     return MatchResultResponse(round_id=match.round_id)
 
 
 @router.patch("/{match_id}/status", response_model=MatchStatusResponse, dependencies=[_supervisor], deprecated=True)
 async def patch_status(match_id: int, body: MatchStatusPatch, session: DbSession) -> MatchStatusResponse:
-    from database.models import Match, Round  # noqa: PLC0415
-
+    """Изменить статус матча. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
 
     match = await session.get(Match, match_id)
     if match is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Match not found")
+        raise NotFoundError(f"Матч {match_id} не найден")
 
     round_ = await session.get(Round, match.round_id)
     if round_ is None or round_.contest_id != contest_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Match not found")
+        raise NotFoundError(f"Матч {match_id} не найден")
 
-    was_calculated = round_.status == RoundStatus.CALCULATED
-
-    try:
-        new_status = MatchStatus(body.status)
-        await change_status(session, contest_id, match_id, new_status)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    was_calculated = RoundStatus(round_.status) == RoundStatus.CALCULATED
+    new_status = MatchStatus(body.status)
+    await change_status(session, contest_id, match_id, new_status)
+    await session.commit()
 
     recalc = was_calculated and body.status == MatchStatus.VOID
     return MatchStatusResponse(recalculation_triggered=recalc)

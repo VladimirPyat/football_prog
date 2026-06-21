@@ -27,11 +27,15 @@ from api.v1 import (
     predictions,
     rounds,
 )
+from api.error_handlers import register_error_handlers
 from config.settings import get_settings
+from core.logging_config import setup_logging
 
 settings = get_settings()
+setup_logging(settings.log_level)
 
 app = FastAPI(title="Football Predictions API", version="1.1.0")
+register_error_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,4 +62,5 @@ app.include_router(admin_contest.router, prefix=API_PREFIX)
 
 @app.get("/health")
 async def health() -> dict[str, str]:
+    """Проверка доступности сервиса."""
     return {"status": "ok"}

@@ -14,6 +14,7 @@ router = APIRouter(prefix="/rounds", tags=["legacy (deprecated)", "rounds (publi
 
 @router.get("", response_model=list[RoundOut], deprecated=True)
 async def list_rounds(session: DbSession) -> list[RoundOut]:
+    """Список туров. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     rounds = (
         await session.scalars(

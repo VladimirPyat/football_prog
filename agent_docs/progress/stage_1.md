@@ -144,3 +144,18 @@
 - Verified: [API-RESULTS] 90/90, [API-LB-GLOBAL] 10/10, [CANARY-PYTEST-*] PASS, contest-scoped lifecycle/gaps/multi PASS; [OP-CLOSE] FAIL — auto_close + close handler conflict, no commit (see test_1.4.md)
 - Report: agent_docs/reports/test_1.4.md
 - Next: @Coder fix [OP-CLOSE] in src/api/deps.py + round close idempotency; re-test
+
+## 2026-06-21 — Coder (1.5 cleanup)
+- STATUS: READY_FOR_TEST
+- Files: src/core/exceptions.py, src/core/logging_config.py, src/api/error_handlers.py, src/api/handlers/, src/services/notification_service.py, src/api/v1/*.py, src/services/*.py, config/settings.py, main.py, manuals/ERROR_LOGGING.md, manuals/API_GUIDE.md, tests/unit/test_exceptions_1_5.py, tests/api/test_errors_1_5.py, tests/unit/test_recoverable_1_5.py
+- Verified: uv run pytest tests/ --ignore=tests/manual → 257 passed, 2 skipped
+- Notes: HTTP detail Russian; AppError JSON {detail, code}; notify_admin stub; centralized error handlers; Russian API docstrings
+- Next: agent_docs/instructions/tester_1.5.md
+
+## 2026-06-21 — Tester (1.5)
+- STATUS: TEST_PASS
+- Tests: tests/unit/test_exceptions_1_5.py, tests/api/test_errors_1_5.py, tests/unit/test_recoverable_1_5.py
+- Executed: uv run pytest tests/unit/test_exceptions_1_5.py tests/api/test_errors_1_5.py tests/unit/test_recoverable_1_5.py -v → 28 passed; uv run pytest (1.5 + 1.4 regression subset) -v → 60 passed, 1 skipped
+- Verified: all [EXC-*], [ERR-*], [REC-*], [LOG-*]; static audit PASS; 90/90 + 10/10 regression PASS
+- Report: agent_docs/reports/test_1.5.md
+- Next: Stage 1.5 sign-off

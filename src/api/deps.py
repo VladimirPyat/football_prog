@@ -33,7 +33,7 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 async def _fetch_user(session: AsyncSession, user_id: int) -> User:
     user = await session.get(User, user_id)
     if user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
     return user
 
 
@@ -41,16 +41,23 @@ async def get_current_user(
     session: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
+    """Вернуть текущего пользователя по JWT из заголовка Authorization."""
     if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация")
     try:
         payload = decode_access_token(credentials.credentials)
     except ValueError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="Недействительный или просроченный токен",
+        ) from None
 
     sub = payload.get("sub")
     if sub is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="Недействительный или просроченный токен",
+        )
 
     return await _fetch_user(session, int(sub))
 
@@ -72,23 +79,23 @@ async def get_optional_user(
 
 
 class RoleChecker:
-    """RBAC dependency: allow only specified roles."""
+    """Проверка роли: доступ только указанным ролям (RBAC)."""
 
     def __init__(self, *allowed_roles: UserRole | str) -> None:
         self.allowed = {r.value if isinstance(r, UserRole) else r for r in allowed_roles}
 
     async def __call__(self, user: CurrentUser) -> User:
         if user.role not in self.allowed:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
         return user
 
 
 def require_not_temp_password(user: CurrentUser) -> User:
-    """Block endpoints when user must change temp password first."""
+    """Запретить операцию, пока пользователь не сменил временный пароль."""
     if user.is_temp_password:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            detail="Temporary password must be changed before accessing this resource",
+            detail="Смените временный пароль перед выполнением операции",
         )
     return user
 
@@ -104,7 +111,7 @@ def cache_control_header() -> dict[str, str]:
 
 
 async def resolve_default_contest_id(session: AsyncSession) -> int:
-    """Resolve default contest for legacy 1.3 shims (RUNNING first, else lowest id)."""
+    """Определить default contest для legacy shim (RUNNING первым, иначе минимальный id)."""
     running_id = await session.scalar(
         select(Contest.id)
         .where(Contest.status == ContestLifecycleStatus.RUNNING)
@@ -116,15 +123,15 @@ async def resolve_default_contest_id(session: AsyncSession) -> int:
 
     first_id = await session.scalar(select(Contest.id).order_by(Contest.id).limit(1))
     if first_id is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No contest found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Конкурс не найден")
     return first_id
 
 
 async def get_contest_context(session: DbSession, contest_id: int) -> Contest:
-    """Load contest and auto-close expired ACTIVE rounds before handler runs."""
+    """Загрузить конкурс и автозакрыть просроченные ACTIVE-туры перед обработчиком."""
     contest = await session.get(Contest, contest_id)
     if contest is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Contest {contest_id} not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Конкурс не найден")
     closed_ids = await auto_close_expired_rounds(session, contest_id)
     if closed_ids:
         await session.commit()

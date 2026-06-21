@@ -38,6 +38,8 @@ class Settings(BaseSettings):
 
     cache_max_age_seconds: int = 300
     cache_stale_while_revalidate_seconds: int = 60
+
+    log_level: str = "INFO"  # root logger level [NEW]
 ```
 
 Access via `get_settings()` (cached singleton).
@@ -60,6 +62,7 @@ Access via `get_settings()` (cached singleton).
 | `CONTEST_ALLOW_INSTANT_DELETE` | `false` | Skip grace period (test/dev only) [NEW] |
 | `CACHE_MAX_AGE_SECONDS` | `300` | Public leaderboard/results cache TTL [NEW] |
 | `CACHE_STALE_WHILE_REVALIDATE_SECONDS` | `60` | Stale-while-revalidate window [NEW] |
+| `LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) [NEW] |
 
 > `contest_defaults_path` is a code default pointing to `docs/test_data/config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
 
@@ -67,7 +70,7 @@ Access via `get_settings()` (cached singleton).
 
 **Source file:** `docs/test_data/config/contest_defaults.json`
 
-Loaded at seed time into `contest_settings` table. The `_meta` block is **not** stored in the database.
+Loaded at seed time into `contests` table. The `_meta` block is **not** stored in the database.
 
 ### Structural fields (top-level columns)
 
@@ -95,10 +98,10 @@ Scoring rule values are documented in [SCORING_LOGIC.md](SCORING_LOGIC.md). DB s
 
 ### Lock behavior [UPDATED]
 
-- `contest_settings.is_locked` defaults to `false` at seed.
+- `contests.is_locked` defaults to `false` at seed.
 - After first round activation (`DRAFT → ACTIVE`), `is_locked=true` and `status=RUNNING`.
 - While locked: structural fields and `rules_json` cannot be PATCHed (HTTP 403).
-- `users.exceptional_tiebreak_points` is **not** locked — ADMIN may update at any time via API.
+- `contest_participants.exceptional_tiebreak_points` is **not** locked — ADMIN may update per contest at any time via API.
 
 See [API_GUIDE.md — Contest Lifecycle](API_GUIDE.md#contest-lifecycle--immutability).
 
@@ -109,7 +112,7 @@ See [API_GUIDE.md — Contest Lifecycle](API_GUIDE.md#contest-lifecycle--immutab
 ### What it does
 
 1. Ensures tables exist (`Base.metadata.create_all`)
-2. Inserts `contest_settings` from `contest_defaults.json` (skips if row exists)
+2. Inserts default `contests` row from `contest_defaults.json` (skips if contest exists)
 3. Inserts ADMIN user from env/settings (skips if login exists)
 
 ### Usage
@@ -122,7 +125,7 @@ uv run python src/scripts/seed.py --defaults-path docs/test_data/config/contest_
 
 ### Idempotency
 
-- Second run logs "already exist, skipping" for both `contest_settings` and ADMIN user.
+- Second run logs "already exist, skipping" for both default contest and ADMIN user.
 - Safe to re-run after migrations.
 
 ### Bootstrap flow
@@ -131,7 +134,7 @@ uv run python src/scripts/seed.py --defaults-path docs/test_data/config/contest_
 flowchart TD
     A[contest_defaults.json] --> B[seed.py]
     C[config/settings.py] --> B
-    B --> D[contest_settings row]
+    B --> D[contests row]
     B --> E[users row ADMIN]
     F[alembic upgrade head] --> G[(football.db)]
     B --> G

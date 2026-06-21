@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from database.base import Base
 from database.models import ContestLifecycleStatus, Match, MatchStatus, Round, RoundStatus, Team
 from services.contest_setup_service import create_contest, create_team
+from core.exceptions import ContestRuleError
 from services.match_service import set_result
 from services.round_auto_close_service import auto_close_expired_rounds
 from services.round_service import close_round
@@ -108,7 +109,7 @@ async def test_result_rejected_before_deadline_allowed_after_close(session: Asyn
     session.add(future_match)
     await session.commit()
 
-    with pytest.raises(ValueError, match="deadline"):
+    with pytest.raises(ContestRuleError, match="дедлайн"):
         await set_result(session, contest.id, future_match.id, 1, 0)
 
     await close_round(session, contest.id, round_.id)

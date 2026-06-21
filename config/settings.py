@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     cache_max_age_seconds: int = 300
     cache_stale_while_revalidate_seconds: int = 60
 
+    log_level: str = "INFO"
+
 
 @lru_cache
 def get_settings() -> Settings:

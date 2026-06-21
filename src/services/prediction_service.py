@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.exceptions import (
+    ContestRuleError,
+    NotFoundError,
+    ScoreOutOfRangeError,
+    ValidationError,
+)
 from database.models import Contest, Match, Prediction, Round, RoundStatus, UserRole
+
+logger = logging.getLogger(__name__)
 
 
 async def _get_contest_for_round(session: AsyncSession, round_id: int) -> Contest:
     round_ = await session.get(Round, round_id)
     if round_ is None:
-        raise ValueError(f"Round {round_id} not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     contest = await session.get(Contest, round_.contest_id)
     if contest is None:
-        raise ValueError(f"Contest {round_.contest_id} not found")
+        raise NotFoundError(f"Конкурс {round_.contest_id} не найден")
     return contest
 
 
@@ -30,14 +39,14 @@ async def submit_batch(
     """Submit predictions for all matches in a round atomically."""
     contest = await _get_contest_for_round(session, round_id)
     if contest.id != contest_id:
-        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
+        raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
     matches_per_round: int = contest.matches_per_round
     max_score: int = contest.rules_json["constraints"]["score_validation_range"][1]
 
     round_ = await session.get(Round, round_id)
     if round_ is None:
-        raise ValueError(f"Round {round_id} not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
 
     now = datetime.now(timezone.utc)
     deadline = round_.deadline
@@ -45,18 +54,18 @@ async def submit_batch(
         deadline = deadline.replace(tzinfo=timezone.utc)
 
     if round_.status != RoundStatus.ACTIVE:
-        raise PermissionError(
-            f"Predictions not accepted: round {round_id} status is {round_.status} (must be ACTIVE)"
+        raise ContestRuleError(
+            f"Прогнозы принимаются только на активный тур (статус: {round_.status})",
+            code="ROUND_NOT_ACTIVE",
         )
 
     if now >= deadline:
-        raise PermissionError(
-            f"Deadline has passed for round {round_id}: {deadline}"
-        )
+        raise ContestRuleError("Дедлайн тура истёк", code="DEADLINE_PASSED")
 
     if len(items) != matches_per_round:
-        raise ValueError(
-            f"Expected exactly {matches_per_round} predictions, got {len(items)}"
+        raise ValidationError(
+            f"Укажите прогнозы на все матчи тура: ожидается {matches_per_round}, "
+            f"получено {len(items)}"
         )
 
     round_matches = (
@@ -68,18 +77,18 @@ async def submit_batch(
     if submitted_match_ids != round_match_ids:
         missing = round_match_ids - submitted_match_ids
         extra = submitted_match_ids - round_match_ids
-        raise ValueError(
-            f"Prediction match coverage mismatch. Missing: {missing}. Extra: {extra}."
+        raise ValidationError(
+            f"Укажите прогнозы на все матчи тура. Не хватает: {missing}. Лишние: {extra}."
         )
 
     for match_id, score1, score2 in items:
         if not (0 <= score1 <= max_score):
-            raise ValueError(
-                f"score1={score1} for match {match_id} out of range [0, {max_score}]"
+            raise ScoreOutOfRangeError(
+                f"Счёт {score1} вне диапазона [0, {max_score}] (матч {match_id})"
             )
         if not (0 <= score2 <= max_score):
-            raise ValueError(
-                f"score2={score2} for match {match_id} out of range [0, {max_score}]"
+            raise ScoreOutOfRangeError(
+                f"Счёт {score2} вне диапазона [0, {max_score}] (матч {match_id})"
             )
 
     await session.execute(
@@ -98,6 +107,13 @@ async def submit_batch(
         )
         session.add(prediction)
 
+    logger.info(
+        "predictions saved user_id=%s contest_id=%s round_id=%s count=%s",
+        user_id,
+        contest_id,
+        round_id,
+        len(items),
+    )
     return len(items)
 
 
@@ -111,9 +127,9 @@ async def visible_predictions(
     """Return predictions filtered by deadline and viewer role."""
     round_ = await session.get(Round, round_id)
     if round_ is None:
-        raise ValueError(f"Round {round_id} not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     if round_.contest_id != contest_id:
-        raise ValueError(f"Round {round_id} does not belong to contest {contest_id}")
+        raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
     now = datetime.now(timezone.utc)
     deadline = round_.deadline

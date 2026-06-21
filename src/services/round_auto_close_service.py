@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.exceptions import AppError
 from database.models import Round, RoundStatus
-from services.round_service import transition_round
+from services.round_service import close_round, transition_round
+
+logger = logging.getLogger(__name__)
 
 
 async def auto_close_expired_rounds(session: AsyncSession, contest_id: int) -> list[int]:
@@ -29,7 +33,29 @@ async def auto_close_expired_rounds(session: AsyncSession, contest_id: int) -> l
         if deadline.tzinfo is None:
             deadline = deadline.replace(tzinfo=timezone.utc)
         if deadline <= now:
-            await transition_round(session, round_.id, RoundStatus.CLOSED)
+            try:
+                await close_round(session, contest_id, round_.id)
+            except AppError as exc:
+                logger.warning(
+                    "auto_close skip round_id=%s contest_id=%s reason=%s",
+                    round_.id,
+                    contest_id,
+                    exc.message,
+                )
+                try:
+                    await transition_round(session, round_.id, RoundStatus.CLOSED)
+                except AppError as inner:
+                    logger.warning(
+                        "auto_close transition skip round_id=%s reason=%s",
+                        round_.id,
+                        inner.message,
+                    )
+                    continue
             closed_ids.append(round_.id)
+            logger.debug(
+                "auto_close closed round_id=%s contest_id=%s",
+                round_.id,
+                contest_id,
+            )
 
     return closed_ids

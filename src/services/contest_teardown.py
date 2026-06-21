@@ -9,6 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import get_settings
+from core.exceptions import NotFoundError
 from database.models import (
     Contest,
     ContestLifecycleStatus,
@@ -64,7 +65,7 @@ async def reset_contest_to_draft(session: AsyncSession, contest_id: int) -> Cont
 
     contest = await session.get(Contest, contest_id)
     if contest is None:
-        raise ValueError(f"Contest {contest_id} not found")
+        raise NotFoundError(f"Конкурс {contest_id} не найден")
 
     contest.is_locked = False
     contest.status = ContestLifecycleStatus.DRAFT

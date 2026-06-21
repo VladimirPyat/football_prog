@@ -17,11 +17,12 @@ Overview of the database layer: SQLAlchemy models, enums, constraints, and Alemb
 | Component | Path | Role |
 |-----------|------|------|
 | Declarative base | `src/database/base.py` | `Base` metadata for ORM + Alembic |
-| Models | `src/database/models.py` | 8 tables, enums, CHECK/UNIQUE |
+| Models | `src/database/models.py` | 10 tables, enums, CHECK/UNIQUE |
 | Engine | `src/database/engine.py` | Async engine + session factory |
-| Initial migration | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates all 8 tables |
+| Initial migration | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates initial 8 tables |
 | Scores extension | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds `count_*` columns to `scores` |
-| Lifecycle extension | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Adds contest lifecycle + tie-break columns [NEW] |
+| Lifecycle extension | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Lifecycle on `contest_settings`; tie-break on `users` |
+| Multi-contest | `alembic/versions/c4d5e6f7a8b9_multi_contest_and_participants.py` | `contests`, `contest_participants`, scoped FKs [NEW] |
 | Alembic runner | `alembic/env.py` | Async migrations; URL from [CONFIG.md](CONFIG.md) |
 
 **Stack:** SQLAlchemy 2.0+ async, `DateTime(timezone=True)` (TIMESTAMPTZ), JSON column for `rules_json`.
@@ -67,7 +68,16 @@ Defined in `src/database/models.py` as `StrEnum` values stored as `VARCHAR`.
 | `PAUSED` | Mutating ops blocked; required before safe delete |
 | `FINISHED` | Early termination; mutating ops blocked |
 
-Stored on `contest_settings.status`. Independent of `is_locked` (lock prevents rule edits; status controls operational pause/finish).
+Stored on `contests.status`. Independent of `is_locked` (lock prevents rule edits; status controls operational pause/finish).
+
+### `ParticipantStatus` [NEW]
+
+| Value | Description |
+|-------|-------------|
+| `PENDING` | Invited, not yet accepted |
+| `ACCEPTED` | Active participant in contest |
+
+Stored on `contest_participants.status`.
 
 ## Tables [NEW]
 
@@ -82,9 +92,8 @@ Stored on `contest_settings.status`. Independent of `is_locked` (lock prevents r
 | `first_name` | VARCHAR | NOT NULL |
 | `last_name` | VARCHAR | NOT NULL |
 | `is_temp_password` | BOOLEAN | NOT NULL, default `false` |
-| `exceptional_tiebreak_points` | INTEGER | NOT NULL, default `0` [NEW] |
 
-> `exceptional_tiebreak_points` is an admin-entered operational tie-break (criterion 5 only). It is **not** part of `rules_json` and is **not** frozen by `is_locked`. See [SCORING_LOGIC.md](SCORING_LOGIC.md#tie-breakers-and-final-standings).
+> Per-contest exceptional tie-break lives on `contest_participants.exceptional_tiebreak_points` (Stage 1.4). See [SCORING_LOGIC.md](SCORING_LOGIC.md#tie-breakers-and-final-standings).
 
 ### `contacts`
 
@@ -96,24 +105,30 @@ Stored on `contest_settings.status`. Independent of `is_locked` (lock prevents r
 | `tg_id` | VARCHAR | NULL |
 | `notify_enabled` | BOOLEAN | NOT NULL, default `false` |
 
-### `teams`
+### `teams` [UPDATED]
 
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `id` | INTEGER | PK |
-| `name` | VARCHAR | UNIQUE, NOT NULL |
+| `contest_id` | INTEGER | FK → `contests.id` ON DELETE CASCADE, NOT NULL [NEW] |
+| `name` | VARCHAR | NOT NULL |
 | `short_name` | VARCHAR | NOT NULL |
 | `logo_url` | VARCHAR | NULL |
 
-### `rounds`
+Unique per contest: `(contest_id, name)`.
+
+### `rounds` [UPDATED]
 
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `id` | INTEGER | PK |
-| `number` | INTEGER | UNIQUE, NOT NULL |
+| `contest_id` | INTEGER | FK → `contests.id` ON DELETE CASCADE, NOT NULL [NEW] |
+| `number` | INTEGER | NOT NULL |
 | `deadline` | TIMESTAMPTZ | NOT NULL |
 | `status` | VARCHAR | NOT NULL (`RoundStatus`) |
 | `matches_count` | INTEGER | NOT NULL, default `0` |
+
+Unique per contest: `(contest_id, number)`.
 
 ### `matches`
 
@@ -164,20 +179,37 @@ Stored on `contest_settings.status`. Independent of `is_locked` (lock prevents r
 
 > All aggregation fields default to `0` because they store **computed totals**, not raw match predictions. See [Data Rules](#data-rules).
 
-### `contest_settings`
+### `contests` [NEW]
+
+Replaces singleton `contest_settings` (Stage 1.4). Multiple contests may coexist.
 
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `id` | INTEGER | PK |
+| `name` | VARCHAR | NOT NULL |
+| `slug` | VARCHAR | UNIQUE, NULL |
 | `is_locked` | BOOLEAN | NOT NULL, default `false` |
-| `status` | VARCHAR | NOT NULL, default `'DRAFT'` (`ContestLifecycleStatus`) [NEW] |
-| `paused_at` | TIMESTAMPTZ | NULL — set on pause [NEW] |
-| `finished_at` | TIMESTAMPTZ | NULL — set on early finish [NEW] |
+| `status` | VARCHAR | NOT NULL, default `'DRAFT'` (`ContestLifecycleStatus`) |
+| `paused_at` | TIMESTAMPTZ | NULL — set on pause |
+| `finished_at` | TIMESTAMPTZ | NULL — set on early finish |
 | `total_teams` | INTEGER | NOT NULL |
 | `matches_per_round` | INTEGER | NOT NULL |
 | `total_rounds` | INTEGER | NOT NULL |
 | `is_round_robin` | BOOLEAN | NOT NULL |
 | `rules_json` | JSON | NOT NULL — see [CONFIG.md](CONFIG.md) and [SCORING_LOGIC.md](SCORING_LOGIC.md) |
+
+### `contest_participants` [NEW]
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `contest_id` | INTEGER | PK (part 1), FK → `contests.id` ON DELETE CASCADE |
+| `user_id` | INTEGER | PK (part 2), FK → `users.id` |
+| `status` | VARCHAR | NOT NULL, default `'ACCEPTED'` (`ParticipantStatus`) |
+| `exceptional_tiebreak_points` | INTEGER | NOT NULL, default `0` |
+
+> `exceptional_tiebreak_points` is per-contest, admin-set (criterion 5). Not part of `rules_json`; updatable when contest is locked.
+
+**Before → After (Stage 1.4):** `contest_settings` (singleton) → `contests` (multi-row). `users.exceptional_tiebreak_points` → `contest_participants.exceptional_tiebreak_points`. `teams` and `rounds` scoped by `contest_id`.
 
 ## Constraints [NEW]
 
@@ -190,16 +222,18 @@ Stored on `contest_settings.status`. Independent of `is_locked` (lock prevents r
 | `ck_matches_score2_range` | `matches` | `score2 IS NULL OR (score2 >= 0 AND score2 <= 20)` |
 | `ck_predictions_score1_range` | `predictions` | same as matches `score1` |
 | `ck_predictions_score2_range` | `predictions` | same as matches `score2` |
-| `ck_contest_settings_status` | `contest_settings` | `status IN ('DRAFT','RUNNING','PAUSED','FINISHED')` [NEW] |
-| `ck_users_exceptional_tiebreak_nonneg` | `users` | `exceptional_tiebreak_points >= 0` [NEW] |
+| `ck_contests_status` | `contests` | `status IN ('DRAFT','RUNNING','PAUSED','FINISHED')` [UPDATED] |
+| `ck_contest_participants_tiebreak_nonneg` | `contest_participants` | `exceptional_tiebreak_points >= 0` [NEW] |
+| `ck_contest_participants_status` | `contest_participants` | `status IN ('PENDING','ACCEPTED')` [NEW] |
 
 ### UNIQUE constraints
 
 | Name | Table | Columns |
 |------|-------|---------|
 | (implicit) | `users` | `login` |
-| (implicit) | `teams` | `name` |
-| (implicit) | `rounds` | `number` |
+| `uq_teams_contest_name` | `teams` | `contest_id`, `name` [UPDATED] |
+| `uq_rounds_contest_number` | `rounds` | `contest_id`, `number` [UPDATED] |
+| (implicit) | `contests` | `slug` [NEW] |
 | `uq_predictions_user_round_match` | `predictions` | `user_id`, `round_id`, `match_id` |
 | `uq_scores_user_round` | `scores` | `user_id`, `round_id` |
 
@@ -208,6 +242,8 @@ Stored on `contest_settings.status`. Independent of `is_locked` (lock prevents r
 ```
 users ← contacts.user_id
 users ← predictions.user_id, scores.user_id
+users ← contest_participants.user_id
+contests ← contest_participants.contest_id, teams.contest_id, rounds.contest_id
 rounds ← matches.round_id, predictions.round_id, scores.round_id
 teams ← matches.team1_id, matches.team2_id
 matches ← predictions.match_id
@@ -238,9 +274,10 @@ uv run alembic downgrade base    # roll back all
 |----------|------|-------------|
 | `0992bb744cc8` | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates all 8 tables |
 | `a2b3c4d5e6f7` | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds 4 `count_*` columns to `scores` |
-| `b3c4d5e6f7a8` | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Lifecycle columns on `contest_settings`; `exceptional_tiebreak_points` on `users` [NEW] |
+| `b3c4d5e6f7a8` | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Lifecycle columns on `contest_settings`; `exceptional_tiebreak_points` on `users` |
+| `c4d5e6f7a8b9` | `alembic/versions/c4d5e6f7a8b9_multi_contest_and_participants.py` | Multi-contest: `contests`, `contest_participants`, `contest_id` on teams/rounds; drops `contest_settings` [NEW] |
 
-Migration `b3c4d5e6f7a8` backfills `status = 'RUNNING'` where `is_locked = TRUE`. Uses batch operations for SQLite compatibility.
+Migration `c4d5e6f7a8b9` migrates existing `contest_settings` row → `contests` id=1, copies users into `contest_participants`, sets `contest_id=1` on teams/rounds, then drops `users.exceptional_tiebreak_points`.
 
 > **SQLite operational note [UPDATED]:** Columns declared `DateTime(timezone=True)` may return naive datetimes when read via aiosqlite. API handlers normalize deadlines for prediction visibility; grace-period delete logic should normalize `paused_at` to UTC-aware before comparison.
 
@@ -253,10 +290,14 @@ erDiagram
     users ||--o| contacts : has
     users ||--o{ predictions : makes
     users ||--o{ scores : earns
+    users ||--o{ contest_participants : joins
+    contests ||--o{ contest_participants : has
+    contests ||--o{ teams : owns
+    contests ||--o{ rounds : owns
     rounds ||--o{ matches : contains
     rounds ||--o{ predictions : scoped
     rounds ||--o{ scores : scoped
     teams ||--o{ matches : plays
     matches ||--o{ predictions : targets
-    contest_settings ||--|| rules_json : stores
+    contests ||--|| rules_json : stores
 ```

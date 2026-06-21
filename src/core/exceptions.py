@@ -1,0 +1,75 @@
+"""Domain exception hierarchy for HTTP mapping and internal error policy."""
+
+from __future__ import annotations
+
+
+class AppError(Exception):
+    """Domain error mapped to HTTP by error_handlers."""
+
+    http_status: int = 400
+    code: str = "APP_ERROR"
+
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        self.message = message
+        if code is not None:
+            self.code = code
+        super().__init__(message)
+
+
+class NotFoundError(AppError):
+    http_status = 404
+    code = "NOT_FOUND"
+
+
+class ValidationError(AppError):
+    http_status = 400
+    code = "VALIDATION_ERROR"
+
+
+class ScoreOutOfRangeError(AppError):
+    http_status = 422
+    code = "SCORE_OUT_OF_RANGE"
+
+
+class ContestRuleError(AppError):
+    http_status = 403
+    code = "CONTEST_RULE_VIOLATION"
+
+
+class ContestLockedError(AppError):
+    http_status = 403
+    code = "CONTEST_LOCKED"
+
+
+class GracePeriodError(AppError):
+    http_status = 400
+    code = "GRACE_PERIOD_ACTIVE"
+
+
+class ContestNotPausedError(AppError):
+    http_status = 403
+    code = "CONTEST_NOT_PAUSED"
+
+
+class ContestDeleteDisabledError(AppError):
+    http_status = 403
+    code = "CONTEST_DELETE_DISABLED"
+
+
+class IllegalTransitionError(AppError):
+    http_status = 409
+    code = "ILLEGAL_TRANSITION"
+
+
+class CriticalError(AppError):
+    http_status = 500
+    code = "INTERNAL_ERROR"
+
+
+class RecoverableError(Exception):
+    """Non-fatal data issue; caller applies fallback. Never mapped to HTTP directly."""
+
+    def __init__(self, message: str, *, context: dict | None = None) -> None:
+        self.message = message
+        self.context = context or {}
+        super().__init__(message)

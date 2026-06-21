@@ -113,7 +113,7 @@ async def test_cache_etag_changes_after_calculate(loaded_api):
 
     rid2 = await get_round_id(sf, 2)
     first = await client.get(f"{API_PREFIX}/rounds/{rid2}/leaderboard")
-    assert first.status_code in (200, 404)
+    assert first.status_code in (200, 403, 404)
 
     await client.post(f"{API_PREFIX}/admin/rounds/{rid2}/calculate", headers=h)
     second = await client.get(f"{API_PREFIX}/rounds/{rid2}/leaderboard")

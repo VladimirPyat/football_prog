@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
 
 from api.deps import (
@@ -16,7 +16,14 @@ from api.deps import (
     cache_control_header,
     require_not_temp_password,
 )
-from database.models import Contest, Match, MatchStatus, Round, RoundStatus, Team, User, UserRole
+from api.handlers.leaderboard import (
+    get_global_leaderboard_response,
+    get_round_leaderboard_response,
+    get_round_results_response,
+)
+from api.handlers.predictions import build_round_predictions_view
+from core.exceptions import NotFoundError, ValidationError
+from database.models import Contest, Match, MatchStatus, Round, RoundStatus, User, UserRole
 from schemas.admin import (
     CreateRoundRequest,
     MatchResultRequest,
@@ -31,14 +38,9 @@ from schemas.leaderboard import LeaderboardOut, RoundResultsOut
 from schemas.predictions import PredictionBatchRequest, PredictionBatchResponse, RoundPredictionsView
 from schemas.rounds import RoundOut
 from services.contest_lifecycle_service import assert_contest_running, ensure_running_on_first_activation
-from services.leaderboard_service import (
-    compute_etag,
-    get_global_leaderboard,
-    get_round_leaderboard,
-    get_round_results,
-)
+from services.leaderboard_service import compute_etag
 from services.match_service import change_status, set_result
-from services.prediction_service import submit_batch, visible_predictions
+from services.prediction_service import submit_batch
 from services.round_service import close_round, create_free_tour, set_deadline, transition_round
 from services.scoring_persistence import calculate_round, recalculate_contest
 
@@ -48,14 +50,11 @@ _supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
 _admin = Depends(RoleChecker(UserRole.ADMIN))
 
 
-async def _get_contest(session: DbSession, contest_id: int, _contest: ContestContext) -> Contest:
-    return _contest
-
-
 @router.get("/rounds", response_model=list[RoundOut])
 async def list_rounds(
     contest_id: int, session: DbSession, _contest: ContestContext
 ) -> list[RoundOut]:
+    """Список туров конкурса (публичный)."""
     rounds = (
         await session.scalars(
             select(Round).where(Round.contest_id == contest_id).order_by(Round.number)
@@ -72,76 +71,13 @@ async def get_predictions(
     user: CurrentUser,
     _contest: ContestContext,
 ) -> RoundPredictionsView:
-    round_ = await session.get(Round, round_id)
-    if round_ is None or round_.contest_id != contest_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Round not found")
+    """Прогнозы тура с учётом дедлайна и прав видимости.
 
-    now = datetime.now(timezone.utc)
-    deadline = round_.deadline
-    if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
-
-    matches = (
-        await session.scalars(select(Match).where(Match.round_id == round_id))
-    ).all()
-    team_ids = {m.team1_id for m in matches} | {m.team2_id for m in matches}
-    teams = {
-        t.id: t
-        for t in (await session.scalars(select(Team).where(Team.id.in_(team_ids)))).all()
-    }
-
-    match_out = []
-    for m in matches:
-        t1 = teams.get(m.team1_id)
-        t2 = teams.get(m.team2_id)
-        match_out.append(
-            {
-                "id": m.id,
-                "team1": t1.name if t1 else str(m.team1_id),
-                "team2": t2.name if t2 else str(m.team2_id),
-                "date_time": m.date_time.isoformat(),
-                "score1": m.score1,
-                "score2": m.score2,
-                "status": m.status,
-            }
-        )
-
-    raw = await visible_predictions(session, contest_id, round_id, user.role, user.id)
-    users = {u.id: u for u in (await session.scalars(select(User))).all()}
-    by_user: dict[int, list] = {}
-    for item in raw:
-        uid = item["user_id"]
-        by_user.setdefault(uid, []).append(item)
-
-    entries = []
-    for uid, preds in by_user.items():
-        u = users.get(uid)
-        name = f"{u.first_name} {u.last_name}" if u else str(uid)
-        if "match_id" in preds[0]:
-            entries.append(
-                {
-                    "user_id": uid,
-                    "user_name": name,
-                    "submitted": True,
-                    "predictions": [
-                        {
-                            "match_id": p["match_id"],
-                            "score1": p.get("score1"),
-                            "score2": p.get("score2"),
-                        }
-                        for p in preds
-                    ],
-                }
-            )
-        else:
-            entries.append({"user_id": uid, "user_name": name, "submitted": True, "predictions": None})
-
-    return RoundPredictionsView(
-        round_id=round_id,
-        deadline_passed=now >= deadline,
-        matches=match_out,
-        entries=entries,
-    )
+    Args:
+        contest_id: идентификатор конкурса
+        round_id: идентификатор тура
+    """
+    return await build_round_predictions_view(session, contest_id, round_id, user)
 
 
 @router.post("/rounds/{round_id}/predictions", response_model=PredictionBatchResponse)
@@ -153,19 +89,17 @@ async def post_predictions(
     user: Annotated[User, Depends(require_not_temp_password)],
     _contest: ContestContext,
 ) -> PredictionBatchResponse:
-    try:
-        await assert_contest_running(session, contest_id)
-        items = [(p.match_id, p.score1, p.score2) for p in body.predictions]
-        count = await submit_batch(session, contest_id, user.id, round_id, items)
-        await session.commit()
-    except PermissionError as exc:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except ValueError as exc:
-        msg = str(exc)
-        if "out of range" in msg:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg) from exc
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=msg) from exc
+    """Сохранить пакет прогнозов пользователя на тур.
 
+    Args:
+        contest_id: идентификатор конкурса
+        round_id: идентификатор тура
+        body: пакет прогнозов (все матчи обязательны)
+    """
+    await assert_contest_running(session, contest_id)
+    items = [(p.match_id, p.score1, p.score2) for p in body.predictions]
+    count = await submit_batch(session, contest_id, user.id, round_id, items)
+    await session.commit()
     return PredictionBatchResponse(saved_count=count)
 
 
@@ -173,71 +107,67 @@ async def post_predictions(
 async def round_leaderboard(
     contest_id: int, round_id: int, session: DbSession, response: Response, _contest: ContestContext
 ) -> LeaderboardOut:
-    try:
-        data = await get_round_leaderboard(session, contest_id, round_id)
-        etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
+    """Таблица лидеров тура (публичный, с кэшированием)."""
+    out = await get_round_leaderboard_response(session, contest_id, round_id)
+    etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
     for k, v in cache_control_header().items():
         response.headers[k] = v
     response.headers["ETag"] = etag
-    return LeaderboardOut(**data)
+    return out
 
 
 @router.get("/rounds/{round_id}/results", response_model=RoundResultsOut)
 async def round_results(
     contest_id: int, round_id: int, session: DbSession, response: Response, _contest: ContestContext
 ) -> RoundResultsOut:
-    try:
-        data = await get_round_results(session, contest_id, round_id)
-        etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
+    """Результаты матчей и очки участников тура."""
+    out = await get_round_results_response(session, contest_id, round_id)
+    etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
     for k, v in cache_control_header().items():
         response.headers[k] = v
     response.headers["ETag"] = etag
-    return RoundResultsOut(**data)
+    return out
 
 
 @router.get("/leaderboard", response_model=LeaderboardOut)
 async def global_leaderboard(
     contest_id: int, session: DbSession, response: Response, _contest: ContestContext
 ) -> LeaderboardOut:
-    try:
-        data = await get_global_leaderboard(session, contest_id)
-        etag = await compute_etag(session, contest_id=contest_id)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
+    """Общая таблица лидеров конкурса (публичный, с кэшированием)."""
+    out = await get_global_leaderboard_response(session, contest_id)
+    etag = await compute_etag(session, contest_id=contest_id)
     for k, v in cache_control_header().items():
         response.headers[k] = v
     response.headers["ETag"] = etag
-    return LeaderboardOut(**data)
+    return out
 
 
 @router.post("/admin/rounds", dependencies=[_supervisor])
 async def create_round(
     contest_id: int, body: CreateRoundRequest, session: DbSession, _contest: ContestContext
 ) -> dict:
+    """Создать тур с матчами (SUPERVISOR+).
+
+    Args:
+        contest_id: идентификатор конкурса
+        body: номер тура, дедлайн, список матчей
+    """
     await assert_contest_running(session, contest_id)
     contest = await session.get(Contest, contest_id)
     if contest is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Contest not found")
+        raise NotFoundError(f"Конкурс {contest_id} не найден")
 
     if len(body.matches) > contest.matches_per_round:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail=f"Too many matches: max {contest.matches_per_round}",
+        raise ValidationError(
+            f"Слишком много матчей: максимум {contest.matches_per_round}"
         )
 
     team_ids_in_round: set[int] = set()
     for m in body.matches:
         if m.team1_id == m.team2_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="team1_id must differ from team2_id")
+            raise ValidationError("Команды home и away должны различаться")
         if m.team1_id in team_ids_in_round or m.team2_id in team_ids_in_round:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Duplicate team in round")
+            raise ValidationError("Команда не может играть дважды в одном туре")
         team_ids_in_round.add(m.team1_id)
         team_ids_in_round.add(m.team2_id)
 
@@ -248,13 +178,13 @@ async def create_round(
     cutoff = earliest - timedelta(hours=deadline_rule)
     dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=timezone.utc)
     if dl >= cutoff:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Deadline violates 24h rule")
+        raise ValidationError("Дедлайн нарушает правило 24 часов до первого матча")
 
     existing = await session.scalar(
         select(Round).where(Round.contest_id == contest_id, Round.number == body.number)
     )
     if existing:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Round number {body.number} exists")
+        raise ValidationError(f"Тур с номером {body.number} уже существует")
 
     round_ = Round(
         contest_id=contest_id,
@@ -290,18 +220,22 @@ async def update_round(
     session: DbSession,
     _contest: ContestContext,
 ) -> dict:
+    """Обновить дедлайн или матчи активного тура.
+
+    Args:
+        contest_id: идентификатор конкурса
+        round_id: идентификатор тура
+        body: новый дедлайн и/или матчи
+    """
     await assert_contest_running(session, contest_id)
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Round not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     if round_.status != RoundStatus.ACTIVE:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Only ACTIVE rounds can be edited")
+        raise ValidationError("Редактировать можно только активный тур")
 
     if body.deadline is not None:
-        try:
-            await set_deadline(session, round_id, body.deadline)
-        except ValueError as exc:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        await set_deadline(session, round_id, body.deadline)
 
     if body.matches:
         for item in body.matches:
@@ -309,7 +243,7 @@ async def update_round(
                 continue
             match = await session.get(Match, item.match_id)
             if match is None or match.round_id != round_id:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Match {item.match_id} not found")
+                raise NotFoundError(f"Матч {item.match_id} не найден")
             if item.team1_id is not None:
                 match.team1_id = item.team1_id
             if item.team2_id is not None:
@@ -327,16 +261,14 @@ async def update_round(
 async def activate_round(
     contest_id: int, round_id: int, session: DbSession, _contest: ContestContext
 ) -> dict:
+    """Активировать тур (DRAFT → ACTIVE); при первой активации конкурс → RUNNING."""
     await assert_contest_running(session, contest_id)
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Round not found")
-    try:
-        round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
-        await ensure_running_on_first_activation(session, contest_id)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
+    await ensure_running_on_first_activation(session, contest_id)
+    await session.commit()
     return {"success": True, "status": round_.status}
 
 
@@ -344,12 +276,10 @@ async def activate_round(
 async def close_round_endpoint(
     contest_id: int, round_id: int, session: DbSession, _contest: ContestContext
 ) -> dict:
+    """Закрыть тур вручную (ACTIVE → CLOSED после дедлайна)."""
     await assert_contest_running(session, contest_id)
-    try:
-        round_ = await close_round(session, contest_id, round_id)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    round_ = await close_round(session, contest_id, round_id)
+    await session.commit()
     return {"round_id": round_.id, "status": round_.status}
 
 
@@ -357,13 +287,10 @@ async def close_round_endpoint(
 async def calculate(
     contest_id: int, round_id: int, session: DbSession, _contest: ContestContext
 ) -> RoundActionResponse:
+    """Рассчитать очки тура (CLOSED → CALCULATED)."""
     await assert_contest_running(session, contest_id)
-    try:
-        count = await calculate_round(session, round_id, contest_id)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
+    count = await calculate_round(session, round_id, contest_id)
+    await session.commit()
     return RoundActionResponse(round_id=round_id, status=RoundStatus.CALCULATED, users_scored=count)
 
 
@@ -371,15 +298,13 @@ async def calculate(
 async def publish_round(
     contest_id: int, round_id: int, session: DbSession, _contest: ContestContext
 ) -> dict:
+    """Опубликовать результаты тура (CALCULATED → PUBLISHED)."""
     await assert_contest_running(session, contest_id)
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Round not found")
-    try:
-        round_ = await transition_round(session, round_id, RoundStatus.PUBLISHED)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await transition_round(session, round_id, RoundStatus.PUBLISHED)
+    await session.commit()
     return {"success": True, "status": round_.status}
 
 
@@ -387,17 +312,20 @@ async def publish_round(
 async def free_tour(
     contest_id: int, body: FreeTourRequest, session: DbSession, _contest: ContestContext
 ) -> dict:
+    """Создать free tour: перенести POSTPONED-матчи в новый тур.
+
+    Args:
+        contest_id: идентификатор конкурса
+        body: дедлайн и список матчей с новыми датами
+    """
     await assert_contest_running(session, contest_id)
-    try:
-        new_round = await create_free_tour(
-            session,
-            contest_id,
-            [{"match_id": m.match_id, "new_date_time": m.new_date_time} for m in body.matches],
-            body.deadline,
-        )
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    new_round = await create_free_tour(
+        session,
+        contest_id,
+        [{"match_id": m.match_id, "new_date_time": m.new_date_time} for m in body.matches],
+        body.deadline,
+    )
+    await session.commit()
     return {"round_id": new_round.id, "round_number": new_round.number}
 
 
@@ -409,16 +337,15 @@ async def apply_result(
     session: DbSession,
     _contest: ContestContext,
 ) -> MatchResultResponse:
-    try:
-        match = await set_result(session, contest_id, match_id, body.score1, body.score2)
-        await session.commit()
-    except PermissionError as exc:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-    except ValueError as exc:
-        msg = str(exc)
-        if "deadline" in msg.lower() or "closed" in msg.lower():
-            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=msg) from exc
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=msg) from exc
+    """Внести результат матча (после дедлайна, тур CLOSED).
+
+    Args:
+        contest_id: идентификатор конкурса
+        match_id: идентификатор матча
+        body: счёт матча
+    """
+    match = await set_result(session, contest_id, match_id, body.score1, body.score2)
+    await session.commit()
     return MatchResultResponse(round_id=match.round_id)
 
 
@@ -430,23 +357,26 @@ async def patch_status(
     session: DbSession,
     _contest: ContestContext,
 ) -> MatchStatusResponse:
+    """Изменить статус матча (VOID / POSTPONED / CANCELED).
+
+    Args:
+        contest_id: идентификатор конкурса
+        match_id: идентификатор матча
+        body: новый статус
+    """
     await assert_contest_running(session, contest_id)
     match = await session.get(Match, match_id)
     if match is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Match not found")
+        raise NotFoundError(f"Матч {match_id} не найден")
 
     round_ = await session.get(Round, match.round_id)
     if round_ is None or round_.contest_id != contest_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Match not found")
+        raise NotFoundError(f"Матч {match_id} не найден")
 
-    was_calculated = round_.status == RoundStatus.CALCULATED
-
-    try:
-        new_status = MatchStatus(body.status)
-        await change_status(session, contest_id, match_id, new_status)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    was_calculated = RoundStatus(round_.status) == RoundStatus.CALCULATED
+    new_status = MatchStatus(body.status)
+    await change_status(session, contest_id, match_id, new_status)
+    await session.commit()
 
     recalc = was_calculated and body.status == MatchStatus.VOID
     return MatchStatusResponse(recalculation_triggered=recalc)
@@ -456,6 +386,7 @@ async def patch_status(
 async def admin_recalculate(
     contest_id: int, session: DbSession, _contest: ContestContext
 ) -> dict:
+    """Пересчитать все CALCULATED-туры конкурса (ADMIN)."""
     count = await recalculate_contest(session, contest_id)
     await session.commit()
     return {"recalculated_rounds": count}

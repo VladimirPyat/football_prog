@@ -21,10 +21,13 @@ from database.models import (
     User,
     UserRole,
 )
-from services.contest_lifecycle_service import (
+from core.exceptions import (
     ContestLockedError,
     GracePeriodError,
     IllegalTransitionError,
+)
+from core.exceptions import ContestRuleError
+from services.contest_lifecycle_service import (
     assert_contest_running,
     assert_deletable,
     delete_contest_data,
@@ -94,7 +97,7 @@ async def test_assert_contest_running_blocks_paused(session: AsyncSession) -> No
     contest.status = ContestLifecycleStatus.PAUSED
     await session.commit()
 
-    with pytest.raises(PermissionError):
+    with pytest.raises(ContestRuleError):
         await assert_contest_running(session, CONTEST_ID)
 
 

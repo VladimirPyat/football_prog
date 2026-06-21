@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 
 from api.deps import DbSession, RoleChecker, resolve_default_contest_id
+from core.exceptions import NotFoundError, ValidationError
 from database.models import Contest, Match, MatchStatus, Round, RoundStatus, UserRole
 from schemas.admin import CreateRoundRequest, RoundActionResponse, UpdateRoundRequest
 from services.contest_lifecycle_service import assert_contest_running, ensure_running_on_first_activation
@@ -21,24 +22,24 @@ _supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
 
 @router.post("", dependencies=[_supervisor], deprecated=True)
 async def create_round(body: CreateRoundRequest, session: DbSession) -> dict:
+    """Создать тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
     contest = await session.get(Contest, contest_id)
     if contest is None:
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No contest")
+        raise NotFoundError(f"Конкурс {contest_id} не найден")
 
     if len(body.matches) > contest.matches_per_round:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail=f"Too many matches: max {contest.matches_per_round}",
+        raise ValidationError(
+            f"Слишком много матчей: максимум {contest.matches_per_round}"
         )
 
     team_ids_in_round: set[int] = set()
     for m in body.matches:
         if m.team1_id == m.team2_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="team1_id must differ from team2_id")
+            raise ValidationError("Команды home и away должны различаться")
         if m.team1_id in team_ids_in_round or m.team2_id in team_ids_in_round:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Duplicate team in round")
+            raise ValidationError("Команда не может играть дважды в одном туре")
         team_ids_in_round.add(m.team1_id)
         team_ids_in_round.add(m.team2_id)
 
@@ -49,13 +50,13 @@ async def create_round(body: CreateRoundRequest, session: DbSession) -> dict:
     cutoff = earliest - timedelta(hours=deadline_rule)
     dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=timezone.utc)
     if dl >= cutoff:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Deadline violates 24h rule")
+        raise ValidationError("Дедлайн нарушает правило 24 часов до первого матча")
 
     existing = await session.scalar(
         select(Round).where(Round.contest_id == contest_id, Round.number == body.number)
     )
     if existing:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Round number {body.number} exists")
+        raise ValidationError(f"Тур с номером {body.number} уже существует")
 
     round_ = Round(
         contest_id=contest_id,
@@ -85,19 +86,17 @@ async def create_round(body: CreateRoundRequest, session: DbSession) -> dict:
 
 @router.patch("/{round_id}", dependencies=[_supervisor], deprecated=True)
 async def update_round(round_id: int, body: UpdateRoundRequest, session: DbSession) -> dict:
+    """Обновить тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Round not found")
+        raise NotFoundError(f"Тур {round_id} не найден")
     if round_.status != RoundStatus.ACTIVE:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Only ACTIVE rounds can be edited")
+        raise ValidationError("Редактировать можно только активный тур")
 
     if body.deadline is not None:
-        try:
-            await set_deadline(session, round_id, body.deadline)
-        except ValueError as exc:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        await set_deadline(session, round_id, body.deadline)
 
     if body.matches:
         for item in body.matches:
@@ -105,7 +104,7 @@ async def update_round(round_id: int, body: UpdateRoundRequest, session: DbSessi
                 continue
             match = await session.get(Match, item.match_id)
             if match is None or match.round_id != round_id:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Match {item.match_id} not found")
+                raise NotFoundError(f"Матч {item.match_id} не найден")
             if item.team1_id is not None:
                 match.team1_id = item.team1_id
             if item.team2_id is not None:
@@ -121,49 +120,40 @@ async def update_round(round_id: int, body: UpdateRoundRequest, session: DbSessi
 
 @router.post("/{round_id}/activate", dependencies=[_supervisor], deprecated=True)
 async def activate_round(round_id: int, session: DbSession) -> dict:
+    """Активировать тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
-    try:
-        round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
-        await ensure_running_on_first_activation(session, contest_id)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
+    await ensure_running_on_first_activation(session, contest_id)
+    await session.commit()
     return {"success": True, "status": round_.status}
 
 
 @router.post("/{round_id}/close", dependencies=[_supervisor], deprecated=True)
 async def close_round_endpoint(round_id: int, session: DbSession) -> dict:
+    """Закрыть тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
-    try:
-        round_ = await close_round(session, contest_id, round_id)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    round_ = await close_round(session, contest_id, round_id)
+    await session.commit()
     return {"round_id": round_.id, "status": round_.status}
 
 
 @router.post("/{round_id}/calculate", response_model=RoundActionResponse, dependencies=[_supervisor], deprecated=True)
 async def calculate(round_id: int, session: DbSession) -> RoundActionResponse:
+    """Рассчитать тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
-    try:
-        count = await calculate_round(session, round_id, contest_id)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
+    count = await calculate_round(session, round_id, contest_id)
+    await session.commit()
     return RoundActionResponse(round_id=round_id, status=RoundStatus.CALCULATED, users_scored=count)
 
 
 @router.post("/{round_id}/publish", dependencies=[_supervisor], deprecated=True)
 async def publish_round(round_id: int, session: DbSession) -> dict:
+    """Опубликовать тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
-    try:
-        round_ = await transition_round(session, round_id, RoundStatus.PUBLISHED)
-        await session.commit()
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    round_ = await transition_round(session, round_id, RoundStatus.PUBLISHED)
+    await session.commit()
     return {"success": True, "status": round_.status}

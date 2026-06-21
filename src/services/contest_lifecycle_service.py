@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import get_settings
+from core.exceptions import (
+    ContestDeleteDisabledError,
+    ContestLockedError,
+    ContestNotPausedError,
+    ContestRuleError,
+    GracePeriodError,
+    IllegalTransitionError,
+    NotFoundError,
+    ValidationError,
+)
 from database.models import Contest, ContestLifecycleStatus, Round, RoundStatus
 from services.contest_teardown import reset_contest_to_draft
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_utc_aware(dt: datetime | None) -> datetime | None:
@@ -21,30 +34,10 @@ def _ensure_utc_aware(dt: datetime | None) -> datetime | None:
     return dt
 
 
-class ContestLockedError(Exception):
-    """Raised when contest is locked and mutation is forbidden."""
-
-
-class GracePeriodError(Exception):
-    """Raised when delete grace period has not elapsed since pause."""
-
-
-class IllegalTransitionError(Exception):
-    """Raised on invalid contest status transition."""
-
-
-class ContestNotPausedError(Exception):
-    """Raised when an operation requires PAUSED status."""
-
-
-class ContestDeleteDisabledError(Exception):
-    """Raised when contest delete is disabled in settings."""
-
-
 async def get_contest(session: AsyncSession, contest_id: int) -> Contest:
     contest = await session.get(Contest, contest_id)
     if contest is None:
-        raise ValueError(f"Contest {contest_id} not found")
+        raise NotFoundError(f"Конкурс {contest_id} не найден")
     return contest
 
 
@@ -52,7 +45,7 @@ async def get_contest_settings(session: AsyncSession) -> Contest:
     """Legacy helper: return the default (first) contest."""
     contest = await session.scalar(select(Contest).order_by(Contest.id).limit(1))
     if contest is None:
-        raise ValueError("Contest not found in database")
+        raise NotFoundError("Конкурс не найден в базе данных")
     return contest
 
 
@@ -60,16 +53,22 @@ async def require_unlocked(session: AsyncSession, contest_id: int) -> Contest:
     contest = await get_contest(session, contest_id)
     if contest.is_locked:
         raise ContestLockedError(
-            "Contest is locked — no structural or rule changes allowed"
+            "Конкурс заблокирован — изменение правил и структуры запрещено"
         )
     return contest
 
 
 async def assert_contest_running(session: AsyncSession, contest_id: int) -> Contest:
     contest = await get_contest(session, contest_id)
-    if contest.status in {ContestLifecycleStatus.PAUSED, ContestLifecycleStatus.FINISHED}:
-        raise PermissionError(
-            f"Contest is {contest.status} — mutating operations are blocked"
+    if contest.status == ContestLifecycleStatus.PAUSED:
+        raise ContestRuleError(
+            "Конкурс приостановлен — операция недоступна",
+            code="CONTEST_NOT_RUNNING",
+        )
+    if contest.status == ContestLifecycleStatus.FINISHED:
+        raise ContestRuleError(
+            "Конкурс завершён — операция недоступна",
+            code="CONTEST_NOT_RUNNING",
         )
     return contest
 
@@ -81,6 +80,7 @@ async def ensure_running_on_first_activation(
     contest = await get_contest(session, contest_id)
     if contest.status == ContestLifecycleStatus.DRAFT:
         contest.status = ContestLifecycleStatus.RUNNING
+        logger.info("contest running on first activation contest_id=%s", contest_id)
     return contest
 
 
@@ -88,10 +88,11 @@ async def pause_contest(session: AsyncSession, contest_id: int) -> Contest:
     contest = await get_contest(session, contest_id)
     if contest.status != ContestLifecycleStatus.RUNNING:
         raise IllegalTransitionError(
-            f"Cannot pause contest from status {contest.status} (must be RUNNING)"
+            f"Недопустимый переход статуса: {contest.status} → PAUSED (требуется RUNNING)"
         )
     contest.status = ContestLifecycleStatus.PAUSED
     contest.paused_at = datetime.now(timezone.utc)
+    logger.info("contest paused contest_id=%s", contest_id)
     return contest
 
 
@@ -99,10 +100,11 @@ async def resume_contest(session: AsyncSession, contest_id: int) -> Contest:
     contest = await get_contest(session, contest_id)
     if contest.status != ContestLifecycleStatus.PAUSED:
         raise IllegalTransitionError(
-            f"Cannot resume contest from status {contest.status} (must be PAUSED)"
+            f"Недопустимый переход статуса: {contest.status} → RUNNING (требуется PAUSED)"
         )
     contest.status = ContestLifecycleStatus.RUNNING
     contest.paused_at = None
+    logger.info("contest resumed contest_id=%s", contest_id)
     return contest
 
 
@@ -112,8 +114,8 @@ async def finish_contest(session: AsyncSession, contest_id: int) -> Contest:
         return contest
     if contest.status not in {ContestLifecycleStatus.RUNNING, ContestLifecycleStatus.PAUSED}:
         raise IllegalTransitionError(
-            f"Cannot finish contest from status {contest.status} "
-            "(must be RUNNING or PAUSED)"
+            f"Недопустимый переход статуса: {contest.status} → FINISHED "
+            "(требуется RUNNING или PAUSED)"
         )
     now = datetime.now(timezone.utc)
     contest.status = ContestLifecycleStatus.FINISHED
@@ -130,6 +132,7 @@ async def finish_contest(session: AsyncSession, contest_id: int) -> Contest:
     for round_ in active_rounds:
         round_.status = RoundStatus.CLOSED.value
 
+    logger.info("contest finished contest_id=%s", contest_id)
     return contest
 
 
@@ -154,12 +157,12 @@ async def assert_deletable(
 ) -> Contest:
     app_settings = get_settings()
     if not app_settings.contest_delete_enabled:
-        raise ContestDeleteDisabledError("Contest delete is disabled")
+        raise ContestDeleteDisabledError("Удаление конкурса отключено в настройках")
 
     contest = await get_contest(session, contest_id)
     if contest.status != ContestLifecycleStatus.PAUSED:
         raise ContestNotPausedError(
-            f"Contest must be PAUSED to delete (current status: {contest.status})"
+            f"Для удаления конкурс должен быть на паузе (текущий статус: {contest.status})"
         )
 
     if instant or app_settings.contest_allow_instant_delete:
@@ -167,13 +170,15 @@ async def assert_deletable(
 
     paused_at = _ensure_utc_aware(contest.paused_at)
     if paused_at is None:
-        raise GracePeriodError("Pause timestamp missing — cannot verify grace period")
+        raise GracePeriodError(
+            "Не зафиксировано время паузы — невозможно проверить период ожидания"
+        )
 
     deletable_at = compute_deletable_at(paused_at)
     if deletable_at is None or datetime.now(timezone.utc) < deletable_at:
         remaining = seconds_until_deletable(paused_at)
         raise GracePeriodError(
-            f"Grace period not elapsed — {remaining}s remaining until deletable"
+            f"Период ожидания после паузы ещё не истёк — осталось {remaining} с"
         )
     return contest
 
@@ -192,11 +197,13 @@ async def update_exceptional_tiebreak(
     from database.models import ContestParticipant  # noqa: PLC0415
 
     if points < 0:
-        raise ValueError("exceptional_tiebreak_points must be >= 0")
+        raise ValidationError("Очки исключительного тай-брейка должны быть >= 0")
 
     participant = await session.get(ContestParticipant, (contest_id, user_id))
     if participant is None:
-        raise ValueError(f"Participant user {user_id} not found in contest {contest_id}")
+        raise NotFoundError(
+            f"Участник {user_id} не найден в конкурсе {contest_id}"
+        )
 
     participant.exceptional_tiebreak_points = points
     return points

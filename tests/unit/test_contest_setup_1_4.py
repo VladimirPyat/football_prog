@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from database.base import Base
 from database.models import Contest, ContestLifecycleStatus, Team, User
-from services.contest_lifecycle_service import ContestLockedError
+from core.exceptions import ContestLockedError
 from services.contest_setup_service import (
     add_participant,
     create_contest,
