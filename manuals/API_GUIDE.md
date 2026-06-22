@@ -42,7 +42,9 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 | Organizer creation API | ✅ Stage 1.6 | `src/api/v1/admin_users.py`, `src/services/user_admin_service.py` |
 | User bootstrap CLI | ✅ Stage 1.6 | `src/scripts/bootstrap_users.py`, `.env.example` |
 | Contest discovery & user contacts | ✅ Stage 1.8 | `src/api/v1/me.py`, `contest_discovery_service`, `contact_service` |
-| OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` (v1.2.0-rc) |
+| Leaderboard count columns + invite accept | ✅ Stage 1.7 | `leaderboard_service`, `participant_service`, `prediction_service` |
+| Team logo upload & static assets | ✅ Stage 1.9 | `team_logo_service`, `contest_teams.py`, `main.py` static routes |
+| OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` (v1.2.0) |
 | HTTP integration tests | ✅ Stage 1.6 | `tests/api/` — loader DB + httpx ASGI |
 
 **Before → After (Stage 1.6):** ADMIN can create global `SUPERVISOR` accounts via `POST /admin/users/supervisor`. Initial ADMIN/SUPERVISOR on a fresh DB via `bootstrap_users.py` + `SEED_*` env vars (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
@@ -68,7 +70,7 @@ Client → FastAPI (Uvicorn) → CORS → logging
 
 | Layer | Path | Role |
 |-------|------|------|
-| Entry point | `main.py` | App factory, CORS, `setup_logging()`, `register_error_handlers()`, routers under `/api/v1` |
+| Entry point | `main.py` | App factory, CORS, `setup_logging()`, `register_error_handlers()`, routers under `/api/v1`, static assets mount [UPDATED] |
 | Error mapping | `src/api/error_handlers.py` | `AppError` → HTTP JSON; unhandled → 500 + `notify_admin()` |
 | Exceptions | `src/core/exceptions.py` | `AppError` hierarchy (`NotFoundError`, `ValidationError`, `ContestRuleError`, …) |
 | Logging | `src/core/logging_config.py` | Root logger format; level from `LOG_LEVEL` |
@@ -175,8 +177,10 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | `GET` | `/contests/{id}/rounds/{rid}/leaderboard` | Public | Round standings |
 | `GET` | `/contests/{id}/rounds/{rid}/results` | Public | Results + points |
 | `GET` | `/contests/{id}/leaderboard` | Public | Global standings |
+| `POST/PATCH/…` | `/contests/{id}/admin/rounds`, `/admin/matches/…` | SUPERVISOR+ | Round/match admin (same semantics as legacy) |
+| `POST` | `/contests/{id}/admin/recalculate` | ADMIN | Recalculate all CALCULATED rounds |
 
-**Leaderboard row fields (Stage 1.7):** Each entry includes tie-break count columns from persisted scores / `StandingRow` aggregates:
+**Leaderboard row fields (Stage 1.7) [UPDATED]:** Each entry includes tie-break count columns from persisted scores / `StandingRow` aggregates:
 
 | Field | Meaning |
 |-------|---------|
@@ -187,15 +191,12 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 
 Round leaderboard reads per-round `scores` columns; global leaderboard uses cross-round `StandingRow` sums (same source as rank tie-breakers).
 
-**Team logos (Stage 1.9):** `TeamOut.logo_url` is never `null` in JSON — when `teams.logo_url` is unset, the API returns `DEFAULT_TEAM_LOGO_URL` (default `/static/assets/default-team-logo.jpg`). Uploaded files are stored under `uploads/teams/{contest_id}/{team_id}.jpg` and served at `{STATIC_URL_PREFIX}/teams/{contest_id}/{team_id}.jpg`. Images are center-cropped and resized to `TEAM_LOGO_TARGET_PX` (default 64×64). Clear a custom logo with `PATCH .../teams/{id}` and `"logo_url": null`.
+**Team logos (Stage 1.9) [UPDATED]:** `TeamOut.logo_url` is never `null` in JSON — when `teams.logo_url` is unset, the API returns `DEFAULT_TEAM_LOGO_URL` (default `/static/assets/default-team-logo.jpg`). Uploaded files are stored under `uploads/teams/{contest_id}/{team_id}.jpg` and served at `{STATIC_URL_PREFIX}/teams/{contest_id}/{team_id}.jpg`. Images are center-cropped and resized to `TEAM_LOGO_TARGET_PX` (default 64×64). Clear a custom logo with `PATCH .../teams/{id}` and `"logo_url": null`.
 
-| Static path | Content |
-|-------------|---------|
-| `/static/assets/*` | Bundled read-only assets (default team logo) |
-| `/static/teams/*` | Supervisor-uploaded team logos |
-
-| `POST/PATCH/…` | `/contests/{id}/admin/rounds`, `/admin/matches/…` | SUPERVISOR+ | Round/match admin (same semantics as legacy) |
-| `POST` | `/contests/{id}/admin/recalculate` | ADMIN | Recalculate all CALCULATED rounds |
+| Static path | Serving mechanism | Content |
+|-------------|-------------------|---------|
+| `/static/assets/*` | `StaticFiles` mount on `static/assets/` | Bundled read-only assets (default team logo) |
+| `/static/teams/*` | Dynamic `FileResponse` route in `main.py` (path traversal guard) | Supervisor-uploaded team logos from `uploads/teams/` |
 
 `ContestContext` dependency validates `contest_id` exists (404 if not).
 
@@ -296,7 +297,7 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 | `NotFoundError` | 404 | `NOT_FOUND` |
 | `ValidationError` | 400 | `VALIDATION_ERROR` |
 | `ScoreOutOfRangeError` | 422 | `SCORE_OUT_OF_RANGE` |
-| `ContestRuleError` | 403 | `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / … |
+| `ContestRuleError` | 403 | `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `PARTICIPANT_NOT_ENROLLED` / `PARTICIPANT_NOT_ACCEPTED` / … |
 | `ContestLockedError` | 403 | `CONTEST_LOCKED` |
 | `GracePeriodError` | 400 | `GRACE_PERIOD_ACTIVE` |
 | `IllegalTransitionError` | 409 | `ILLEGAL_TRANSITION` |
@@ -340,7 +341,7 @@ async def change_status(session, match_id, new_status: MatchStatus) -> Match
 - `set_result`: validates `0 ≤ score ≤ max_score_value`; sets `FINISHED`.
 - `change_status(VOID)`: if round is `CALCULATED`, triggers `recalculate_round` atomically.
 
-### `prediction_service.py`
+### `prediction_service.py` [UPDATED]
 
 ```python
 async def submit_batch(session, user_id, round_id, items: list[tuple[int,int,int]]) -> int
@@ -350,6 +351,16 @@ async def visible_predictions(session, round_id, viewer_role, viewer_id) -> list
 Before deadline: own scores only for `USER` and `SUPERVISOR`; `ADMIN` sees all. After deadline: full table.
 
 API adds `assert_contest_running` before submit. Incomplete batch → `400`; deadline/not ACTIVE/contest not RUNNING → `403`.
+
+**Before → After (Stage 1.7):** Prediction submit no longer uses router-level `require_not_temp_password`. `submit_batch` enforces enrollment and accept status:
+
+| Condition | HTTP | `code` |
+|-----------|------|--------|
+| `users.is_temp_password=true` | 403 | `PARTICIPANT_NOT_ACCEPTED` |
+| No `contest_participants` row | 403 | `PARTICIPANT_NOT_ENROLLED` |
+| `participant.status != ACCEPTED` | 403 | `PARTICIPANT_NOT_ACCEPTED` |
+
+Password change (`POST /auth/change-password`) flips all `PENDING` participations to `ACCEPTED` via `participant_service.accept_pending_participations`.
 
 ### `scoring_persistence.py`
 
@@ -514,6 +525,7 @@ Domain errors (`AppError` subclasses from `src/core/exceptions.py`) return:
 | `VALIDATION_ERROR` | 400 |
 | `SCORE_OUT_OF_RANGE` | 422 |
 | `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `CONTEST_NOT_RUNNING` | 403 |
+| `PARTICIPANT_NOT_ENROLLED` / `PARTICIPANT_NOT_ACCEPTED` | 403 |
 | `CONTEST_LOCKED` | 403 |
 | `GRACE_PERIOD_ACTIVE` | 400 |
 | `ILLEGAL_TRANSITION` | 409 |

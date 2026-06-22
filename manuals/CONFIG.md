@@ -90,6 +90,15 @@ Access via `get_settings()` (cached singleton).
 | `TEAM_LOGO_TARGET_PX` | `64` | Uploaded logos normalized to this square size (px) [NEW] |
 | `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback when `teams.logo_url` is NULL [NEW] |
 
+### Team logo storage [NEW]
+
+| Path | Git | Purpose |
+|------|-----|---------|
+| `static/assets/default-team-logo.jpg` | Committed | Bundled placeholder served at `/static/assets/` |
+| `uploads/teams/{contest_id}/{team_id}.jpg` | Gitignored (`uploads/`) | Supervisor-uploaded logos served at `/static/teams/` |
+
+Directories `uploads/` and `static/assets/` are created at app startup (`main.py`). See [API_GUIDE.md — Team logos](API_GUIDE.md#multi-contest-api).
+
 > `contest_defaults_path` is a code default pointing to `docs/test_data/config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
 >
 > **Env template:** copy [`.env.example`](../.env.example) to `.env` (gitignored). Prefer `SEED_ADMIN_PASSWORD` (plaintext); scripts hash at runtime. Precomputed hash: `uv run python src/scripts/hash_password.py 'your-password'`.
@@ -276,6 +285,7 @@ Managed with `uv`. Key packages from `pyproject.toml`:
 | `python-jose[cryptography]` | JWT encode/decode [NEW] |
 | `passlib[bcrypt]` | Listed dependency; hashing uses `bcrypt` directly [NEW] |
 | `python-multipart` | Form/file upload support [NEW] |
+| `pillow` | Team logo validate, center-crop, resize (Stage 1.9) [NEW] |
 | `pytest`, `pytest-asyncio` | Tests (dev group) |
 | `httpx` | ASGI client for API integration tests (dev group) [NEW] |
 

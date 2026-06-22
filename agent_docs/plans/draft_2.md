@@ -89,6 +89,12 @@ Build a **Next.js 14+ (App Router) + TypeScript + Tailwind CSS** single-page app
 | `ui/state_management.md` | §3.4 | `instructions/coder_2.md` |
 | `instructions/coder_2.md` | — | Phase 2 only |
 | `instructions/coder_2.1.md` | § Sub-stage 2.1 | **Ready** — foundation & auth |
+| `instructions/coder_2.2.md` | § Sub-stage 2.2 | **Ready** — predictions & privacy |
+| `instructions/tester_2.2.md` | § Sub-stage 2.2 | **Ready** — prediction E2E + unit |
+| `instructions/coder_2.3.md` | § Sub-stage 2.3 | **Ready** — supervisor admin UI |
+| `instructions/tester_2.3.md` | § Sub-stage 2.3 | **Ready** — supervisor admin E2E + unit |
+| `instructions/coder_2.4.md` | § Sub-stage 2.4 | **Ready** — leaderboard, results, integration |
+| `instructions/tester_2.4.md` | § Sub-stage 2.4 | **Ready** — full E2E gate + responsive LB |
 | `instructions/tester_2.1.md` | § Sub-stage 2.1 | **Ready** — unit + E2E smoke |
 | `instructions/tester_2.md` | §8 Testing | Phase 2 only |
 | `reports/test_2.md` | — | @Tester deliverable |
@@ -520,14 +526,18 @@ Data from `RoundPredictionsView`:
 
 **Done checklist:**
 
-- [ ] 7/8 filled → submit disabled
-- [ ] 8/8 → save → reload shows data
-- [ ] Pre-deadline: other users masked
-- [ ] Post-deadline: full matrix visible to visitor
-- [ ] Score 0 is valid (not treated as empty)
-- [ ] Invalid score shows validation error from API
+- [ ] **Batch:** 7/8 filled → submit disabled; 8/8 → save → reload shows data
+- [ ] **Score 0** valid (NULL ≠ 0 — empty ≠ zero)
+- [ ] **Score range** `0..maxScore` from contest rules (not hardcoded 20); invalid → UI + API error
+- [ ] **Pre-deadline:** USER sees own scores; others → «Прогноз сделан»; visitor → stub
+- [ ] **Post-deadline:** authenticated user sees full matrix; form readonly
+- [ ] **Deadline warning:** banner when &lt;24h remain
+- [ ] **Deadline passed:** countdown «Дедлайн прошёл»; Edit/Save disabled; POST → 403 handled
+- [ ] Profile **Сделать прогноз** → active round predict page
 
-**Dependencies:** 2.1; active round in test DB
+**Dependencies:** 2.1; active round in test DB (`load_test_data.py` round 10).
+
+**Instructions:** `agent_docs/instructions/coder_2.2.md`, `agent_docs/instructions/tester_2.2.md`.
 
 ---
 
@@ -551,16 +561,19 @@ Data from `RoundPredictionsView`:
 
 **Done checklist:**
 
-- [ ] SETUP: create teams, invite participant, edit parameters
-- [ ] Activate round → `is_locked=true` → setup forms disabled
+- [ ] SETUP: create teams, invite participant, edit parameters (while `!is_locked`)
+- [ ] Activate round → `is_locked=true` → setup forms disabled + `LockBanner`
 - [ ] 24h rule blocks invalid deadline in UI
+- [ ] Deadline change → newsletter stub modal (Stage 3; no send)
+- [ ] ACTIVE round: structure frozen; only match status (+ date) editable
+- [ ] Free Tour: POSTPONED matches only
 - [ ] Results → calculate → publish → public results visible
-- [ ] VOID match → leaderboard updates
+- [ ] VOID match → leaderboard updated
 - [ ] ADMIN: pause blocks mutations
 
-**Dependencies:** 2.1; supervisor credentials
+**Dependencies:** 2.1, 2.2; supervisor credentials; backend B5/B6 resolved (`BLOCKED.md`).
 
-**Note:** "Загрузить по API" for match import → **manual entry only** unless external API is specified (§9).
+**Instructions:** `agent_docs/instructions/coder_2.3.md`, `agent_docs/instructions/tester_2.3.md`.
 
 ---
 
@@ -583,13 +596,20 @@ Data from `RoundPredictionsView`:
 
 **Done checklist:**
 
-- [ ] Visitor sees global leaderboard without login
-- [ ] Results only for CALCULATED/PUBLISHED rounds (graceful message otherwise)
-- [ ] E2E: user_full_flow, prediction_validation, deadline_block pass
-- [ ] E2E: supervisor_create_round, supervisor_results, supervisor_void, supervisor_24h, supervisor_free_tour pass
-- [ ] RBAC: user cannot access `/admin`
+- [ ] **Visitor** sees global leaderboard on `/contest/[id]` without login
+- [ ] **Leaderboard:** 13 columns (B4 counts); desktop horizontal scroll; mobile toggle **Краткая** / **📊 Полная**
+- [ ] **Sticky** `Место` + `Фамилия Имя`; view mode in `localStorage` (survives round change)
+- [ ] **Green** «Всего очков» in compact and full modes
+- [ ] **Results** only for CALCULATED/PUBLISHED tours (else graceful message)
+- [ ] **Прогнозы** tab: no regression from 2.2
+- [ ] **E2E integration:** `user_full_flow`, `prediction_validation`, `deadline_block` pass
+- [ ] **E2E supervisor:** `supervisor_create_round`, `supervisor_results`, `supervisor_void`, `supervisor_24h`, `supervisor_free_tour` pass
+- [ ] **RBAC:** user blocked from `/admin`
+- [ ] ETag caching on leaderboard/results
 
-**Dependencies:** 2.2, 2.3 for meaningful data
+**Dependencies:** 2.2, 2.3; B4 resolved (`BLOCKED.md`).
+
+**Instructions:** `agent_docs/instructions/coder_2.4.md`, `agent_docs/instructions/tester_2.4.md`.
 
 ---
 
@@ -797,8 +817,14 @@ After user approval (✅), Planner Phase B will create:
 | `agent_docs/ui/forms_validation.md` | Zod schemas, business rules |
 | `agent_docs/ui/state_management.md` | Context providers, data flow diagrams |
 | `agent_docs/instructions/coder_2.md` | Step-by-step implementation per sub-stage 2.1–2.4 |
-| `agent_docs/instructions/coder_2.1.md` | ✅ Sub-stage 2.1 — foundation, auth, profile (ready) |
-| `agent_docs/instructions/tester_2.1.md` | ✅ Sub-stage 2.1 — Vitest + Playwright smoke (ready) |
+| `agent_docs/instructions/coder_2.1.md` | ✅ Sub-stage 2.1 — foundation & auth (ready) |
+| `agent_docs/instructions/tester_2.1.md` | ✅ Sub-stage 2.1 — unit + E2E smoke (ready) |
+| `agent_docs/instructions/coder_2.2.md` | ✅ Sub-stage 2.2 — predictions & privacy (ready) |
+| `agent_docs/instructions/tester_2.2.md` | ✅ Sub-stage 2.2 — prediction tests (ready) |
+| `agent_docs/instructions/coder_2.3.md` | ✅ Sub-stage 2.3 — supervisor admin UI (ready) |
+| `agent_docs/instructions/tester_2.3.md` | ✅ Sub-stage 2.3 — supervisor admin tests (ready) |
+| `agent_docs/instructions/coder_2.4.md` | ✅ Sub-stage 2.4 — leaderboard & integration (ready) |
+| `agent_docs/instructions/tester_2.4.md` | ✅ Sub-stage 2.4 — full E2E gate (ready) |
 | `agent_docs/instructions/tester_2.md` | E2E scenarios, data setup, pass criteria |
 | `agent_docs/progress/stage_2.md` | Append `INSTRUCTIONS_READY` |
 

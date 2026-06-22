@@ -6,6 +6,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 
 | Document | Topic |
 |----------|-------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System overview, layers, data flows, state machines |
 | [DB_REFERENCE.md](DB_REFERENCE.md) | SQLAlchemy models, enums, constraints, migrations |
 | [CONFIG.md](CONFIG.md) | Settings, env vars, seed script, contest defaults |
 | [SCORING_LOGIC.md](SCORING_LOGIC.md) | Points, bonuses, tie-breakers, validation rules |
@@ -28,5 +29,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | **1.5** — Errors, logging, docstrings | [ERROR_LOGGING.md](ERROR_LOGGING.md) |
 | **1.6** — Bootstrap users & organizer API | [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) |
 | **1.8** — Contest discovery & user contacts | [API_GUIDE.md](API_GUIDE.md#contest-discovery--user-contacts) |
+| **1.7** — Leaderboard counts & invite accept | [API_GUIDE.md](API_GUIDE.md#multi-contest-api) (count_* fields, participant accept) |
+| **1.9** — Team logo upload & static assets | [API_GUIDE.md](API_GUIDE.md#multi-contest-api), [CONFIG.md](CONFIG.md#team-logo-storage) |
 
-Last synced: Stage 1.8 discovery/contacts + SUPERVISOR pre-deadline privacy policy.
+Last synced: ARCHITECTURE.md added; Stage 1.7/1.9; OpenAPI v1.2.0.
