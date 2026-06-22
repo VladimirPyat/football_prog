@@ -16,7 +16,7 @@ Verify Stage **2.4** deliverables:
 1. **Unit tests** — leaderboard columns, view-mode persistence, ETag cache, results guard.
 2. **E2E — new 2.4** — visitor leaderboard, results graceful/unavailable, mobile toggle, sticky smoke.
 3. **E2E — integration (must all pass)** — user + supervisor + RBAC specs listed in §6.
-4. **Build** — `npm run build`.
+4. **Lint & build** — ESLint, `type-check`, `format:check`, `build`.
 5. **Docs** — Coder updated living specs (§8 of `coder_2.4.md`).
 6. **BLOCKED.md** — confirm B4 live; append **B7+** only if new gaps found.
 
@@ -229,19 +229,36 @@ cd frontend && npm run test:e2e
 
 Document pass count / skips in report.
 
----
-
-## 7. Build & lint
+**Recommended full Stage 2.4 run order:**
 
 ```bash
-npm run lint
+cd frontend
+npm run test:unit
+npm run lint && npm run type-check && npm run format:check
+npm run test:e2e
 npm run build
 ```
 
-| ID | Pass |
-|----|------|
-| `[BUILD]` | exit 0 |
-| `[LINT]` | no errors |
+---
+
+## 7. TypeScript lint & build (mandatory)
+
+Full lint gate before release sign-off:
+
+```bash
+cd frontend
+npm run lint
+npm run type-check
+npm run format:check
+npm run build
+```
+
+| ID | Command | Pass criteria |
+|----|---------|---------------|
+| `[LINT-ESLINT]` | `npm run lint` | exit 0; errors = FAIL |
+| `[LINT-TSC]` | `npm run type-check` | exit 0 |
+| `[LINT-PRETTIER]` | `npm run format:check` | exit 0 |
+| `[BUILD]` | `npm run build` | exit 0 |
 
 ---
 
@@ -309,6 +326,9 @@ Include in `test_2.4.md`:
 | `[E2E-PRED-*]` | PASS/FAIL | batch/validation/privacy/deadline |
 | `[E2E-SUPERVISOR-*]` | PASS/FAIL | list specs run |
 | `[E2E-RBAC-ADMIN]` | PASS/FAIL | |
+| `[LINT-ESLINT]` | PASS/FAIL | |
+| `[LINT-TSC]` | PASS/FAIL | |
+| `[LINT-PRETTIER]` | PASS/FAIL | |
 | `[BUILD]` | PASS/FAIL | |
 | `[DOC-*]` | PASS/FAIL | |
 | B4 API smoke | OK / B7 | |
@@ -337,6 +357,7 @@ On **TEST_PASS:** **Stage 2 frontend complete** (pending human manual checklist)
 | `prediction_validation`, `deadline_block` | `[E2E-PRED-*]`, `[E2E-DEADLINE-BLOCK]` |
 | supervisor_* suite | `[E2E-SUPERVISOR-*]` |
 | RBAC user /admin | `[E2E-RBAC-ADMIN]` |
+| Lint toolchain | `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]`, `[BUILD]` |
 
 ---
 

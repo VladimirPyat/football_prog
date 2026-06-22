@@ -227,3 +227,21 @@
 - Executed: pytest logo tests → 9 passed; test_setup_teams_crud_and_duplicate → 1 passed; regression → 302 passed, 2 skipped
 - Report: agent_docs/reports/test_1.9.md
 - Contract: api_v1.yaml v1.2.0
+
+## 2026-06-23 — Planner (1.lint)
+- STATUS: INSTRUCTIONS_READY
+- Sub-stage: backend linting baseline audit (non-blocking)
+- Prerequisite: Stage 1.9 TEST_PASS
+- Instructions: agent_docs/instructions/backend/tester_1_lint.md
+- Scope: pyproject.toml (dev deps + ruff/mypy config), tests/test_linting.py, agent_docs/reports/test_1_lint.md
+- Mode: linters run with pytest but do not fail suite; CRITICAL/TOLERABLE triage in report
+- Next: @Tester executes tester_1_lint.md
+
+## 2026-06-23 — Tester (1.lint)
+- STATUS: TEST_PASS
+- Sub-stage: backend linting baseline (non-blocking)
+- Report: agent_docs/reports/test_1_lint.md
+- Infra: ruff, mypy, bandit in dev deps; tests/test_linting.py
+- Regression: 305 passed, 2 skipped
+- CRITICAL findings: 1 (bandit B608 medium in load_test_data.py)
+- Next: coder_1_lint_fix.md for CRITICAL + mypy config + ruff cleanup

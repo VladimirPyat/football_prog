@@ -13,7 +13,7 @@ Verify Stage **2.3** frontend deliverables:
 
 1. **Unit tests** — `deriveAdminUiMode`, `deadlineRule`, `collectPostponedMatches` (`npm run test:unit`).
 2. **E2E (Playwright)** — supervisor admin flows: SETUP, lock after activate, 24h rule, ACTIVE round restrictions, newsletter stub, results workflow, VOID, Free Tour, ADMIN pause, RBAC.
-3. **Build** — `npm run build` succeeds.
+3. **Lint & build** — ESLint, `type-check`, `format:check`, `build`.
 4. **Docs** — Coder updated living UI specs (§10 of `coder_2.3.md`).
 5. **Blockers** — new backend gaps → append `agent_docs/reports/BLOCKED.md`; resolved constraints → confirm Stage 2.3 checklist in `BLOCKED.md`.
 
@@ -313,18 +313,22 @@ Maps to BLOCKED: **Team logo upload (B5)**.
 
 ---
 
-## 7. Build & lint
+## 7. TypeScript lint & build (mandatory)
 
 ```bash
 cd frontend
-npm run lint          # if configured
+npm run lint
+npm run type-check
+npm run format:check
 npm run build
 ```
 
-| ID | Pass criteria |
-|----|---------------|
-| `[BUILD]` | `npm run build` exit 0 |
-| `[LINT]` | no errors (warnings noted) |
+| ID | Command | Pass criteria |
+|----|---------|---------------|
+| `[LINT-ESLINT]` | `npm run lint` | exit 0; errors = FAIL; warnings in report |
+| `[LINT-TSC]` | `npm run type-check` | exit 0 |
+| `[LINT-PRETTIER]` | `npm run format:check` | exit 0 |
+| `[BUILD]` | `npm run build` | exit 0 |
 
 ---
 
@@ -383,13 +387,16 @@ Agent verdict **TEST_PASS** does not require manual checklist completion — onl
 # 1. Unit
 cd frontend && npm run test:unit
 
-# 2. E2E (backend + frontend up)
+# 2. Lint
+npm run lint && npm run type-check && npm run format:check
+
+# 3. E2E (backend + frontend up)
 npm run test:e2e
 
-# 3. Build
+# 4. Build
 npm run build
 
-# 4. Doc audit + BLOCKED review (read files)
+# 5. Doc audit + BLOCKED review (read files)
 ```
 
 Prefer running admin E2E in order: **RBAC → SETUP → create_round → 24h → active → results → void → free_tour → pause** to reduce DB contention. Use fresh contests where tests mutate SETUP state.
@@ -416,6 +423,9 @@ Russian summary. Table:
 | `[E2E-SUPERVISOR-VOID]` | PASS/FAIL | leaderboard delta noted |
 | `[E2E-ADMIN-PAUSE]` | PASS/FAIL | |
 | `[E2E-ADMIN-LOGO]` | PASS/FAIL/SKIP | |
+| `[LINT-ESLINT]` | PASS/FAIL | |
+| `[LINT-TSC]` | PASS/FAIL | |
+| `[LINT-PRETTIER]` | PASS/FAIL | |
 | `[BUILD]` | PASS/FAIL | |
 | `[DOC-*]` | PASS/FAIL | |
 | BLOCKED.md | OK / NEW B7 | |
@@ -445,6 +455,7 @@ On **TEST_PASS:**
 | ADMIN pause blocks mutations | `[E2E-ADMIN-PAUSE]`, `[UNIT-UI-MODE-PAUSED]` |
 | Logo upload B5 | `[E2E-ADMIN-LOGO]` |
 | `deriveAdminUiMode` unit coverage | `[UNIT-UI-MODE-*]` |
+| Lint toolchain | `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` |
 | `npm run build` + `test:unit` | `[BUILD]`, `[UNIT-*]` |
 | Living docs updated | `[DOC-*]` |
 

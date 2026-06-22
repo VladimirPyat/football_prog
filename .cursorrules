@@ -39,3 +39,22 @@ alwaysApply: true
 - `manual/` = HUMAN-FACING TECHNICAL DOCS. Updated ONLY by `/docs-git-sync` or `/polish`. Contains architecture, DB reference, API guides.
 
 - ONE TOPIC, ONE FILE: Never dump all docs into a single file. Use relative links `[DB Schema](manual/DB_REFERENCE.md)` instead of copy-pasting.
+
+## LINTING STANDARDS
+
+- Run linting BEFORE marking any task complete.
+- If linting fails → fix issues before proceeding.
+- Do NOT disable linting rules without explicit user approval.
+- Security issues (bandit) are CRITICAL — must be fixed immediately.
+
+### Python (Backend)
+- **ruff**: `uv run ruff check src/` — Code style, syntax errors, unused imports
+- **mypy**: `uv run mypy src/` — Type checking
+- **bandit**: `uv run bandit -r src/ -ll` — Security vulnerabilities (medium+ severity)
+- **Test file**: `tests/test_linting.py` (runs automatically with pytest)
+
+### TypeScript (Frontend )
+- **ESLint**: `cd frontend && npm run lint` — Code style, React patterns
+- **TypeScript**: `cd frontend && npm run type-check` — Type checking
+- **Prettier**: `cd frontend && npm run format:check` — Code formatting
+- **Test file**: `frontend/tests/test_linting.ts` (or via script in `package.json`)

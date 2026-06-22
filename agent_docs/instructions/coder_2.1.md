@@ -1,7 +1,7 @@
 # Coder Instructions — Stage 2.1: Foundation, Auth & Profile Shell
 
 > **Status gate:** `INSTRUCTIONS_READY`
-> **Prerequisite:** Backend Stage 1.8 at `TEST_PASS` (B1–B3 resolved). See `agent_docs/reports/BLOCKED.md`.
+> **Prerequisite:** Backend Stage 1.8+ at `TEST_PASS` (B1–B3 resolved). **Local env:** [manuals/DEV_SETUP.md](../../manuals/DEV_SETUP.md) + `src/scripts/dev_setup.py`. See `agent_docs/reports/BLOCKED.md`.
 > **Plan:** `agent_docs/plans/draft_2.md` § Sub-stage 2.1.
 > **Specs:** `agent_docs/ui/{components,pages,forms_validation,state_management}.md`, `agent_docs/contracts/frontend_api_integration.md`.
 > **Language policy:** UI copy Russian; code comments English; display API `detail` as-is (Russian).
@@ -31,27 +31,72 @@ Bootstrap the **`frontend/`** Next.js application and deliver the **auth + navig
 
 ---
 
-## 2. Background
+## 2. Background & dev environment
 
-- `frontend/` **does not exist** yet — create from scratch.
-- Backend runs at `http://localhost:8000` (`uv run uvicorn main:app --reload`).
-- Contest-scoped API prefix: `/api/v1/contests/{contest_id}/…` — do **not** use legacy shims.
-- B1–B3 implemented in Stage 1.8; frontend fallbacks remain for resilience (see §8).
+**Authoritative setup guide:** [manuals/DEV_SETUP.md](../../manuals/DEV_SETUP.md) — prerequisites, bootstrap script, test logins, troubleshooting.
 
-**Dev workflow:**
+- `frontend/` **does not exist** yet — create from scratch (this stage).
+- Backend at `http://127.0.0.1:8000` — contest-scoped API `/api/v1/contests/{contest_id}/…` (no legacy shims).
+- B1–B3 implemented in Stage 1.8; frontend fallbacks remain for resilience (§8).
+
+### 2.1 Prerequisites (verify before coding)
+
+| Tool | Required | Notes |
+|------|----------|--------|
+| Python + **uv** | ≥ 3.12 | `uv sync` in repo root |
+| **Node.js** | ≥ 20 LTS | for `frontend/` (npm) |
+| **npm** | ≥ 10 | ships with Node 20+ |
+| `.env` | yes | copy `.env.example`; set `SEED_ADMIN_PASSWORD`, `SEED_SUPERVISOR_PASSWORD` |
+
+Check: `uv run python src/scripts/dev_setup.py --check`
+
+### 2.2 One-shot backend bootstrap
 
 ```bash
-# Terminal 1 — backend
-uv run alembic upgrade head
-uv run python src/scripts/bootstrap_users.py
-uv run python src/scripts/load_test_data.py   # if user/user needed for smoke
-uv run uvicorn main:app --reload --port 8000
-
-# Terminal 2 — frontend (after scaffold)
-cd frontend && npm install && npm run dev   # port 3000
+cd /work/football_prog
+cp .env.example .env                    # once; edit passwords
+uv run python src/scripts/dev_setup.py  # migrations + loader + admin + RUNNING contest
 ```
 
-Test logins: `user/user` (from loader), `supervisor/…` and `admin/…` (from `.env` bootstrap). See `manuals/BOOTSTRAP_USERS.md`.
+This runs (in order): `alembic upgrade head` → `load_test_data.py --reset` → `bootstrap_users.py` → contest `1` set **RUNNING** (required for `GET /contests/public`, B2).
+
+**Why bootstrap after loader:** `load_test_data --reset` deletes the `users` table; `bootstrap_users.py` must run **after** to restore `admin` / `supervisor`.
+
+### 2.3 Daily dev workflow
+
+```bash
+# Terminal 1 — API (after bootstrap)
+uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
+
+# Terminal 2 — frontend (after scaffold in §4)
+cd frontend
+cp .env.local.example .env.local
+npm install
+npm run dev                             # http://127.0.0.1:3000
+```
+
+Health: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
+
+### 2.4 Test logins
+
+| Role | Login | Password |
+|------|-------|----------|
+| USER | `user` | `user` (from loader) |
+| SUPERVISOR | `supervisor` | `SEED_SUPERVISOR_PASSWORD` in root `.env` |
+| ADMIN | `admin` | `SEED_ADMIN_PASSWORD` in root `.env` |
+
+See [BOOTSTRAP_USERS.md](../../manuals/BOOTSTRAP_USERS.md). Reset demo DB: `uv run python src/scripts/dev_setup.py`.
+
+### 2.5 Frontend env (create with scaffold)
+
+`frontend/.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_DEFAULT_CONTEST_ID=1
+```
+
+Use `127.0.0.1` (matches Playwright `tester_2.1` and CORS smoke tests).
 
 ---
 
@@ -119,7 +164,7 @@ agent_docs/contracts/frontend_api_integration.md  # UPDATE if integration quirks
 agent_docs/progress/stage_2.md            # APPEND handoff (append-only)
 ```
 
-**Do NOT modify:** `docs/`, `src/` (Python backend), `manuals/` unless you hit a backend bug (report in handoff instead).
+**Do NOT modify:** `docs/`, Python `src/` except **`src/scripts/dev_setup.py`** if bootstrap needs a fix (document in handoff). `manuals/` — only if setup doc must be corrected alongside a bootstrap fix.
 
 ---
 
@@ -148,21 +193,27 @@ Add devDependencies: `vitest`, `@testing-library/react` (optional for 2.1), `esl
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:unit": "vitest run"
+    "type-check": "tsc --noEmit",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
   }
 }
 ```
+
+Optional lint smoke: `frontend/tests/test_linting.ts` or `"test:lint": "npm run lint && npm run type-check && npm run format:check"`.
 
 ### 4.2 Environment
 
 `frontend/.env.local.example`:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 NEXT_PUBLIC_DEFAULT_CONTEST_ID=1
 ```
 
-Copy to `.env.local` for local dev. **`NEXT_PUBLIC_DEFAULT_CONTEST_ID`** is the fallback when B1/B2 lists are empty or requests fail.
+Copy to `.env.local` for local dev. **`NEXT_PUBLIC_DEFAULT_CONTEST_ID`** is the fallback when B1/B2 lists are empty or requests fail. Align with [manuals/DEV_SETUP.md](../../manuals/DEV_SETUP.md).
 
 ### 4.3 CORS
 
@@ -443,6 +494,7 @@ Manual smoke (all must pass):
 - [ ] **User `/contests`** — shows enrolled contests from `GET /me/contests`
 - [ ] **Contacts** — GET/PATCH works; readonly fallback if GET fails
 - [ ] **`npm run build`** succeeds
+- [ ] **`npm run lint`**, **`npm run type-check`**, **`npm run format:check`** pass (Tester §6)
 - [ ] **`npm run test:unit`** passes
 - [ ] Living docs updated (§11)
 

@@ -1,7 +1,7 @@
 # Tester Instructions — Stage 2.1: Foundation, Auth & Profile Shell
 
 > **Status gate:** @Coder `READY_FOR_TEST` for 2.1 in `agent_docs/progress/stage_2.md`.
-> **Prerequisite:** Backend Stage 1.8 at `TEST_PASS` (B1–B3). See `agent_docs/reports/BLOCKED.md`.
+> **Prerequisite:** Backend Stage 1.8+ at `TEST_PASS`. **Local env:** [manuals/DEV_SETUP.md](../../manuals/DEV_SETUP.md). See `agent_docs/reports/BLOCKED.md`.
 > **Reference:** `instructions/coder_2.1.md`, `docs/06_front_tests.md`, `agent_docs/contracts/frontend_api_integration.md`.
 > **Strategy:** Unit (Vitest) + E2E (Playwright) — **agent runs**; visual/mobile UX — **human** (agent reminds in report).
 
@@ -13,7 +13,7 @@ Verify Stage **2.1** frontend deliverables:
 
 1. **Unit tests** — validation, API error parser, default contest id helper (`npm run test:unit`).
 2. **E2E smoke (Playwright)** — auth, discovery, profile contacts, RBAC guards, 401 logout, temp password.
-3. **Build** — `npm run build` succeeds.
+3. **Lint & build** — ESLint, TypeScript `type-check`, Prettier `format:check`, `npm run build` (all exit 0).
 4. **Docs** — Coder updated living UI specs (§11 of `coder_2.1.md`).
 
 **Non-goals (later sub-stages):**
@@ -28,17 +28,29 @@ Verify Stage **2.1** frontend deliverables:
 
 ## 2. Test environment
 
+**Setup guide:** [manuals/DEV_SETUP.md](../../manuals/DEV_SETUP.md)
+
 ### 2.1 Backend (Terminal 1)
 
 ```bash
 cd /work/football_prog
-uv run alembic upgrade head
-uv run python src/scripts/bootstrap_users.py
-uv run python src/scripts/load_test_data.py    # provides user/user + RUNNING contest data
+cp .env.example .env                              # once; set SEED_* passwords
+uv run python src/scripts/dev_setup.py            # migrations + loader + bootstrap + RUNNING contest
 uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+Equivalent manual order (if not using script):
+
+```bash
+uv run alembic upgrade head
+uv run python src/scripts/load_test_data.py --reset
+uv run python src/scripts/bootstrap_users.py      # AFTER loader (loader wipes users)
+uv run python src/scripts/dev_setup.py --ensure-running-only
+```
+
 Health: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
+
+Public discovery smoke: `curl -s http://127.0.0.1:8000/api/v1/contests/public` → non-empty (contest `1` RUNNING).
 
 ### 2.2 Frontend env
 
@@ -223,18 +235,28 @@ If implemented: when `/contests/public` returns `[]`, home redirects to `/contes
 
 ---
 
-## 6. Build & lint
+## 6. TypeScript lint & build (mandatory)
+
+**Tooling** (Coder 2.1 wires `package.json` scripts; re-run every stage):
 
 ```bash
 cd frontend
-npm run lint          # if configured — warn-only OK, document errors
-npm run build
+npm run lint           # ESLint — code style, React patterns
+npm run type-check     # TypeScript — tsc, no emit
+npm run format:check   # Prettier — check-only (no write)
+npm run build          # Next.js production build
 ```
 
-| ID | Pass criteria |
-|----|---------------|
-| `[BUILD]` | `npm run build` exit 0 |
-| `[LINT]` | no errors (warnings noted in report) |
+Optional smoke (if Coder added): `npm run test:lint` or `frontend/tests/test_linting.ts`.
+
+| ID | Command | Pass criteria |
+|----|---------|---------------|
+| `[LINT-ESLINT]` | `npm run lint` | exit 0; ESLint **errors** = FAIL; warnings noted in report |
+| `[LINT-TSC]` | `npm run type-check` | exit 0 |
+| `[LINT-PRETTIER]` | `npm run format:check` | exit 0 |
+| `[BUILD]` | `npm run build` | exit 0 |
+
+Missing script → **FAIL** for @Coder (all four commands expected from 2.1 scaffold).
 
 ---
 
@@ -270,13 +292,16 @@ Agent verdict **TEST_PASS** does not require manual checklist completion — onl
 # 1. Unit
 cd frontend && npm run test:unit
 
-# 2. E2E (backend must be running)
+# 2. Lint
+npm run lint && npm run type-check && npm run format:check
+
+# 3. E2E (backend must be running)
 npm run test:e2e          # or: npx playwright test
 
-# 3. Build
+# 4. Build
 npm run build
 
-# 4. Doc audit (read files)
+# 5. Doc audit (read files)
 ```
 
 Add `package.json` script if missing:
@@ -304,6 +329,9 @@ Russian summary. Table:
 | `[E2E-PROFILE-CONTACTS]` | PASS/FAIL | |
 | `[E2E-RBAC-GUARDS]` | PASS/FAIL | |
 | `[E2E-CORS-SMOKE]` | PASS/FAIL/MANUAL | |
+| `[LINT-ESLINT]` | PASS/FAIL | warnings: … |
+| `[LINT-TSC]` | PASS/FAIL | |
+| `[LINT-PRETTIER]` | PASS/FAIL | |
 | `[BUILD]` | PASS/FAIL | |
 | `[DOC-*]` | PASS/FAIL | |
 | Manual checklist | REMINDER | link to §8 |
@@ -330,6 +358,7 @@ On **TEST_PASS:**
 | User `/contests` | `[E2E-USER-CONTESTS]` |
 | Contacts GET/PATCH | `[E2E-PROFILE-CONTACTS]` |
 | `npm run test:unit` | `[UNIT-*]` |
+| Lint toolchain | `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` |
 | `npm run build` | `[BUILD]` |
 
 ---

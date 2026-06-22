@@ -80,7 +80,7 @@ Do NOT proceed to Phase B until the user replies with ✅ or explicitly approves
 
 ## AGENT ROLES (For your context when writing instructions):
 - **@Coder**: Writes production code and unit tests. Upon completion, updates `progress.md` with a "ready for testing" status, or reports if something is broken and human intervention is required.
-- **@Tester**: Runs integration tests using real data. Generates a final report and provides a clear verdict on whether the solution is ready or requires fixes.
+- **@Tester**: Runs integration tests using real data. Generates a final report and provides a clear verdict on whether the solution is ready or requires fixes. Include linting verification step before integration tests (see LINTING STANDARDS in .cursorrules).
 
 # DELEGATION
 

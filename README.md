@@ -87,18 +87,17 @@ Client → FastAPI → JWT / RBAC → Router → Service → SQLAlchemy → DB
 
 ## Быстрый старт
 
+Полная инструкция (бэкенд + фронт, тестовые логины, troubleshooting): **[manuals/DEV_SETUP.md](manuals/DEV_SETUP.md)**
+
 ```bash
 uv sync
-cp .env.example .env          # задать SEED_ADMIN_PASSWORD, при необходимости SEED_SUPERVISOR_*
-uv run alembic upgrade head
-uv run python src/scripts/seed.py
-uv run python src/scripts/bootstrap_users.py
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cp .env.example .env          # задать SEED_ADMIN_PASSWORD, SEED_SUPERVISOR_PASSWORD
+uv run python src/scripts/dev_setup.py
+uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-- Проверка: `GET /health`
-- Swagger: `http://localhost:8000/docs`
-- Контрактные тестовые данные: `uv run python src/scripts/load_test_data.py --reset`
+- Проверка: `GET /health` · Swagger: `http://127.0.0.1:8000/docs`
+- Минимальный ручной путь (без loader): см. `dev_setup.py --minimal` в [DEV_SETUP.md](manuals/DEV_SETUP.md)
 
 Bootstrap и переменные окружения: [BOOTSTRAP_USERS.md](manuals/BOOTSTRAP_USERS.md) · [CONFIG.md](manuals/CONFIG.md)
 
@@ -115,6 +114,7 @@ uv run pytest tests/ --ignore=tests/manual -q
 | Тема | Документ |
 |------|----------|
 | **Оглавление** | [manuals/README.md](manuals/README.md) |
+| **Локальная разработка (API + UI)** | [manuals/DEV_SETUP.md](manuals/DEV_SETUP.md) |
 | Общая архитектура, dataflow | [manuals/ARCHITECTURE.md](manuals/ARCHITECTURE.md) |
 | HTTP API, auth, RBAC, lifecycle | [manuals/API_GUIDE.md](manuals/API_GUIDE.md) |
 | Модели БД и миграции | [manuals/DB_REFERENCE.md](manuals/DB_REFERENCE.md) |

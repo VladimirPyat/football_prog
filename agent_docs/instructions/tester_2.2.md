@@ -13,7 +13,7 @@ Verify Stage **2.2** frontend deliverables:
 
 1. **Unit tests** — score range, batch schema, privacy helper, deadline warning (`npm run test:unit`).
 2. **E2E (Playwright)** — batch gating, validation, privacy pre/post deadline, deadline block, user flow smoke.
-3. **Build** — `npm run build` succeeds.
+3. **Lint & build** — ESLint, `type-check`, `format:check`, `build`.
 4. **Docs** — Coder updated living UI specs (§8 of `coder_2.2.md`).
 
 **Non-goals (later sub-stages):**
@@ -229,18 +229,24 @@ Source: `docs/03` partial `user_full_flow` (full flow with logout → 2.4).
 
 ---
 
-## 7. Build & lint
+## 7. TypeScript lint & build (mandatory)
+
+Re-run full lint gate (scripts from Coder 2.1):
 
 ```bash
 cd frontend
 npm run lint
+npm run type-check
+npm run format:check
 npm run build
 ```
 
-| ID | Pass criteria |
-|----|---------------|
-| `[BUILD]` | exit 0 |
-| `[LINT]` | no errors |
+| ID | Command | Pass criteria |
+|----|---------|---------------|
+| `[LINT-ESLINT]` | `npm run lint` | exit 0; errors = FAIL |
+| `[LINT-TSC]` | `npm run type-check` | exit 0 |
+| `[LINT-PRETTIER]` | `npm run format:check` | exit 0 |
+| `[BUILD]` | `npm run build` | exit 0 |
 
 ---
 
@@ -284,6 +290,7 @@ Include in `test_2.2.md`:
 
 ```bash
 cd frontend && npm run test:unit
+npm run lint && npm run type-check && npm run format:check
 npm run test:e2e    # backend running
 npm run build
 ```
@@ -311,6 +318,9 @@ Russian summary. Table:
 | `[E2E-USER-PREDICT-FLOW]` | PASS/FAIL | |
 | `[E2E-VISITOR-PRED-STUB]` | PASS/FAIL | |
 | `[E2E-CONTEST-PRED-TAB]` | PASS/FAIL | |
+| `[LINT-ESLINT]` | PASS/FAIL | |
+| `[LINT-TSC]` | PASS/FAIL | |
+| `[LINT-PRETTIER]` | PASS/FAIL | |
 | `[BUILD]` | PASS/FAIL | |
 | `[DOC-*]` | PASS/FAIL | |
 | Manual checklist | REMINDER | §10 |
@@ -336,7 +346,7 @@ On **TEST_PASS:** ready for **2.3** (admin UI) or parallel if team splits work �
 | Deadline warning &lt;24h | `[E2E-PRED-DEADLINE-WARN]`, `[UNIT-DEADLINE-WARN]` |
 | After deadline readonly | `[E2E-DEADLINE-BLOCK]` |
 | Edit flow | `[E2E-USER-PREDICT-FLOW]` |
-| `npm run test:unit` / `build` | `[UNIT-*]`, `[BUILD]` |
+| `npm run test:unit` / lint / `build` | `[UNIT-*]`, `[LINT-*]`, `[BUILD]` |
 
 ---
 
