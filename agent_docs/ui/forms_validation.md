@@ -23,13 +23,13 @@
 
 ## 2. Form schemas
 
-### LoginForm
+### LoginForm — **Implemented (2.1)** → `frontend/src/lib/validation/login.ts`
 ```ts
 z.object({ login: z.string().min(1), password: z.string().min(1) })
 ```
 401 → show `detail` («Неверный логин или пароль»).
 
-### ChangePasswordForm
+### ChangePasswordForm — **Implemented (2.1)** → `frontend/src/lib/validation/changePassword.ts`
 ```ts
 z.object({
   old_password: z.string().min(1),
@@ -54,7 +54,7 @@ const predictionBatch = (max:number, count:number) =>
 - After save: switch to readonly with `Редактировать`; re-enable until deadline.
 - Errors: `SCORE_OUT_OF_RANGE` (422) → highlight cell; `DEADLINE_PASSED` (403) → set readonly + toast; `400` incomplete → keep disabled.
 
-### ContactsForm  (B3)
+### ContactsForm  (B3) — **Implemented (2.1)** → `frontend/src/lib/validation/contacts.ts`
 ```ts
 z.object({
   email: z.string().email().optional().or(z.literal('')),
@@ -195,3 +195,4 @@ Duplicate login → `400 VALIDATION_ERROR`.
 | Date | Change |
 |------|--------|
 | 2026-06-21 | Initial Zod schemas + cross-cutting rules for all Stage-2 forms; mirrors `docs/01` §6 and API error contract. |
+| 2026-06-23 | Stage 2.1: Zod export paths for login, changePassword, contacts under `frontend/src/lib/validation/`. |

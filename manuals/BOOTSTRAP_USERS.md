@@ -16,20 +16,18 @@ After bootstrap, users live in `football.db` (or your `DATABASE_URL`) — **you 
 
 Copy template: `cp .env.example .env`
 
-Minimum:
+Minimum (passwords only — logins `admin` / `supervisor` are in `config/settings.py`):
 
 ```env
-SEED_ADMIN_LOGIN=admin
 SEED_ADMIN_PASSWORD=your-admin-password
-
-SEED_SUPERVISOR_LOGIN=supervisor
 SEED_SUPERVISOR_PASSWORD=your-supervisor-password
+JWT_SECRET_KEY=change-me-to-a-long-random-string
 ```
 
 Use **plaintext passwords** — the script hashes them with bcrypt before saving.  
-Alternative: `SEED_ADMIN_PASSWORD_HASH` / `SEED_SUPERVISOR_PASSWORD_HASH` (generate with `uv run python src/scripts/hash_password.py 'your-password'`).
+Alternative: `SEED_ADMIN_PASSWORD_HASH` / `SEED_SUPERVISOR_PASSWORD_HASH` (see [CONFIG.md](CONFIG.md#env--secrets--deployment)).
 
-Also set `JWT_SECRET_KEY` before production.
+Also set `DATABASE_URL` for non-SQLite deployments.
 
 ## 2. One-time setup
 

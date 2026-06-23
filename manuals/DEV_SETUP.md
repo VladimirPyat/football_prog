@@ -28,24 +28,44 @@ From the repository root:
 ```bash
 # 1. Environment (once)
 cp .env.example .env
-# Edit .env: set SEED_ADMIN_PASSWORD and SEED_SUPERVISOR_PASSWORD (plaintext)
+# Edit .env: set SEED_ADMIN_PASSWORD and SEED_SUPERVISOR_PASSWORD (see .env.example)
 
-# 2. Backend + demo data (idempotent)
+# 2. Bootstrap DB + start API & UI (one command)
+uv run python src/scripts/dev_setup.py --run
+# → http://127.0.0.1:3000/  (UI)
+# → http://127.0.0.1:8000/health  (API)
+# Press Ctrl+C to stop both servers
+```
+
+On first `--run`, the script also creates `frontend/.env.local` from `.env.local.example` and runs `npm install` if `node_modules/` is missing.
+
+### Manual start (two terminals)
+
+Use when you prefer separate processes or DB is already bootstrapped:
+
+```bash
+# Bootstrap only (no servers)
 uv run python src/scripts/dev_setup.py
 
-# 3. API server — Terminal 1
+# Terminal 1 — API
 uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
-# 4. Frontend — Terminal 2 (after Coder scaffolds frontend/)
+# Terminal 2 — UI
 cd frontend
-cp .env.local.example .env.local   # if not created by scaffold
-npm install
+cp .env.local.example .env.local   # once
+npm install                        # once
 npm run dev                        # http://127.0.0.1:3000
+```
+
+**Restart servers without resetting DB:**
+
+```bash
+uv run python src/scripts/dev_setup.py --run-only
 ```
 
 **Verify API:** `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`
 
-**Verify public contest list (B2):** after `dev_setup.py --full`, contest id `1` is **RUNNING** → `curl -s http://127.0.0.1:8000/api/v1/contests/public`
+**Verify public contest list (B2):** after full setup, contest id `1` is **RUNNING** → `curl -s http://127.0.0.1:8000/api/v1/contests/public`
 
 ---
 
@@ -55,12 +75,25 @@ Automates migrations, test data, admin users, and dev contest state.
 
 ```bash
 uv run python src/scripts/dev_setup.py              # full frontend dev DB (default)
+uv run python src/scripts/dev_setup.py --run        # full setup + start API (:8000) & UI (:3000)
+uv run python src/scripts/dev_setup.py --run-only     # start servers only (skip DB setup)
 uv run python src/scripts/dev_setup.py --minimal    # empty contest + admin only (no CSV loader)
 uv run python src/scripts/dev_setup.py --no-reset   # full without wiping loader tables first
 uv run python src/scripts/dev_setup.py --check      # prerequisites only, no DB changes
 uv run python src/scripts/dev_setup.py --ensure-running-only
 uv run python src/scripts/dev_setup.py --help
 ```
+
+### What `--run` / `--run-only` do
+
+1. Ensure `frontend/.env.local` exists (copy from `.env.local.example` if missing)
+2. Run `npm install` in `frontend/` when `node_modules/` is absent
+3. Start **API**: `uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000`
+4. Start **UI**: `npm run dev` in `frontend/` → `http://127.0.0.1:3000`
+5. Poll `/health` and UI root until ready (or timeout ~90s)
+6. On **Ctrl+C** or SIGTERM — stop both child processes
+
+`--run` = default full setup, then steps 1–6. `--run-only` = steps 1–6 without touching the DB.
 
 ### What `--full` (default) does
 
@@ -158,7 +191,9 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 | `load_test_data` unique constraint | Use `--reset` or run full `dev_setup.py` |
 | Admin missing after loader | Run `bootstrap_users.py` **after** `load_test_data --reset` |
 | Playwright E2E cannot find browser | `npx playwright install chromium` in `frontend/` |
-| Port in use | Change ports or stop conflicting process |
+| Port in use | Stop process on :8000/:3000 or change ports in script / `frontend/package.json` |
+| `--run` exits immediately | Check logs — missing `frontend/`, `node`, or `npm`; run `--check` |
+| UI not ready after `--run` | Wait up to 90s on first `npm install`; re-run `cd frontend && npm run dev` |
 
 ---
 
@@ -166,9 +201,12 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 
 | Task | Command |
 |------|---------|
+| Bootstrap + start stack | `uv run python src/scripts/dev_setup.py --run` |
+| Start stack (DB already OK) | `uv run python src/scripts/dev_setup.py --run-only` |
 | Start API only | `uv run uvicorn main:app --reload --port 8000` |
 | Start UI only | `cd frontend && npm run dev` |
-| Reset DB to demo state | `uv run python src/scripts/dev_setup.py --reset` |
+| Reset DB to demo state | `uv run python src/scripts/dev_setup.py` |
+| Archive application log | `uv run python src/scripts/archive_logs.py` |
 | Re-run migrations | `uv run alembic upgrade head` |
 
 You **do not** re-run `bootstrap_users.py` on every API restart — users persist in `football.db`. Re-run after wiping the DB or fresh clone.
@@ -186,4 +224,4 @@ You **do not** re-run `bootstrap_users.py` on every API restart — users persis
 
 ---
 
-*Last updated: Stage 2.1 dev bootstrap — adjust this file when Docker Compose or `frontend/` scaffold lands.*
+*Last updated: Stage 2.1 — `dev_setup.py --run` / `--run-only` for one-command local stack.*

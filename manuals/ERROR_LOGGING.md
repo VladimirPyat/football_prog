@@ -116,13 +116,31 @@
 
 ## Логирование
 
-Настройка: переменная окружения `LOG_LEVEL` (по умолчанию `INFO`).
+Настройка через `config/settings.py` (дефолт `log_level=INFO`). Переопределение: env `LOG_LEVEL`. Полная таблица: [CONFIG.md](CONFIG.md#application-defaults-configsettingspy).
 
 Формат строки:
 
 ```
 2026-06-21 12:00:00 INFO [services.prediction_service] predictions saved user_id=3 round_id=10 count=8
 ```
+
+Вывод: **stderr** (консоль) и, если `LOG_TO_FILE=true`, файл **`app.log`**. Файл в `.gitignore`.
+
+### Ротация / архивация
+
+Скрипт `src/scripts/archive_logs.py` копирует `app.log` в `logs/archive/app-YYYYMMDD-HHMMSS.log` и обнуляет активный файл, когда:
+
+- размер ≥ `LOG_ARCHIVE_MAX_BYTES` (по умолчанию 5 MiB), **или**
+- прошло ≥ `LOG_ARCHIVE_INTERVAL_DAYS` (по умолчанию 7) с последней архивации.
+
+```bash
+uv run python src/scripts/archive_logs.py           # по порогам
+uv run python src/scripts/archive_logs.py --force   # сейчас (если лог не пуст)
+```
+
+Рекомендуется cron (например, раз в неделю). При работающем API после truncate лучше перезапустить Uvicorn — см. docstring скрипта.
+
+Будущее: отдельный **auth.log** для аудита входов — см. `agent_docs/reports/todo.md`.
 
 | Уровень | Назначение | Примеры |
 |---------|------------|---------|

@@ -263,3 +263,4 @@ types/api.ts       // interfaces from §7
 | Date | Change |
 |------|--------|
 | 2026-06-22 | B1–B3 RESOLVED (Stage 1.8); fallback table for B1/B2/B3; `NEXT_PUBLIC_DEFAULT_CONTEST_ID` naming. |
+| 2026-06-23 | Stage 2.1: `fp:unauthorized` custom event (not generic `unauthorized`); Pydantic 422 array parsed in `parseErrorDetail()` (`frontend/src/lib/api/errors.ts`); `localStorage` key `fp_active_contest_id` for contest picker persistence. |

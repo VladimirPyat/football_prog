@@ -17,7 +17,7 @@
 
 ## 2. Global contexts
 
-### 2.1 AuthProvider
+### 2.1 AuthProvider — **Implemented (2.1)** → `frontend/src/providers/AuthProvider.tsx`
 
 | Field | Type | Source |
 |-------|------|--------|
@@ -31,9 +31,9 @@
 
 - Token in `localStorage: fp_access_token`.
 - On mount: if token → hydrate via `/auth/me`; on 401 → `logout()` silently (Visitor).
-- Listens to a global `unauthorized` event emitted by the API client on any 401 → `logout()`.
+- Listens to a global `fp:unauthorized` event emitted by the API client on any 401 → `logout()`.
 
-### 2.2 ContestProvider
+### 2.2 ContestProvider — **Implemented (2.1)** → `frontend/src/providers/ContestProvider.tsx`
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -61,9 +61,9 @@ Lightweight SWR-style hooks over the typed API client (no external SWR lib unles
 | `useLeaderboard(contestId, roundId?)` | `…/leaderboard` | ETag + `localStorage` seed |
 | `useRoundResults(contestId, roundId)` | `…/rounds/{rid}/results` | ETag |
 | `usePredictionsView(contestId, roundId)` | `GET …/predictions` | **never cached** (privacy) |
-| `useMyContests()` | `GET /me/contests` (B1) | in-memory |
-| `usePublicContests()` | `GET /contests/public` (B2) | in-memory |
-| `useContacts()` | `GET/PATCH /auth/me/contacts` (B3) | in-memory; **fallback:** readonly UI if GET fails |
+| `useMyContests()` | `GET /me/contests` (B1) | in-memory — **Implemented (2.1)** → `frontend/src/hooks/useMyContests.ts` |
+| `usePublicContests()` | `GET /contests/public` (B2) | in-memory — **Implemented (2.1)** → `frontend/src/hooks/usePublicContests.ts` |
+| `useContacts()` | `GET/PATCH /auth/me/contacts` (B3) | in-memory; **fallback:** readonly UI if GET fails — **Implemented (2.1)** → `frontend/src/hooks/useContacts.ts` |
 
 Each hook returns `{ data, error, loading, refetch }`. Errors are typed `AppError` (`{status, detail, code?}`).
 
@@ -103,9 +103,10 @@ Phase derivation (mirrors plan §3.6) lives in a pure helper `deriveUiMode(conte
 ## 7. Provider tree
 
 ```
-<AuthProvider>
-  <ContestProvider>      // reads contestId from route/picker
-    <ToastProvider>
+<AuthProvider>           // frontend/src/providers/AuthProvider.tsx
+  <ContestProvider>      // frontend/src/providers/ContestProvider.tsx
+    <ToastProvider>      // frontend/src/providers/ToastProvider.tsx
+      <TempPasswordGuard />  // frontend/src/components/auth/TempPasswordGuard.tsx
       {app}
     </ToastProvider>
   </ContestProvider>
@@ -119,3 +120,4 @@ Phase derivation (mirrors plan §3.6) lives in a pure helper `deriveUiMode(conte
 | Date | Change |
 |------|--------|
 | 2026-06-22 | B1–B3 resolved note; fallback via `NEXT_PUBLIC_DEFAULT_CONTEST_ID`; contacts readonly fallback. |
+| 2026-06-23 | Stage 2.1: provider/hook file paths; `fp:unauthorized` event name; `TempPasswordGuard` in tree. |

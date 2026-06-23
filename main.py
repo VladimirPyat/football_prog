@@ -36,7 +36,10 @@ from config.settings import get_settings
 from core.logging_config import setup_logging
 
 settings = get_settings()
-setup_logging(settings.log_level)
+setup_logging(
+    settings.log_level,
+    log_file=settings.log_file if settings.log_to_file else None,
+)
 
 app = FastAPI(title="Football Predictions API", version="1.1.0")
 register_error_handlers(app)

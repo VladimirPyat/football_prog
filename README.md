@@ -92,11 +92,11 @@ Client → FastAPI → JWT / RBAC → Router → Service → SQLAlchemy → DB
 ```bash
 uv sync
 cp .env.example .env          # задать SEED_ADMIN_PASSWORD, SEED_SUPERVISOR_PASSWORD
-uv run python src/scripts/dev_setup.py
-uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
+uv run python src/scripts/dev_setup.py --run   # БД + API (:8000) + UI (:3000)
 ```
 
-- Проверка: `GET /health` · Swagger: `http://127.0.0.1:8000/docs`
+- UI: `http://127.0.0.1:3000/` · API health: `http://127.0.0.1:8000/health` · Swagger: `http://127.0.0.1:8000/docs`
+- Только перезапуск серверов (без сброса БД): `uv run python src/scripts/dev_setup.py --run-only`
 - Минимальный ручной путь (без loader): см. `dev_setup.py --minimal` в [DEV_SETUP.md](manuals/DEV_SETUP.md)
 
 Bootstrap и переменные окружения: [BOOTSTRAP_USERS.md](manuals/BOOTSTRAP_USERS.md) · [CONFIG.md](manuals/CONFIG.md)

@@ -89,12 +89,10 @@ async def seed_admin_user(session: AsyncSession, settings: Settings, contest_id:
 async def seed_supervisor_user(session: AsyncSession, settings: Settings) -> User | None:
     # When the admin UI can create organizers via POST /admin/users/supervisor,
     # comment out the call to this function in run_bootstrap().
-    if not settings.seed_supervisor_login:
-        logger.info("SEED_SUPERVISOR_LOGIN not set — skipping organizer bootstrap")
-        return None
     if not settings.seed_supervisor_password and not settings.seed_supervisor_password_hash:
-        logger.warning(
-            "SEED_SUPERVISOR_LOGIN set but no SEED_SUPERVISOR_PASSWORD — skipping organizer"
+        logger.info(
+            "SEED_SUPERVISOR_PASSWORD not set — skipping organizer bootstrap (login=%s)",
+            settings.seed_supervisor_login,
         )
         return None
 

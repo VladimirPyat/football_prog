@@ -18,6 +18,8 @@ Thumbs.db
 
 # Logs and databases
 *.log
+logs/
+!logs/.gitkeep
 *.sql
 *.sqlite
 *.db

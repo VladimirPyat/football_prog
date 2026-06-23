@@ -10,7 +10,7 @@ Components grouped by layer. Props are TypeScript-ish sketches; exact types live
 
 ## 1. Layout / shell
 
-### `AppShell` (public)
+### `AppShell` (public) — **Implemented (2.1)** → `frontend/src/components/layout/AppShell.tsx`
 Header bar: brand `Sport Prognosis` (left); right side `Личный кабинет` + `Выйти` when authenticated, else `Вход` (opens `LoginModal`). Footer `© 2024 SportPrognosis. Все права защищены.`
 - props: `{ children }`; reads `useAuth`.
 
@@ -18,18 +18,21 @@ Header bar: brand `Sport Prognosis` (left); right side `Личный кабин�
 Top nav: brand `SportPrognosis` + `Сегодня DD.MM.YYYY`; tabs `Настройки` `Туры` `Рассылки` `Результаты`; right `ContestPicker` + `NewContestButton`.
 - props: `{ activeTab }`.
 
-### `ContestPicker`
+### `ContestPicker` — **Implemented (2.1)** → `frontend/src/components/contest/ContestPicker.tsx`
 Dropdown of contests. Supervisor → `GET /contests`; User → `GET /me/contests` (B1); Visitor → `GET /contests/public` (B2).
-- props: `{ contests, value, onChange }`.
+- props: internal (reads `useAuth`, `useContest`, `useMyContests`); compact `<select>` in header for SUPERVISOR+.
 
 ### `NewContestButton`
 `+ Новый конкурс` → opens `CreateContestForm` (SUPERVISOR+, SETUP).
 
-### `LoginModal`
+### `LoginModal` — **Implemented (2.1)** → `frontend/src/components/layout/LoginModal.tsx`
 Overlay with `LoginForm`; closes on success; shows API `detail` on 401.
 
-### `ProtectedRoute`
+### `ProtectedRoute` — **Implemented (2.1)** → `frontend/src/components/auth/ProtectedRoute.tsx`
 Client guard: `requireAuth` / `requireRole(role)` / `requireNotTempPassword`. Redirects: unauthenticated→login, wrong role→`/`, temp-pw→`/change-password`.
+
+### `TempPasswordGuard` — **Implemented (2.1)** → `frontend/src/components/auth/TempPasswordGuard.tsx`
+Global layout guard; redirects authenticated `is_temp_password` users to `/change-password`.
 
 ---
 
@@ -41,9 +44,9 @@ Client guard: `requireAuth` / `requireRole(role)` / `requireNotTempPassword`. Re
 | `RoundSelector` | Top-right dropdown `Тур N (Текущий)`; disables unavailable rounds | `{ rounds, value, onChange }` |
 | `DeadlineCountdown` | Time remaining → «Дедлайн прошёл» | `{ deadline }` |
 | `StatusChip` | Colored badge for round/match/contest status | `{ kind, status }` |
-| `Toast` / `ToastProvider` | Success/error notifications (no animation lib) | `{ type, message }` |
+| `Toast` / `ToastProvider` | Success/error notifications (no animation lib) | `{ type, message }` — **Implemented (2.1)** → `frontend/src/components/ui/Toast.tsx`, `frontend/src/providers/ToastProvider.tsx` |
 | `ConfirmDialog` | Confirm VOID / activate / delete | `{ title, body, onConfirm }` |
-| `LoadingState` / `ErrorState` / `EmptyState` | Consistent fetch states | `{ message? }` |
+| `LoadingState` / `ErrorState` / `EmptyState` | Consistent fetch states | `{ message? }` — **LoadingState, ErrorState implemented (2.1)** → `frontend/src/components/ui/` |
 | `RoleBadge` | Show current role | `{ role }` |
 | `ContestStatusBanner` | PAUSED / FINISHED / locked notice | `{ contest }` |
 | `LockBanner` | «Редактирование параметров недоступно — Конкурс уже запущен» | `{ visible }` |
@@ -90,11 +93,11 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 
 | Component | Used on |
 |-----------|---------|
-| `LoginForm` | LoginModal |
-| `ChangePasswordForm` | `/change-password` |
+| `LoginForm` | LoginModal — **Implemented (2.1)** → `frontend/src/components/auth/LoginForm.tsx` |
+| `ChangePasswordForm` | `/change-password` — **Implemented (2.1)** → `frontend/src/components/auth/ChangePasswordForm.tsx` |
 | `PredictionForm` | `/contest/[id]/predict/[rid]` |
 | `ScoreInput` | inside PredictionForm / ResultsEntryGrid |
-| `ContactsForm` | `/profile` (B3) |
+| `ContactsForm` | `/profile` (B3) — **Implemented (2.1)** → `frontend/src/components/profile/ContactsForm.tsx` |
 | `CreateContestForm` | NewContestButton |
 | `ContestParametersForm` | Настройки → Параметры |
 | `TeamForm` | Настройки → Команды |
@@ -125,6 +128,10 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 
 `useAuth`, `useContest`, `useRounds`, `useLeaderboard`, `useRoundResults`, `usePredictionsView`, `usePredictionSubmit`, `useDeadline`, `useMaxScore`, `useMyContests`, `usePublicContests`, `useContacts`, `useToast`.
 
+**Implemented (2.1):** `useAuth` → `frontend/src/hooks/useAuth.ts`; `useContest` → `frontend/src/hooks/useContest.ts`; `useMyContests` → `frontend/src/hooks/useMyContests.ts`; `usePublicContests` → `frontend/src/hooks/usePublicContests.ts`; `useContacts` → `frontend/src/hooks/useContacts.ts`; `useToast` → `frontend/src/hooks/useToast.ts`.
+
+**Also (2.1):** `ContestList` → `frontend/src/components/contest/ContestList.tsx`; `ProfileMenu` → `frontend/src/components/profile/ProfileMenu.tsx`.
+
 ---
 
 ## Update log
@@ -132,3 +139,4 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | Date | Change |
 |------|--------|
 | 2026-06-21 | Initial catalogue across layout/shared/data/forms/admin, derived from plan §5 + screenshots §11. Props to refine per sub-stage. |
+| 2026-06-23 | Stage 2.1: marked implemented components with `frontend/src/...` paths; added `TempPasswordGuard`, `ContestList`, `ProfileMenu`. |

@@ -10,18 +10,18 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 
 ## 1. Public & User pages
 
-### `/` — Home / contest discovery
+### `/` — Home / contest discovery — **Implemented (2.1)** ✅ → `frontend/src/app/page.tsx`
 - **Roles:** all.
 - **Visitor:** list of running contests (`GET /contests/public`, B2) → select → `/contest/{id}`.
 - **User:** may redirect to «Конкурсы» or last contest.
 - Fallback (B2 unavailable/empty): redirect to `NEXT_PUBLIC_DEFAULT_CONTEST_ID`.
 
-### `/contests` — «Конкурсы»
+### `/contests` — «Конкурсы» — **Implemented (2.1)** ✅ → `frontend/src/app/contests/page.tsx`
 - **User:** contests they were invited to (`GET /me/contests`, B1).
 - **Supervisor/Admin:** managed contests (`GET /contests`).
 - Row → set active contest → navigate to contest page or admin.
 
-### `/contest/[contestId]` — public tabbed page  (`user_*.jpg`)
+### `/contest/[contestId]` — public tabbed page  (`user_*.jpg`) — **Placeholder (2.1)** → `frontend/src/app/contest/[contestId]/page.tsx`
 - **Roles:** all (privacy rules per tab).
 - **Header:** title `Конкурс спортивных прогнозов` + subtitle; top-right `RoundSelector` (`Тур N (Текущий)`).
 - **Tabs (`PublicTabs`):**
@@ -36,13 +36,13 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 - Batch save (8/8, 0..max), Edit/Save toggle, readonly after deadline, 403 handling.
 - Source: `GET …/predictions` (prefill), `POST …/predictions`.
 
-### `/profile` — personal hub
+### `/profile` — personal hub — **Implemented (2.1)** ✅ → `frontend/src/app/profile/page.tsx`
 - **Roles:** USER+.
 - Sections: `ContactsForm` (email/VK/TG + notify, B3), «Конкурсы» link, «Сделать прогноз» shortcut (active round), «Просмотр результатов», «Личная статистика» (stub), «Выйти».
 - **Contacts fallback:** if `GET /auth/me/contacts` fails → fields readonly, Save hidden.
 - Default center: active prediction form (if open) or latest results.
 
-### `/change-password` — forced change gate
+### `/change-password` — forced change gate — **Implemented (2.1)** ✅ → `frontend/src/app/change-password/page.tsx`
 - **Roles:** authenticated with `is_temp_password=true`.
 - `ChangePasswordForm`; on success → `/profile`. Blocks all other navigation until done.
 
@@ -109,3 +109,4 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 | Date | Change |
 |------|--------|
 | 2026-06-21 | Initial page specs per role with routes, data sources, screenshot refs, access matrix. |
+| 2026-06-23 | Stage 2.1: marked `/`, `/contests`, `/profile`, `/change-password` ✅; `/contest/[id]` placeholder. |

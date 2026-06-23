@@ -5,7 +5,8 @@ Environment variables, application settings, seed workflow, and contest defaults
 ## Table of Contents
 
 - [Settings Module](#settings-module)
-- [Environment Variables](#environment-variables)
+- [`.env` — secrets & deployment](#env--secrets--deployment)
+- [Application defaults](#application-defaults-configsettingspy)
 - [Contest Defaults](#contest-defaults)
 - [Seed Script](#seed-script)
 - [Bootstrap Users Script](#bootstrap-users-script)
@@ -14,83 +15,78 @@ Environment variables, application settings, seed workflow, and contest defaults
 
 ## Settings Module [UPDATED]
 
-**Path:** `config/settings.py`
+**Path:** `config/settings.py` — **source of truth** for application defaults (committed, no secrets).
 
-Uses `pydantic-settings` with optional `.env` file support.
+**Path:** `.env` — gitignored secrets and deployment overrides only (template: [`.env.example`](../.env.example)).
 
-```python
-class Settings(BaseSettings):
-    database_url: str = "sqlite+aiosqlite:///./football.db"
-    contest_defaults_path: Path = PROJECT_ROOT / "docs/test_data/config/contest_defaults.json"
-    seed_admin_login: str = "admin"
-    seed_admin_password: str | None = None
-    seed_admin_password_hash: str | None = None
-    seed_admin_first_name: str = "Admin"
-    seed_admin_last_name: str = "User"
-
-    seed_supervisor_login: str | None = None
-    seed_supervisor_password: str | None = None
-    seed_supervisor_password_hash: str | None = None
-    seed_supervisor_first_name: str = "Supervisor"
-    seed_supervisor_last_name: str = "User"
-
-    jwt_secret_key: str = "dev-secret-change-in-production"
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 1440
-
-    cors_origins: list[str] = ["*"]
-
-    contest_delete_grace_seconds: int = 10
-    contest_delete_enabled: bool = True
-    contest_allow_instant_delete: bool = False
-
-    cache_max_age_seconds: int = 300
-    cache_stale_while_revalidate_seconds: int = 60
-
-    log_level: str = "INFO"  # root logger level [NEW]
-
-    upload_dir: Path = PROJECT_ROOT / "uploads"
-    static_assets_dir: Path = PROJECT_ROOT / "static" / "assets"
-    static_url_prefix: str = "/static"
-    max_logo_bytes: int = 2097152  # 2 MiB
-    team_logo_target_px: int = 64  # center-crop + resize target (square)
-    default_team_logo_url: str = "/static/assets/default-team-logo.jpg"
+```
+┌─────────────────────────────────────────────────────────────┐
+│  config/settings.py   ← defaults (repo)                     │
+│         ↑                                                   │
+│  .env (optional)      ← secrets override matching fields    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
+Uses `pydantic-settings`: any `Settings` field can be overridden by an env var (`log_level` → `LOG_LEVEL`).  
 Access via `get_settings()` (cached singleton).
 
-## Environment Variables [UPDATED]
+**Do not** duplicate non-secret defaults in `.env.example` — change `settings.py` or document optional prod overrides in the table below.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./football.db` | Async SQLAlchemy connection URL |
-| `SEED_ADMIN_LOGIN` | `admin` | Login for bootstrap ADMIN |
-| `SEED_ADMIN_PASSWORD` | — | Plaintext admin password (hashed at runtime by bootstrap/seed) [NEW] |
-| `SEED_ADMIN_PASSWORD_HASH` | — | Precomputed bcrypt hash (alternative to `SEED_ADMIN_PASSWORD`) |
-| `SEED_ADMIN_FIRST_NAME` | `Admin` | ADMIN first name |
-| `SEED_ADMIN_LAST_NAME` | `User` | ADMIN last name |
-| `SEED_SUPERVISOR_LOGIN` | — | Optional organizer login for `bootstrap_users.py` [NEW] |
-| `SEED_SUPERVISOR_PASSWORD` | — | Plaintext supervisor password [NEW] |
-| `SEED_SUPERVISOR_PASSWORD_HASH` | — | Precomputed bcrypt hash for supervisor [NEW] |
-| `SEED_SUPERVISOR_FIRST_NAME` | `Supervisor` | SUPERVISOR first name [NEW] |
-| `SEED_SUPERVISOR_LAST_NAME` | `User` | SUPERVISOR last name [NEW] |
-| `JWT_SECRET_KEY` | `dev-secret-change-in-production` | HS256 signing key for access tokens [NEW] |
-| `JWT_ALGORITHM` | `HS256` | JWT algorithm [NEW] |
-| `JWT_EXPIRE_MINUTES` | `1440` | Token lifetime in minutes (24 h) [NEW] |
-| `CORS_ORIGINS` | `["*"]` | Allowed CORS origins (JSON list) [NEW] |
-| `CONTEST_DELETE_GRACE_SECONDS` | `10` | Seconds after pause before safe delete allowed [NEW] |
-| `CONTEST_DELETE_ENABLED` | `true` | Enable/disable contest delete endpoint [NEW] |
-| `CONTEST_ALLOW_INSTANT_DELETE` | `false` | Skip grace period (test/dev only) [NEW] |
-| `CACHE_MAX_AGE_SECONDS` | `300` | Public leaderboard/results cache TTL [NEW] |
-| `CACHE_STALE_WHILE_REVALIDATE_SECONDS` | `60` | Stale-while-revalidate window [NEW] |
-| `LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) [NEW] |
-| `UPLOAD_DIR` | `./uploads` | Writable root for uploaded team logos [NEW] |
-| `STATIC_URL_PREFIX` | `/static` | URL prefix for static mounts (`/assets`, `/teams`) [NEW] |
-| `MAX_LOGO_BYTES` | `2097152` | Max team logo upload size (2 MiB) [NEW] |
-| `TEAM_LOGO_TARGET_PX` | `64` | Uploaded logos normalized to this square size (px) [NEW] |
-| `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback when `teams.logo_url` is NULL [NEW] |
+---
 
-### Team logo storage [NEW]
+## `.env` — secrets & deployment
+
+Copy [`.env.example`](../.env.example) → `.env` and fill in **before first bootstrap**:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | dev: has default | Async SQLAlchemy URL; use PostgreSQL in production |
+| `JWT_SECRET_KEY` | **prod: yes** | HS256 signing key for access tokens |
+| `SEED_ADMIN_PASSWORD` | **bootstrap: yes** | Plaintext admin password (hashed at runtime) |
+| `SEED_SUPERVISOR_PASSWORD` | recommended | Plaintext supervisor password |
+| `SEED_ADMIN_PASSWORD_HASH` | alternative | Precomputed bcrypt instead of `SEED_ADMIN_PASSWORD` |
+| `SEED_SUPERVISOR_PASSWORD_HASH` | alternative | Precomputed bcrypt instead of `SEED_SUPERVISOR_PASSWORD` |
+
+Generate hash: `uv run python src/scripts/hash_password.py 'your-password'`
+
+Logins (`admin`, `supervisor`), JWT algorithm/TTL, logging, CORS, cache, paths — **not** in `.env.example`; see [Application defaults](#application-defaults-configsettingspy) below.
+
+---
+
+## Application defaults (`config/settings.py`)
+
+Change in code for dev; override via env in production (Kubernetes, etc.) if needed.
+
+| Setting field | Env override | Default | Description |
+|---------------|--------------|---------|-------------|
+| `seed_admin_login` | `SEED_ADMIN_LOGIN` | `admin` | Bootstrap ADMIN login |
+| `seed_admin_first_name` | `SEED_ADMIN_FIRST_NAME` | `Admin` | ADMIN first name |
+| `seed_admin_last_name` | `SEED_ADMIN_LAST_NAME` | `User` | ADMIN last name |
+| `seed_supervisor_login` | `SEED_SUPERVISOR_LOGIN` | `supervisor` | Bootstrap SUPERVISOR login |
+| `seed_supervisor_first_name` | `SEED_SUPERVISOR_FIRST_NAME` | `Supervisor` | SUPERVISOR first name |
+| `seed_supervisor_last_name` | `SEED_SUPERVISOR_LAST_NAME` | `User` | SUPERVISOR last name |
+| `jwt_algorithm` | `JWT_ALGORITHM` | `HS256` | JWT algorithm |
+| `jwt_expire_minutes` | `JWT_EXPIRE_MINUTES` | `1440` | Token lifetime (minutes) |
+| `cors_origins` | `CORS_ORIGINS` | `["*"]` | Allowed CORS origins (JSON list) |
+| `contest_delete_grace_seconds` | `CONTEST_DELETE_GRACE_SECONDS` | `10` | Grace before safe delete after pause |
+| `contest_delete_enabled` | `CONTEST_DELETE_ENABLED` | `true` | Enable contest delete endpoint |
+| `contest_allow_instant_delete` | `CONTEST_ALLOW_INSTANT_DELETE` | `false` | Skip grace (test/dev only) |
+| `cache_max_age_seconds` | `CACHE_MAX_AGE_SECONDS` | `300` | Public cache TTL |
+| `cache_stale_while_revalidate_seconds` | `CACHE_STALE_WHILE_REVALIDATE_SECONDS` | `60` | Stale-while-revalidate window |
+| `log_level` | `LOG_LEVEL` | `INFO` | Root log level |
+| `log_to_file` | `LOG_TO_FILE` | `true` | Write to `log_file` + stderr |
+| `log_file` | `LOG_FILE` | `app.log` | Active log path (repo root) |
+| `log_archive_dir` | `LOG_ARCHIVE_DIR` | `logs/archive` | Archived log copies |
+| `log_archive_max_bytes` | `LOG_ARCHIVE_MAX_BYTES` | `5242880` | Archive at 5 MiB |
+| `log_archive_interval_days` | `LOG_ARCHIVE_INTERVAL_DAYS` | `7` | Weekly archive trigger |
+| `upload_dir` | `UPLOAD_DIR` | `./uploads` | Team logo uploads |
+| `static_url_prefix` | `STATIC_URL_PREFIX` | `/static` | Static URL prefix |
+| `max_logo_bytes` | `MAX_LOGO_BYTES` | `2097152` | Max logo upload (2 MiB) |
+| `team_logo_target_px` | `TEAM_LOGO_TARGET_PX` | `64` | Logo resize target (px) |
+| `default_team_logo_url` | `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback logo URL |
+| `contest_defaults_path` | — | `docs/test_data/config/contest_defaults.json` | Seed JSON path (code only) |
+
+### Team logo storage
 
 | Path | Git | Purpose |
 |------|-----|---------|
@@ -100,8 +96,6 @@ Access via `get_settings()` (cached singleton).
 Directories `uploads/` and `static/assets/` are created at app startup (`main.py`). See [API_GUIDE.md — Team logos](API_GUIDE.md#multi-contest-api).
 
 > `contest_defaults_path` is a code default pointing to `docs/test_data/config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
->
-> **Env template:** copy [`.env.example`](../.env.example) to `.env` (gitignored). Prefer `SEED_ADMIN_PASSWORD` (plaintext); scripts hash at runtime. Precomputed hash: `uv run python src/scripts/hash_password.py 'your-password'`.
 
 ## Contest Defaults [NEW]
 
