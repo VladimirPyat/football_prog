@@ -59,46 +59,39 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 
 All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unless marked ADMIN.
 
-### `/admin` — admin landing — **Stub (2.1.1)** → `frontend/src/app/admin/page.tsx`
-- **ADMIN:** dashboard stub — placeholder links to lifecycle/users/settings («Скоро — этап 2.3»).
+### `/admin` — admin landing — **Implemented (2.3)** → `frontend/src/app/admin/page.tsx`
+- **ADMIN:** dashboard with links to lifecycle/users/settings.
 - **SUPERVISOR:** redirect to `/admin/settings/parameters`.
 - Guard: `ProtectedRoute requireRole SUPERVISOR+`.
 
-### `/admin/layout.tsx` — admin shell — **Stub (2.1.1)**
-- `AdminTopNav` with tabs Настройки / Туры / Рассылки / Результаты — disabled or «Скоро 2.3» until full UI in 2.3.
-- `ContestPicker` in header when applicable.
+### `/admin/layout.tsx` — admin shell — **Implemented (2.3)** → `frontend/src/app/admin/layout.tsx`
+- `AdminTopNav` + `ProtectedRoute requireRole SUPERVISOR+`.
 
-### `/admin/settings/parameters` — Настройки → Параметры  (`supervisor_settings.jpg`) — **Stub (2.1.1)** → placeholder; **Full UI (2.3)**
+### `/admin/settings/parameters` — **Implemented (2.3)** → `frontend/src/app/admin/settings/parameters/page.tsx`
 - `LockBanner` when `is_locked`. Fields readonly when locked: `Количество команд`, `Количество туров`, `Число матчей в туре`, `Произвольное количество`.
 - Scoring cards (`Основные очки`, `Бонусы`) from `rules_json`. `Остановить конкурс` (pause/finish, ADMIN).
 - Source: `GET/PATCH /contests/{id}`.
 
-### `/admin/settings/participants` — Участники  (`supervisor_settings2.jpg`)
+### `/admin/settings/participants` — **Implemented (2.3)** → `frontend/src/app/admin/settings/participants/page.tsx`
 - `ParticipantsTable`; `+ Добавить участника` (disabled when locked); invite → `temp_password` shown.
 - Source: `GET/POST/DELETE …/participants`. ADMIN row action: tie-break (`PUT …/exceptional-tiebreak`).
 
-### `/admin/settings/teams` — Команды  (`supervisor_settings3.jpg`)
+### `/admin/settings/teams` — **Implemented (2.3)** → `frontend/src/app/admin/settings/teams/page.tsx`
 - `TeamsGrid` + add-team card (`Название`, `Сокращение ≤4`, `Логотип` upload B5). Disabled when locked.
 - Source: `GET/POST/PATCH/DELETE …/teams`. Logo: B5 upload, fallback `logo_url`.
 
-### `/admin/rounds` — Туры  (`supervisor_tours.jpg`)
+### `/admin/rounds` — **Implemented (2.3)** → `frontend/src/app/admin/rounds/page.tsx`
 - `RoundManagementPanel`: round dropdown, `Дедлайн прогнозов` picker (24h rule), 8-match grid (`Домашняя/Гостевая/Статус/Время`), right `Статус тура` card, `+ Добавить свободный тур`.
 - Warnings when active/deadline passed (only status+date editable).
 - Source: `POST/PATCH …/admin/rounds`, `…/activate|close`, `…/free-tour`, `PATCH …/matches/{id}/status`.
 
-### `/admin/results` — Результаты  (`supervisor_results.jpg`)
+### `/admin/results` — **Implemented (2.3)** → `frontend/src/app/admin/results/page.tsx`
 - `ResultsEntryPanel`: round dropdown, per-match `Завершён`/`Отменить` + score inputs, `Применить результаты` → calculate → publish workflow; `Применено` lock badge.
 - Source: `PUT …/matches/{id}/result`, `PATCH …/matches/{id}/status` (VOID), `POST …/rounds/{id}/calculate|publish`.
 
-### `/admin/newsletters` — Рассылки
-- `NewslettersPlaceholder` («Скоро — Stage 3»). Tab visible per screenshot; no API.
-
-### `/admin/lifecycle` — Contest lifecycle (ADMIN)
-- `LifecyclePanel`: pause/resume/finish/delete (confirm `DELETE` + grace), `RecalculateButton`.
-- Source: `POST …/pause|resume|finish`, `DELETE …/contests/{id}`, `POST …/admin/recalculate`.
-
-### `/admin/users` — Create organizer (ADMIN)
-- Form → `POST /admin/users/supervisor`.
+### `/admin/newsletters` — **Implemented (2.3 placeholder)** → `frontend/src/app/admin/newsletters/page.tsx`
+### `/admin/lifecycle` — **Implemented (2.3, ADMIN)** → `frontend/src/app/admin/lifecycle/page.tsx`
+### `/admin/users` — **Implemented (2.3, ADMIN)** → `frontend/src/app/admin/users/page.tsx`
 
 ---
 
@@ -114,7 +107,7 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 | `/profile` | ❌ | ✅ | ❌ → `/admin` | ❌ → `/admin` |
 | `/change-password` | ❌ | ✅ (temp) | ✅ (temp) | ✅ (temp) |
 | `/staff/login` | ✅ | ❌† | ❌† | ❌† |
-| `/admin`, `/admin/settings/*` (stub 2.1.1) | ❌ | ❌ | ✅ | ✅ |
+| `/admin`, `/admin/settings/*` | ❌ | ❌ | ✅ | ✅ |
 | `/admin/rounds`, `/admin/results`, `/admin/newsletters` | ❌ | ❌ | ✅ | ✅ |
 | `/admin/lifecycle`, `/admin/users` | ❌ | ❌ | ❌ | ✅ |
 
@@ -131,3 +124,4 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 | 2026-06-21 | Initial page specs per role with routes, data sources, screenshot refs, access matrix. |
 | 2026-06-23 | Stage 2.1: marked `/`, `/contests`, `/profile`, `/change-password` ✅; `/contest/[id]` placeholder. |
 | 2026-06-24 | Stage 2.1.1: `/profile` USER-only (staff redirect `/admin`); `/admin` stubs; `/staff/login` optional; `resolvePostLoginPath` post-login routing. |
+| 2026-06-24 | Stage 2.3: full `/admin/*` routes implemented with page file paths. |

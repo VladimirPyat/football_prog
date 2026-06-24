@@ -182,6 +182,7 @@ agent_docs/ui/forms_validation.md         # UPDATE PredictionForm paths
 agent_docs/ui/state_management.md         # UPDATE hooks §3
 agent_docs/contracts/frontend_api_integration.md
 agent_docs/progress/stage_2.md            # APPEND handoff
+manuals/FRONTEND_REFERENCE.md             # APPEND §2.2 routes, components, editable copy
 ```
 
 Enable profile link **«Сделать прогноз»** → `/contest/{activeContestId}/predict/{activeRoundId}` (resolve ACTIVE round from `useRounds`).
@@ -276,7 +277,40 @@ Run: `npm run test:unit`.
 
 ## 8. Documentation maintenance (required)
 
+### 8.1 Living specs (`agent_docs/`)
+
 Update living docs with **Implemented (2.2)** + file paths; append update log rows.
+
+| File | Updates |
+|------|---------|
+| `agent_docs/ui/components.md` | Prediction components + paths |
+| `agent_docs/ui/pages.md` | `/contest/[id]/predict/*`, Прогнозы tab |
+| `agent_docs/ui/forms_validation.md` | Score/prediction Zod schemas |
+| `agent_docs/ui/state_management.md` | `usePredictionsView`, `usePredictionSubmit`, etc. |
+| `agent_docs/contracts/frontend_api_integration.md` | Predictions GET/POST, privacy matrix |
+
+Append update log rows — do not delete prior content.
+
+### 8.2 Human frontend map (`manuals/FRONTEND_REFERENCE.md`) — required
+
+Append to **§ Stage 2.2** (do not overwrite prior stages). Goal: a human can find and edit UI copy (footer, banners, button labels) without searching the repo.
+
+For **each new route** add a row:
+
+| Route | Page file | Role / guard | Main features |
+
+For **each new or materially changed component** add a row:
+
+| Component | Source file | Editable copy (Russian strings) | Notes |
+
+Include at minimum for 2.2:
+
+- `/contest/[contestId]/predict/[roundId]` — prediction form page
+- `/contest/[contestId]` — Прогнозы tab wiring
+- `PredictionForm`, `PredictionsMatrix`, `PrivacyMask`, `DeadlineCountdown`, `DeadlineWarningBanner`, `PublicTabs`, `RoundSelector`
+- Any new banners, stubs, or button labels («Сохранить прогноз», «Редактировать», «Прогноз сделан», deadline messages)
+
+Append one row to **Update log** at the bottom of `FRONTEND_REFERENCE.md`.
 
 If integration reveals missing backend behaviour (e.g. anonymous post-deadline GET), append to `BLOCKED.md` — do not mock.
 
@@ -299,6 +333,7 @@ Manual + automated (`tester_2.2`):
 - [ ] Profile **Сделать прогноз** → active round predict page
 - [ ] `npm run build` + `npm run test:unit` pass
 - [ ] Living docs updated
+- [ ] `manuals/FRONTEND_REFERENCE.md` §2.2 appended (routes + components + copy)
 
 ---
 
@@ -314,7 +349,8 @@ Manual + automated (`tester_2.2`):
 8. Upgrade `/contest/[id]` — Прогнозы tab
 9. Profile «Сделать прогноз» link
 10. Update `agent_docs/ui/*`, `frontend_api_integration.md`
-11. Append handoff → `stage_2.md`
+11. Append `manuals/FRONTEND_REFERENCE.md` §2.2
+12. Append handoff → `stage_2.md`
 
 ---
 
@@ -328,7 +364,7 @@ Append to `agent_docs/progress/stage_2.md`:
 - Scope: PredictionForm, PredictionsMatrix, deadline UX, privacy helpers
 - UI rules: batch-only, 0..maxScore, NULL≠0, 24h warning, privacy pre/post deadline
 - Verified: npm run build, npm run test:unit; manual checklist §9
-- Docs updated: ui/*, frontend_api_integration.md
+- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.2
 - Next: agent_docs/instructions/tester_2.2.md
 ```
 

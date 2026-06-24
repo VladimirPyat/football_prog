@@ -239,6 +239,7 @@ agent_docs/ui/pages.md                    # UPDATE /contest/[id] complete ✅
 agent_docs/ui/state_management.md         # UPDATE caching + view mode
 agent_docs/contracts/frontend_api_integration.md
 agent_docs/progress/stage_2.md            # APPEND handoff
+manuals/FRONTEND_REFERENCE.md             # APPEND §2.4 routes, components, editable copy
 ```
 
 Add stable selectors for E2E:
@@ -264,9 +265,35 @@ Run: `npm run test:unit`.
 
 ---
 
-## 8. Documentation maintenance
+## 8. Documentation maintenance (required)
+
+### 8.1 Living specs (`agent_docs/`)
 
 Update living docs **Implemented (2.4)** + paths. New backend gap → `BLOCKED.md` append-only.
+
+| File | Updates |
+|------|---------|
+| `agent_docs/ui/components.md` | `LeaderboardTable`, `ResultsMatrix`, toggle |
+| `agent_docs/ui/pages.md` | Complete `/contest/[id]` tabbed page |
+| `agent_docs/ui/state_management.md` | ETag cache, `useLeaderboardViewMode` |
+| `agent_docs/contracts/frontend_api_integration.md` | Leaderboard/results GET, ETag |
+
+### 8.2 Human frontend map (`manuals/FRONTEND_REFERENCE.md`) — required
+
+Append to **§ Stage 2.4** (do not overwrite prior stages). Goal: a human can find leaderboard/results labels and tab copy without searching the repo.
+
+For **routes** (upgrade existing `/contest/[contestId]` row or add sub-features): document tab labels «Лидерборд», «Прогнозы», «Результаты», round selector copy.
+
+For **each new or materially changed component** add a row:
+
+| Component | Source file | Editable copy (Russian strings) | Notes |
+
+Include at minimum for 2.4:
+
+- `PublicContestPage`, `LeaderboardTable`, `LeaderboardViewToggle`, `ResultsMatrix`, `ResultsUnavailableMessage`
+- Column headers (13-col full / 3-col compact), toggle labels «Краткая» / «📊 Полная», empty/unavailable messages
+
+Append one row to **Update log** at the bottom of `FRONTEND_REFERENCE.md`.
 
 ---
 
@@ -285,6 +312,7 @@ Manual + `tester_2.4`:
 - [ ] **Integration E2E** green (see `tester_2.4.md`): user flows + supervisor flows + RBAC
 - [ ] `npm run build` + `npm run test:unit` pass
 - [ ] Living docs updated; `BLOCKED.md` — no new open blockers (or documented)
+- [ ] `manuals/FRONTEND_REFERENCE.md` §2.4 appended (routes + components + copy)
 
 ---
 
@@ -299,7 +327,8 @@ Manual + `tester_2.4`:
 7. Upgrade `/contest/[id]/page.tsx`
 8. `data-testid` pass for E2E
 9. Update docs + verify B4 fields in network response
-10. Append handoff → `stage_2.md`
+10. Append `manuals/FRONTEND_REFERENCE.md` §2.4
+11. Append handoff → `stage_2.md`
 
 ---
 
@@ -311,7 +340,7 @@ Manual + `tester_2.4`:
 - Scope: full tabbed contest page, LeaderboardTable responsive, ResultsMatrix, ETag
 - UI: 13 cols, mobile toggle, sticky cols, localStorage view mode
 - Verified: npm run build, npm run test:unit; checklist §9
-- Docs updated: ui/*, frontend_api_integration.md
+- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.4
 - Next: agent_docs/instructions/tester_2.4.md
 ```
 

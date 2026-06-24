@@ -282,7 +282,7 @@ lib/api/
 types/api.ts       // interfaces from §7
 ```
 
-`client.ts` responsibilities: inject base URL + Bearer; throw typed `AppError` on non-2xx (parse `detail`/`code`); 401 → emit logout event; expose `get/post/patch/put/del` + `getCached` (ETag).
+`client.ts` responsibilities: inject base URL + Bearer; throw typed `AppError` on non-2xx (parse `detail`/`code`); 401 → emit logout event; expose `get/post/patch/put/del/upload` + `getCached` (ETag). **2.3:** `apiUpload()` for B5 team logo — skips `Content-Type` when body is `FormData`.
 
 ---
 
@@ -293,3 +293,4 @@ types/api.ts       // interfaces from §7
 | 2026-06-22 | B1–B3 RESOLVED (Stage 1.8); fallback table for B1/B2/B3; `NEXT_PUBLIC_DEFAULT_CONTEST_ID` naming. |
 | 2026-06-23 | Stage 2.1: `fp:unauthorized` custom event (not generic `unauthorized`); Pydantic 422 array parsed in `parseErrorDetail()` (`frontend/src/lib/api/errors.ts`); `localStorage` key `fp_active_contest_id` for contest picker persistence. |
 | 2026-06-24 | Stage 2.1.1: §2.4 Post-login routing by role (`resolvePostLoginPath`); `/profile` USER-only; `/admin/*` SUPERVISOR+; demo `user/user` from bootstrap (TEMPORARY until 2.3 invite UI). |
+| 2026-06-24 | Stage 2.3: B5 logo multipart via `apiUpload`; extended `contestAdmin` path builders in `endpoints.ts`; admin hook matrix. |

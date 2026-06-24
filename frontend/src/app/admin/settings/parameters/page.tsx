@@ -1,28 +1,34 @@
 "use client";
 
-import { useEffect } from "react";
-import { useContest } from "@/hooks/useContest";
-import { resolveDefaultContestId } from "@/lib/contest/resolveDefaultContestId";
+import { AdminPageShell } from "@/components/admin/AdminPageShell";
+import { ContestParametersForm } from "@/components/admin/ContestParametersForm";
+import { deriveAdminUiMode } from "@/lib/admin/deriveAdminUiMode";
+import { useContestAdmin } from "@/hooks/useContestAdmin";
+import { useToast } from "@/hooks/useToast";
+import { AppError } from "@/lib/api/client";
 
 export default function AdminSettingsParametersPage() {
-  const { contest, contestId, setContestId } = useContest();
+  const { contest, patchContest } = useContestAdmin();
+  const { showSuccess, showError } = useToast();
 
-  useEffect(() => {
-    const id = contestId ?? resolveDefaultContestId();
-    if (!contest) {
-      void setContestId(id, true);
-    }
-  }, [contest, contestId, setContestId]);
+  if (!contest) return null;
+
+  const uiMode = deriveAdminUiMode({ contest, round: null });
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Управление конкурсом</h1>
-      {contest && (
-        <p className="text-gray-700 mb-4">
-          Активный конкурс: <span className="font-medium">{contest.name}</span>
-        </p>
-      )}
-      <p className="text-gray-600">Полный интерфейс настроек — этап 2.3</p>
-    </div>
+    <AdminPageShell title="Настройки" showSettingsNav>
+      <ContestParametersForm
+        contest={contest}
+        readonly={uiMode.setupReadonly}
+        onSave={async (data) => {
+          try {
+            await patchContest(data);
+            showSuccess("Параметры сохранены");
+          } catch (err) {
+            showError(err instanceof AppError ? err.detail : "Ошибка сохранения");
+          }
+        }}
+      />
+    </AdminPageShell>
   );
 }

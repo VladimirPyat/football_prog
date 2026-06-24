@@ -172,6 +172,7 @@ agent_docs/ui/forms_validation.md       # UPDATE admin Zod if paths differ
 agent_docs/ui/state_management.md       # UPDATE admin hooks
 agent_docs/contracts/frontend_api_integration.md  # logo multipart, admin matrix
 agent_docs/progress/stage_2.md          # APPEND handoff
+manuals/FRONTEND_REFERENCE.md           # APPEND §2.3 routes, components, editable copy
 ```
 
 Copy default team logo per `coder_1.9.md`:
@@ -351,7 +352,33 @@ Run: `npm run test:unit`.
 
 ## 10. Documentation maintenance (required)
 
+### 10.1 Living specs (`agent_docs/`)
+
 Same as 2.1 — update living docs with **Implemented (2.3)** annotations and file paths; append update log rows.
+
+| File | Updates |
+|------|---------|
+| `agent_docs/ui/components.md` | Admin components + paths |
+| `agent_docs/ui/pages.md` | Full `/admin/*` route map |
+| `agent_docs/ui/forms_validation.md` | Admin Zod forms |
+| `agent_docs/ui/state_management.md` | Admin hooks |
+| `agent_docs/contracts/frontend_api_integration.md` | Logo multipart, admin API matrix |
+
+### 10.2 Human frontend map (`manuals/FRONTEND_REFERENCE.md`) — required
+
+Append to **§ Stage 2.3** (do not overwrite prior stages). Goal: a human can find and edit admin UI copy without searching the repo.
+
+For **each new `/admin/*` route** add a row (route, page file, role guard, main features).
+
+For **each new or materially changed admin component** add a row (component, source file, editable Russian copy, notes).
+
+Include at minimum for 2.3:
+
+- `/admin/settings/{parameters,participants,teams}`, `/admin/rounds`, `/admin/results`, `/admin/newsletters`, `/admin/lifecycle`, `/admin/users`
+- `AdminTopNav`, `LockBanner`, `ContestStatusBanner`, modals (`ParticipantInviteModal`, `FreeTourModal`, `NewsletterPromptModal`)
+- Key mutation buttons and banners («Активировать», «Опубликовать», 24h errors, lock/pause messages)
+
+Append one row to **Update log** at the bottom of `FRONTEND_REFERENCE.md`.
 
 If a **new backend gap** is discovered, add to `BLOCKED.md`:
 
@@ -380,6 +407,7 @@ Manual + automated (tester_2.3):
 - [ ] **Logo upload** works (B5); default logo when none
 - [ ] `npm run build` + `npm run test:unit` pass
 - [ ] Living docs updated
+- [ ] `manuals/FRONTEND_REFERENCE.md` §2.3 appended (routes + components + copy)
 
 ---
 
@@ -395,7 +423,8 @@ Manual + automated (tester_2.3):
 8. Newsletters placeholder page
 9. Vitest for admin rules
 10. Update `agent_docs/ui/*`, `frontend_api_integration.md`, `BLOCKED.md` if needed
-11. Append handoff → `stage_2.md`
+11. Append `manuals/FRONTEND_REFERENCE.md` §2.3
+12. Append handoff → `stage_2.md`
 
 ---
 
@@ -409,7 +438,7 @@ Append to `agent_docs/progress/stage_2.md`:
 - Scope: /admin settings, rounds, results, lifecycle, B5 logo upload
 - UI rules: is_locked readonly, ACTIVE round restrictions, 24h, newsletter stub
 - Verified: npm run build, npm run test:unit; manual checklist §11
-- Docs updated: ui/*, frontend_api_integration.md
+- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.3
 - Next: agent_docs/instructions/tester_2.3.md
 ```
 

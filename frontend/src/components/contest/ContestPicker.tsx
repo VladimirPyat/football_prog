@@ -15,7 +15,12 @@ function toListItemFromContest(c: ContestOut): ContestListItem {
   return { id: c.id, name: c.name, status: c.status };
 }
 
-export function ContestPicker() {
+interface ContestPickerProps {
+  /** When true, changing contest stays on current admin page */
+  adminMode?: boolean;
+}
+
+export function ContestPicker({ adminMode = false }: ContestPickerProps) {
   const { role } = useAuth();
   const { contestId, setContestId } = useContest();
   const { contests: myContests } = useMyContests(role === "USER");
@@ -51,7 +56,9 @@ export function ContestPicker() {
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = Number(e.target.value);
     await setContestId(id, isSupervisorOrAbove(role));
-    router.push(`/contest/${id}`);
+    if (!adminMode) {
+      router.push(`/contest/${id}`);
+    }
   };
 
   if (loading && !items.length) {

@@ -19,6 +19,7 @@ export async function clearAuthStorage(page: Page): Promise<void> {
     localStorage.clear();
     sessionStorage.clear();
   });
+  await page.reload();
 }
 
 export async function openLoginModal(page: Page): Promise<void> {

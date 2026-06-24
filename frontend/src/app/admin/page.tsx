@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { LoadingState } from "@/components/ui/LoadingState";
 
-const PLACEHOLDER_LINKS = [
-  { label: "Жизненный цикл", href: "#" },
-  { label: "Пользователи", href: "#" },
-  { label: "Настройки конкурса", href: "#" },
+const ADMIN_LINKS = [
+  { label: "Жизненный цикл", href: "/admin/lifecycle" },
+  { label: "Пользователи", href: "/admin/users" },
+  { label: "Настройки конкурса", href: "/admin/settings/parameters" },
 ] as const;
 
 export default function AdminDashboardPage() {
@@ -34,27 +34,16 @@ export default function AdminDashboardPage() {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Панель администратора</h1>
-      <p className="text-gray-600 mb-6">Разделы управления появятся на этапе 2.3.</p>
+      <p className="text-gray-600 mb-6">Управление конкурсом и системными настройками.</p>
       <ul className="space-y-3">
-        {PLACEHOLDER_LINKS.map((item) => (
-          <li key={item.label}>
-            <span
-              className="text-gray-400 cursor-not-allowed"
-              title="Скоро — этап 2.3"
-              aria-disabled="true"
-            >
+        {ADMIN_LINKS.map((item) => (
+          <li key={item.href}>
+            <Link href={item.href} className="text-blue-600 hover:underline font-medium">
               {item.label}
-            </span>
-            <span className="text-sm text-gray-500 ml-2">— Скоро — этап 2.3</span>
+            </Link>
           </li>
         ))}
       </ul>
-      <p className="mt-6 text-sm text-gray-500">
-        Организаторы:{" "}
-        <Link href="/admin/settings/parameters" className="text-blue-600 hover:underline">
-          Управление конкурсом
-        </Link>
-      </p>
     </div>
   );
 }

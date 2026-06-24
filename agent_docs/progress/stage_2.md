@@ -41,4 +41,23 @@
 - Unit: 22 passed; E2E: 18 passed (0 skipped)
 - Bootstrap: user/user API login OK
 - Follow-up: completed after Tester subagent crash; routing race + admin bootstrap temp flag fixed
-- Next: coder_2.3.md (admin UI), then coder_2.2.md (predictions)
+- Next: coder_2.2.md (predictions)
+
+## 2026-06-24 — Coder (2.3 supervisor admin UI)
+- STATUS: READY_FOR_TEST
+- Scope: /admin settings, rounds, results, lifecycle, B5 logo upload
+- UI rules: is_locked readonly, ACTIVE round restrictions, 24h, newsletter stub
+- Verified: npm run build (0), npm run test:unit (36 passed)
+- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.3
+- Next: agent_docs/instructions/tester_2.3.md
+
+## 2026-06-25 — Tester (2.3)
+- STATUS: TEST_FAIL
+- Report: agent_docs/reports/test_2.3.md
+- Unit: 36 passed; E2E (2.3 specs): 1 passed / 15 failed
+- Build: OK; Lint/TSC: OK; Prettier: FAIL (18 files)
+- Blockers: B7 (`rounds.number` global UNIQUE), B8 (`teams.name` global UNIQUE) — `agent_docs/reports/BLOCKED.md`
+- Tests: frontend/e2e/admin_*.spec.ts, supervisor_*.spec.ts, fixtures/adminApi.ts
+- Env: `load_test_data.py --reset` + `bootstrap_users.py` + `dev_setup.py --ensure-running-only` required
+- Manual UX checklist: reminded in report §10
+- Next: @Coder fix B7/B8, VOID UX, Prettier; re-run tester_2.3.md

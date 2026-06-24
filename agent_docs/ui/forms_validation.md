@@ -64,7 +64,7 @@ z.object({
 })
 ```
 
-### CreateContestForm  (SETUP)
+### CreateContestForm  (SETUP) — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`createContestSchema`)
 ```ts
 z.object({
   name: z.string().min(1),
@@ -84,10 +84,10 @@ z.object({
 ```
 (Round-robin math per `docs/01` §3.2.)
 
-### ContestParametersForm
+### ContestParametersForm — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`contestParametersSchema`)
 - Same fields as create; **all readonly when `is_locked`**. Scoring/bonus values shown from `rules_json` (display-only here). PATCH `/contests/{id}`; `CONTEST_LOCKED` (403) → keep readonly + banner.
 
-### TeamForm
+### TeamForm — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`teamFormSchema`)
 ```ts
 z.object({
   name: z.string().min(1),
@@ -97,7 +97,7 @@ z.object({
 ```
 Logo: B5 multipart upload; fallback to `logo_url` text. File: PNG/JPG/GIF ≤2MB (client-check size/type).
 
-### ParticipantInviteForm
+### ParticipantInviteForm — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`participantInviteSchema`)
 ```ts
 z.object({
   email: z.string().email(),
@@ -108,7 +108,7 @@ z.object({
 ```
 On success show returned `temp_password`. Disabled when locked.
 
-### RoundBuilderForm
+### RoundBuilderForm — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`roundBuilderSchema`)
 ```ts
 z.object({
   number: z.number().int().positive(),
@@ -132,7 +132,7 @@ z.object({
 - `team1_id !== team2_id` per match.
 - After activation: only match status + date editable (per `supervisor_tours.jpg`); deadline locked <24h.
 
-### MatchResultForm / ResultsEntryGrid
+### MatchResultForm / ResultsEntryGrid — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`matchResultSchema`)
 ```ts
 z.object({
   score1: z.number().int().min(0).max(maxScore),
@@ -143,7 +143,7 @@ z.object({
 - Available only after round CLOSED (else 403). `Применить` → calculate; inputs lock after apply.
 - `Отменить` (VOID) → `PATCH …/matches/{id}/status {status:'VOID'}` with `ConfirmDialog`.
 
-### FreeTourModal
+### FreeTourModal — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`freeTourSchema`)
 ```ts
 z.object({
   deadline: z.string().datetime(),
@@ -155,13 +155,13 @@ z.object({
 ```
 Only `POSTPONED` matches selectable; teams readonly.
 
-### TiebreakForm  (ADMIN)
+### TiebreakForm  (ADMIN) — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`tiebreakSchema`)
 ```ts
 z.object({ points: z.number().int().min(0) })
 ```
 `PUT …/participants/{user_id}/exceptional-tiebreak`; allowed even when locked.
 
-### CreateSupervisorForm  (ADMIN)
+### CreateSupervisorForm  (ADMIN) — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`createOrganizerSchema`)
 ```ts
 z.object({
   login: z.string().min(1),
@@ -196,3 +196,4 @@ Duplicate login → `400 VALIDATION_ERROR`.
 |------|--------|
 | 2026-06-21 | Initial Zod schemas + cross-cutting rules for all Stage-2 forms; mirrors `docs/01` §6 and API error contract. |
 | 2026-06-23 | Stage 2.1: Zod export paths for login, changePassword, contacts under `frontend/src/lib/validation/`. |
+| 2026-06-24 | Stage 2.3: admin Zod schemas in `frontend/src/lib/validation/admin.ts`; client 24h rule in `lib/admin/deadlineRule.ts`. |

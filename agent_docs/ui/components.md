@@ -14,15 +14,13 @@ Components grouped by layer. Props are TypeScript-ish sketches; exact types live
 Header bar: brand `Sport Prognosis` (left); right side role-aware nav — USER: `Личный кабинет` → `/profile`; SUPERVISOR+: `Управление` → `/admin` + `ContestPicker`. Visitor: `Вход` (opens `LoginModal`). Footer: copyright + link «Вход для организаторов» → `/staff/login`.
 - props: `{ children }`; reads `useAuth`.
 
-### `AdminTopNav` (supervisor) — **Stub (2.1.1)** → `frontend/src/components/admin/AdminTopNav.tsx`
-Top nav: brand `SportPrognosis` + `Сегодня DD.MM.YYYY`; tabs `Настройки` `Туры` `Рассылки` `Результаты` (disabled, `title="Скоро 2.3"`); right `ContestPicker`. Brand link → `/admin`.
-- props: `{ activeTab? }`.
+### `AdminTopNav` (supervisor) — **Implemented (2.3)** → `frontend/src/components/admin/AdminTopNav.tsx`
+Top nav: brand `SportPrognosis` + `Сегодня DD.MM.YYYY`; tabs `Настройки` `Туры` `Рассылки` `Результаты` (active link via pathname); right `ContestPicker adminMode` + `+ Новый конкурс` → `CreateContestForm`.
 
-### `ContestPicker` — **Implemented (2.1)** → `frontend/src/components/contest/ContestPicker.tsx`
-Dropdown of contests. Supervisor → `GET /contests`; User → `GET /me/contests` (B1); Visitor → `GET /contests/public` (B2).
-- props: internal (reads `useAuth`, `useContest`, `useMyContests`); compact `<select>` in header for SUPERVISOR+.
+### `ContestPicker` — **Implemented (2.1, 2.3)** → `frontend/src/components/contest/ContestPicker.tsx`
+Dropdown of contests. Supervisor → `GET /contests`; User → `GET /me/contests` (B1); Visitor → `GET /contests/public` (B2). Prop `adminMode` keeps user on admin page when switching contest.
 
-### `NewContestButton`
+### `NewContestButton` — **Implemented (2.3)** in `AdminTopNav`
 `+ Новый конкурс` → opens `CreateContestForm` (SUPERVISOR+, SETUP).
 
 ### `LoginModal` — **Implemented (2.1)** → `frontend/src/components/layout/LoginModal.tsx`
@@ -48,11 +46,11 @@ Global layout guard; redirects authenticated `is_temp_password` users to `/chang
 | `DeadlineCountdown` | Time remaining → «Дедлайн прошёл» | `{ deadline }` |
 | `StatusChip` | Colored badge for round/match/contest status | `{ kind, status }` |
 | `Toast` / `ToastProvider` | Success/error notifications (no animation lib) | `{ type, message }` — **Implemented (2.1)** → `frontend/src/components/ui/Toast.tsx`, `frontend/src/providers/ToastProvider.tsx` |
-| `ConfirmDialog` | Confirm VOID / activate / delete | `{ title, body, onConfirm }` |
+| `ConfirmDialog` | Confirm VOID / activate / delete | **Implemented (2.3)** → `frontend/src/components/ui/ConfirmDialog.tsx` |
 | `LoadingState` / `ErrorState` / `EmptyState` | Consistent fetch states | `{ message? }` — **LoadingState, ErrorState implemented (2.1)** → `frontend/src/components/ui/` |
 | `RoleBadge` | Show current role | `{ role }` |
-| `ContestStatusBanner` | PAUSED / FINISHED / locked notice | `{ contest }` |
-| `LockBanner` | «Редактирование параметров недоступно — Конкурс уже запущен» | `{ visible }` |
+| `ContestStatusBanner` | PAUSED / FINISHED / locked notice | **Implemented (2.3)** → `frontend/src/components/admin/ContestStatusBanner.tsx` |
+| `LockBanner` | «Редактирование параметров недоступно — Конкурс уже запущен» | **Implemented (2.3)** → `frontend/src/components/admin/LockBanner.tsx` |
 
 ### Status color map (Tailwind badge classes)
 
@@ -101,35 +99,40 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | `PredictionForm` | `/contest/[id]/predict/[rid]` |
 | `ScoreInput` | inside PredictionForm / ResultsEntryGrid |
 | `ContactsForm` | `/profile` (B3) — **Implemented (2.1)** → `frontend/src/components/profile/ContactsForm.tsx` |
-| `CreateContestForm` | NewContestButton |
-| `ContestParametersForm` | Настройки → Параметры |
-| `TeamForm` | Настройки → Команды |
-| `ParticipantInviteForm` | Настройки → Участники |
-| `RoundBuilderForm` | Туры |
-| `MatchEditorRow` | Туры (ACTIVE round) |
-| `MatchResultForm` / `ResultsEntryGrid` | Результаты |
-| `FreeTourModal` | Туры |
-| `TiebreakForm` | Участники (ADMIN row action) |
+| `CreateContestForm` | NewContestButton — **Implemented (2.3)** → `frontend/src/components/admin/CreateContestForm.tsx` |
+| `ContestParametersForm` | Настройки → Параметры — **Implemented (2.3)** → `frontend/src/components/admin/ContestParametersForm.tsx` |
+| `TeamForm` | Настройки → Команды — **Implemented (2.3)** → `frontend/src/components/admin/TeamForm.tsx` |
+| `ParticipantInviteForm` | Настройки → Участники — **Implemented (2.3)** → `frontend/src/components/admin/ParticipantInviteForm.tsx` |
+| `RoundBuilderForm` | Туры — **Implemented (2.3)** → `frontend/src/components/admin/RoundBuilderForm.tsx` |
+| `MatchEditorRow` | Туры (ACTIVE round) — **Implemented (2.3)** → `frontend/src/components/admin/MatchEditorRow.tsx` |
+| `MatchResultForm` / `ResultsEntryGrid` | Результаты — **Implemented (2.3)** → `ResultsEntryPanel`, `MatchResultRow` |
+| `FreeTourModal` | Туры — **Implemented (2.3)** → `frontend/src/components/admin/FreeTourModal.tsx` |
+| `TiebreakForm` | Участники (ADMIN row action) — **Implemented (2.3)** → `frontend/src/components/admin/TiebreakForm.tsx` |
 
 ---
 
-## 5. Admin tables / panels
+## 5. Admin tables / panels — **Implemented (2.3)**
 
-| Component | Features |
-|-----------|----------|
-| `ParticipantsTable` | cols `Имя · Email · [Выслать приглашение] · Статус · Действия`; status PENDING/ACCEPTED; invite shows returned `temp_password`; delete disabled when locked |
-| `TeamsGrid` | team chips (2-letter badge + name) + `Добавить команду` card (disabled when locked) |
-| `RoundManagementPanel` | round dropdown, deadline picker, 8-match grid, right `Статус тура` card, `+ Добавить свободный тур` |
-| `ResultsEntryPanel` | round dropdown, per-match `Завершён`/`Отменить` + score inputs, `Применено` lock badge |
-| `LifecyclePanel` (ADMIN) | pause/resume/finish/delete + grace timer |
-| `RecalculateButton` (ADMIN) | `POST …/admin/recalculate` with confirm |
-| `NewslettersPlaceholder` | «Скоро (Stage 3)» page for `Рассылки` tab |
+| Component | Path |
+|-----------|------|
+| `AdminPageShell` | `frontend/src/components/admin/AdminPageShell.tsx` — banners + settings header |
+| `SettingsSubNav` | `frontend/src/components/admin/SettingsSubNav.tsx` |
+| `ParticipantsTable` | `frontend/src/components/admin/ParticipantsTable.tsx` |
+| `ParticipantInviteModal` | `frontend/src/components/admin/ParticipantInviteModal.tsx` |
+| `TeamsGrid` / `TeamLogoUpload` | `frontend/src/components/admin/TeamsGrid.tsx`, `TeamLogoUpload.tsx` |
+| `RoundManagementPanel` | `frontend/src/components/admin/RoundManagementPanel.tsx` |
+| `ResultsEntryPanel` | `frontend/src/components/admin/ResultsEntryPanel.tsx` |
+| `LifecyclePanel` | `frontend/src/components/admin/LifecyclePanel.tsx` |
+| `CreateOrganizerForm` | `frontend/src/components/admin/CreateOrganizerForm.tsx` |
+| `NewsletterPromptModal` | `frontend/src/components/admin/NewsletterPromptModal.tsx` (Stage 3 stub) |
 
 ---
 
 ## 6. Hooks (see `ui/state_management.md`)
 
 `useAuth`, `useContest`, `useRounds`, `useLeaderboard`, `useRoundResults`, `usePredictionsView`, `usePredictionSubmit`, `useDeadline`, `useMaxScore`, `useMyContests`, `usePublicContests`, `useContacts`, `useToast`.
+
+**Implemented (2.3):** `useContestAdmin`, `useTeams`, `useParticipants`, `useAdminRounds`, `useRoundMatches`, `useAdminResults` under `frontend/src/hooks/`. Pure helpers: `deriveAdminUiMode`, `deadlineRule`, `collectPostponedMatches` in `frontend/src/lib/admin/`.
 
 **Implemented (2.1):** `useAuth` → `frontend/src/hooks/useAuth.ts`; `useContest` → `frontend/src/hooks/useContest.ts`; `useMyContests` → `frontend/src/hooks/useMyContests.ts`; `usePublicContests` → `frontend/src/hooks/usePublicContests.ts`; `useContacts` → `frontend/src/hooks/useContacts.ts`; `useToast` → `frontend/src/hooks/useToast.ts`.
 
@@ -144,3 +147,4 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | 2026-06-21 | Initial catalogue across layout/shared/data/forms/admin, derived from plan §5 + screenshots §11. Props to refine per sub-stage. |
 | 2026-06-23 | Stage 2.1: marked implemented components with `frontend/src/...` paths; added `TempPasswordGuard`, `ContestList`, `ProfileMenu`. |
 | 2026-06-24 | Stage 2.1.1: `AdminTopNav` stub; `resolvePostLoginPath`; role-aware `AppShell` nav; `ProtectedRoute` staff redirect from `/profile`. |
+| 2026-06-24 | Stage 2.3: full admin component catalogue with `frontend/src/components/admin/*` paths; `deriveAdminUiMode` engine; admin hooks. |

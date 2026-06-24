@@ -12,6 +12,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | [SCORING_LOGIC.md](SCORING_LOGIC.md) | Points, bonuses, tie-breakers, validation rules |
 | [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) | Initial ADMIN/SUPERVISOR via `.env` + bootstrap script |
 | [DEV_SETUP.md](DEV_SETUP.md) | **Local dev:** deps, bootstrap script, API + frontend, test logins |
+| [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) | **Frontend map:** routes, components, editable UI copy (human quick edits) |
 | [API_GUIDE.md](API_GUIDE.md) | FastAPI routes, auth, RBAC, contest lifecycle |
 | [ERROR_LOGGING.md](ERROR_LOGGING.md) | Политика ошибок и логирования (RU) |
 | [MANUAL_SCORING_VERIFICATION.md](MANUAL_SCORING_VERIFICATION.md) | Stage 1 sign-off: ручная проверка scoring + CANARY (RU) |
@@ -33,5 +34,6 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | **1.7** — Leaderboard counts & invite accept | [API_GUIDE.md](API_GUIDE.md#multi-contest-api) (count_* fields, participant accept) |
 | **1.9** — Team logo upload & static assets | [API_GUIDE.md](API_GUIDE.md#multi-contest-api), [CONFIG.md](CONFIG.md#team-logo-storage) |
 | **2.x** — Frontend local dev | [DEV_SETUP.md](DEV_SETUP.md) |
+| **2.x** — Frontend routes & UI copy | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) |
 
 Last synced: DEV_SETUP.md (Stage 2 bootstrap); OpenAPI v1.2.0.

@@ -19,7 +19,8 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
   const headers = new Headers(options?.headers);
-  if (!headers.has("Content-Type")) {
+  const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
+  if (!headers.has("Content-Type") && !isFormData) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -65,4 +66,26 @@ export function apiPatch<T>(path: string, body: unknown, auth = true): Promise<T
     body: JSON.stringify(body),
     auth,
   });
+}
+
+export function apiPut<T>(path: string, body: unknown, auth = true): Promise<T> {
+  return apiFetch<T>(path, {
+    method: "PUT",
+    body: JSON.stringify(body),
+    auth,
+  });
+}
+
+export function apiDelete<T>(path: string, body?: unknown, auth = true): Promise<T> {
+  return apiFetch<T>(path, {
+    method: "DELETE",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    auth,
+  });
+}
+
+export async function apiUpload<T>(path: string, file: File, fieldName = "file"): Promise<T> {
+  const fd = new FormData();
+  fd.append(fieldName, file);
+  return apiFetch<T>(path, { method: "POST", body: fd });
 }

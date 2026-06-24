@@ -9,5 +9,5 @@
   "version": 1,
   "type": "workspace_readwrite",
   "additionalReadonlyPaths": ["docs/"],
-  "networkPolicy": { "default": "deny", "allow": ["github.com", "registry.npmjs.org", "pypi.org"] }
+  "networkPolicy": { "default": "deny", "allow": ["github.com", "registry.npmjs.org", "pypi.org", 127.0.0.1, localhost] }
 }

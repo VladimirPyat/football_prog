@@ -90,7 +90,16 @@ Each hook returns `{ data, error, loading, refetch }`. Errors are typed `AppErro
 - `deadlinePassed` switches prediction form to readonly and shows «Дедлайн прошёл».
 - Server is source of truth: `RoundPredictionsView.deadline_passed` overrides client clock if they disagree.
 
-Phase derivation (mirrors plan §3.6) lives in a pure helper `deriveUiMode(contest, round)` → flags used by components (`canEditPredictions`, `canEditSetup`, `canEnterResults`, `mutationsDisabled`).
+Phase derivation (mirrors plan §3.6) lives in **`deriveAdminUiMode(contest, round)`** — **Implemented (2.3)** → `frontend/src/lib/admin/deriveAdminUiMode.ts`. Client 24h pre-check: `frontend/src/lib/admin/deadlineRule.ts`.
+
+| Hook | Endpoint | Cache |
+|------|----------|-------|
+| `useContestAdmin()` | `GET/PATCH /contests/{id}` | refetch on mutations — **2.3** |
+| `useTeams(contestId)` | `GET/POST/PATCH/DELETE …/teams`, logo upload | refetch — **2.3** |
+| `useParticipants(contestId)` | `GET/POST/DELETE …/participants`, tiebreak | refetch — **2.3** |
+| `useAdminRounds(contestId)` | admin round CRUD + activate/calculate/publish | refetch — **2.3** |
+| `useRoundMatches(contestId, roundId)` | `GET …/predictions` | never cached — **2.3** |
+| `useAdminResults(contestId)` | `PUT …/result`, `PATCH …/status` | no cache — **2.3** |
 
 ---
 
@@ -123,3 +132,4 @@ Phase derivation (mirrors plan §3.6) lives in a pure helper `deriveUiMode(conte
 | 2026-06-22 | B1–B3 resolved note; fallback via `NEXT_PUBLIC_DEFAULT_CONTEST_ID`; contacts readonly fallback. |
 | 2026-06-23 | Stage 2.1: provider/hook file paths; `fp:unauthorized` event name; `TempPasswordGuard` in tree. |
 | 2026-06-24 | Stage 2.1.1: post-login routing via `resolvePostLoginPath` in `AuthProvider.login` / `changePassword`. |
+| 2026-06-24 | Stage 2.3: `deriveAdminUiMode`, admin hooks (`useContestAdmin`, `useTeams`, …), `deadlineRule` client check. |

@@ -75,3 +75,89 @@ export interface ContestListItem {
   name: string;
   status: ContestStatus;
 }
+
+export type RoundStatus = "DRAFT" | "ACTIVE" | "CLOSED" | "CALCULATED" | "PUBLISHED";
+
+export type MatchStatus = "SCHEDULED" | "POSTPONED" | "CANCELED" | "VOID" | "FINISHED";
+
+export interface TeamOut {
+  id: number;
+  contest_id: number;
+  name: string;
+  short_name: string;
+  logo_url: string;
+}
+
+export interface ParticipantOut {
+  user_id: number;
+  login: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  status: ParticipantStatus;
+  exceptional_tiebreak_points: number;
+}
+
+export interface ParticipantInviteOut {
+  user_id: number;
+  login: string;
+  temp_password: string;
+  status: ParticipantStatus;
+}
+
+export interface RoundOut {
+  id: number;
+  contest_id: number;
+  number: number;
+  deadline: string;
+  status: RoundStatus;
+  matches_count: number;
+}
+
+export interface MatchOut {
+  id: number;
+  team1: string;
+  team2: string;
+  date_time: string;
+  score1: number | null;
+  score2: number | null;
+  status: MatchStatus;
+}
+
+export interface RoundPredictionsView {
+  round_id: number;
+  deadline_passed: boolean;
+  matches: MatchOut[];
+  entries: unknown[];
+}
+
+export interface CreateRoundResponse {
+  round_id: number;
+  status: RoundStatus;
+}
+
+export interface MatchStatusPatchResponse {
+  recalculation_triggered?: boolean;
+}
+
+export interface CreateSupervisorResponse {
+  user: UserOut;
+}
+
+export interface ContestPatchRequest {
+  name?: string;
+  slug?: string | null;
+  total_teams?: number;
+  matches_per_round?: number;
+  total_rounds?: number;
+  is_round_robin?: boolean;
+}
+
+export interface CreateContestRequest {
+  name: string;
+  slug?: string | null;
+  total_teams?: number;
+  matches_per_round?: number;
+  total_rounds?: number;
+  is_round_robin?: boolean;
+}

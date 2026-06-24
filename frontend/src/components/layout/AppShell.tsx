@@ -66,7 +66,7 @@ export function AppShell({ children }: AppShellProps) {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">{children}</main>
 
       <footer className="border-t border-gray-200 bg-white py-4 text-center text-sm text-gray-500">
-        <p>© 2024 SportPrognosis. Все права защищены.</p>
+        <p>© 2026 SportPrognosis. Все права защищены.</p>
         {!isAuthenticated && (
           <p className="mt-1">
             <Link href="/staff/login" className="text-blue-600 hover:underline">
