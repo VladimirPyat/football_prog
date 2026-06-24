@@ -67,6 +67,11 @@ class IllegalTransitionError(AppError):
     code = "ILLEGAL_TRANSITION"
 
 
+class ConflictError(AppError):
+    http_status = 409
+    code = "CONFLICT"
+
+
 class CriticalError(AppError):
     http_status = 500
     code = "INTERNAL_ERROR"

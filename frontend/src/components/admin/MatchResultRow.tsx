@@ -8,12 +8,20 @@ import { useState } from "react";
 interface MatchResultRowProps {
   match: MatchOut;
   maxScore: number;
-  readonly: boolean;
+  scoresReadonly: boolean;
+  canVoid: boolean;
   onSave: (matchId: number, score1: number, score2: number) => Promise<void>;
   onVoid: (matchId: number) => void;
 }
 
-export function MatchResultRow({ match, maxScore, readonly, onSave, onVoid }: MatchResultRowProps) {
+export function MatchResultRow({
+  match,
+  maxScore,
+  scoresReadonly,
+  canVoid,
+  onSave,
+  onVoid,
+}: MatchResultRowProps) {
   const [score1, setScore1] = useState(match.score1 ?? "");
   const [score2, setScore2] = useState(match.score2 ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +59,7 @@ export function MatchResultRow({ match, maxScore, readonly, onSave, onVoid }: Ma
             max={maxScore}
             value={score1}
             onChange={(e) => setScore1(e.target.value === "" ? "" : Number(e.target.value))}
-            disabled={readonly || finished}
+            disabled={scoresReadonly || finished}
             className="w-14 border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100"
             aria-label="Счёт 1"
           />
@@ -62,7 +70,7 @@ export function MatchResultRow({ match, maxScore, readonly, onSave, onVoid }: Ma
             max={maxScore}
             value={score2}
             onChange={(e) => setScore2(e.target.value === "" ? "" : Number(e.target.value))}
-            disabled={readonly || finished}
+            disabled={scoresReadonly || finished}
             className="w-14 border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100"
             aria-label="Счёт 2"
           />
@@ -70,7 +78,7 @@ export function MatchResultRow({ match, maxScore, readonly, onSave, onVoid }: Ma
         {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
       </td>
       <td className="px-3 py-2 space-x-2">
-        {!readonly && !finished && (
+        {!scoresReadonly && !finished && (
           <button
             type="button"
             onClick={handleFinish}
@@ -80,7 +88,7 @@ export function MatchResultRow({ match, maxScore, readonly, onSave, onVoid }: Ma
             Завершён
           </button>
         )}
-        {!readonly && match.status !== "VOID" && (
+        {canVoid && match.status !== "VOID" && (
           <button
             type="button"
             onClick={() => onVoid(match.id)}

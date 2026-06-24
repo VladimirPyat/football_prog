@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { deadlineErrorMessage, getDeadlineRuleHours, isDeadlineValid } from "@/lib/admin/deadlineRule";
+import {
+  deadlineErrorMessage,
+  getDeadlineRuleHours,
+  isDeadlineValid,
+} from "@/lib/admin/deadlineRule";
 
 export const createContestSchema = z
   .object({

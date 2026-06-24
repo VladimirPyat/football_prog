@@ -71,7 +71,9 @@ export function CreateContestForm({ open, onClose, onSubmit }: CreateContestForm
             {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Slug (необязательно)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Slug (необязательно)
+            </label>
             <input
               value={slug}
               onChange={(e) => setSlug(e.target.value)}

@@ -19,7 +19,11 @@ export function NewsletterPromptModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6" role="dialog" aria-modal="true">
+      <div
+        className="bg-white rounded-lg shadow-lg max-w-md w-full p-6"
+        role="dialog"
+        aria-modal="true"
+      >
         <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
         <p className="text-gray-600 mb-6">{body}</p>
         <div className="flex justify-end">

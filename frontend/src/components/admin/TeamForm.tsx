@@ -51,9 +51,7 @@ export function TeamForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      {!readonly && (
-        <p className="text-sm text-gray-500">Доступно только до старта конкурса</p>
-      )}
+      {!readonly && <p className="text-sm text-gray-500">Доступно только до старта конкурса</p>}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
         <input

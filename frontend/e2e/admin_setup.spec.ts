@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { clearAuthStorage } from "./fixtures/auth";
 import {
-  addTeams,
   createDraftContest,
   gotoAdminContest,
   seedSupervisorSession,
   supervisorToken,
+  waitForAdminShell,
 } from "./fixtures/adminApi";
 import { SUPERVISOR_PASSWORD } from "./fixtures/credentials";
 
@@ -24,11 +24,11 @@ test.describe("[E2E-ADMIN-SETUP]", () => {
       total_rounds: 2,
     });
     contestId = contest.id;
-    await addTeams(token, contestId, 4);
 
     await clearAuthStorage(page);
     await seedSupervisorSession(page);
     await gotoAdminContest(page, contestId, "/admin/settings/parameters");
+    await waitForAdminShell(page);
   });
 
   test("parameters save persists after reload", async ({ page }) => {
@@ -56,8 +56,14 @@ test.describe("[E2E-ADMIN-SETUP]", () => {
   });
 
   test("participant invite shows credentials modal", async ({ page }) => {
-    await page.goto("/admin/settings/participants");
-    const inviteForm = page.locator("form").filter({ hasText: "Пригласить участника" });
+    await gotoAdminContest(page, contestId, "/admin/settings/participants");
+    await waitForAdminShell(page);
+    await expect(page.getByRole("heading", { name: "Пригласить участника" })).toBeVisible({
+      timeout: 15_000,
+    });
+    const inviteForm = page
+      .locator("form")
+      .filter({ has: page.getByRole("heading", { name: "Пригласить участника" }) });
     await inviteForm.locator('div:has(> label:text-is("Email")) input').fill(
       `e2e_invite_${Date.now()}@example.com`,
     );
@@ -65,7 +71,7 @@ test.describe("[E2E-ADMIN-SETUP]", () => {
     await inviteForm.locator('div:has(> label:text-is("Фамилия")) input').fill("User");
     await page.getByRole("button", { name: "Пригласить" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByText("Логин")).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("Логин", { exact: true })).toBeVisible();
     await expect(page.getByText("Временный пароль")).toBeVisible();
     await expect(page.getByRole("button", { name: "Удалить" }).first()).toBeEnabled();
   });

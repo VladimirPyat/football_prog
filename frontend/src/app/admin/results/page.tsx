@@ -16,17 +16,16 @@ export default function AdminResultsPage() {
   const { maxScore } = useContest();
   const { rounds, loading, calculateRound, publishRound, refetch } = useAdminRounds(contestId);
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
-  const { matches, loading: matchesLoading, refetch: refetchMatches } = useRoundMatches(
-    contestId,
-    selectedRoundId,
-  );
+  const {
+    matches,
+    loading: matchesLoading,
+    refetch: refetchMatches,
+  } = useRoundMatches(contestId, selectedRoundId);
   const { putResult, patchStatus } = useAdminResults(contestId);
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
-    const eligible = rounds.filter((r) =>
-      ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status),
-    );
+    const eligible = rounds.filter((r) => ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status));
     if (eligible.length && !selectedRoundId) {
       setSelectedRoundId(eligible[eligible.length - 1].id);
     }

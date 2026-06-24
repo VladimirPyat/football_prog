@@ -76,7 +76,9 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   const rootEnv = parseRootEnv();
   const supervisorPassword = rootEnv.SEED_SUPERVISOR_PASSWORD ?? "";
   if (!supervisorPassword) {
-    throw new Error("SEED_SUPERVISOR_PASSWORD missing in root .env — required for E2E user provisioning");
+    throw new Error(
+      "SEED_SUPERVISOR_PASSWORD missing in root .env — required for E2E user provisioning",
+    );
   }
 
   const credentials = await provisionRegularUser(supervisorPassword);

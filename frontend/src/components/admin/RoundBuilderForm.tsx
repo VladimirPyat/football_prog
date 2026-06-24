@@ -17,11 +17,7 @@ interface RoundBuilderFormProps {
   rules: Record<string, unknown>;
   nextRoundNumber: number;
   disabled?: boolean;
-  onSubmit: (data: {
-    number: number;
-    deadline: string;
-    matches: MatchDraft[];
-  }) => Promise<void>;
+  onSubmit: (data: { number: number; deadline: string; matches: MatchDraft[] }) => Promise<void>;
 }
 
 function emptyMatch(): MatchDraft {

@@ -7,9 +7,10 @@ import logging
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from core.exceptions import AppError, CriticalError
+from core.exceptions import AppError, ConflictError, CriticalError
 from services.notification_service import notify_admin
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,16 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         return JSONResponse(status_code=exc.status_code, content={"detail": detail})
     if isinstance(exc, RequestValidationError):
         raise exc
+    if isinstance(exc, IntegrityError):
+        orig = exc.orig
+        msg = str(orig) if orig is not None else str(exc)
+        if "UNIQUE" in msg.upper():
+            logger.warning("IntegrityError path=%s detail=%s", request.url.path, msg)
+            return await app_error_handler(
+                request,
+                ConflictError("Конфликт данных: запись уже существует"),
+            )
+        logger.exception("Unhandled IntegrityError path=%s detail=%s", request.url.path, msg)
     logger.exception("Unhandled exception path=%s", request.url.path)
     await notify_admin(
         "unhandled_exception",

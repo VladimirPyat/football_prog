@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collectPostponedMatches, type PostponedMatchItem } from "@/lib/admin/collectPostponedMatches";
+import {
+  collectPostponedMatches,
+  type PostponedMatchItem,
+} from "@/lib/admin/collectPostponedMatches";
 import { formatDateTimeRu, fromDatetimeLocal } from "@/lib/admin/format";
 import { freeTourSchema } from "@/lib/validation/admin";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -97,9 +100,7 @@ export function FreeTourModal({ open, contestId, onClose, onSubmit }: FreeTourMo
                     <input
                       type="datetime-local"
                       value={dates[m.id] ?? ""}
-                      onChange={(e) =>
-                        setDates((prev) => ({ ...prev, [m.id]: e.target.value }))
-                      }
+                      onChange={(e) => setDates((prev) => ({ ...prev, [m.id]: e.target.value }))}
                       className="border border-gray-300 rounded px-2 py-1"
                       required
                     />

@@ -83,10 +83,7 @@ export function useAdminRounds(contestId: number) {
   );
 
   const createFreeTour = useCallback(
-    async (body: {
-      deadline: string;
-      matches: { match_id: number; new_date_time: string }[];
-    }) => {
+    async (body: { deadline: string; matches: { match_id: number; new_date_time: string }[] }) => {
       await apiPost(contestAdmin.rounds.freeTour(contestId), body);
       await refetch();
     },

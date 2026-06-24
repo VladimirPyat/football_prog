@@ -5,25 +5,29 @@
 | ID | Status | Summary |
 |----|--------|---------|
 | B1–B6 | RESOLVED | See prior stage reports / `frontend_api_integration.md` |
-| B7 | **OPEN** | SQLite retains legacy global `UNIQUE` on `rounds.number` after migration `c4d5e6f7a8b9` |
-| B8 | **OPEN** | SQLite retains legacy global `UNIQUE` on `teams.name` (same migration gap) |
+| B7 | **RESOLVED** ✅ | Migration `d5e6f7a8b9c0` — legacy global UNIQUE on `rounds.number` dropped; re-verified 2026-06-25 (`[FIX-B7-*]` pytest) |
+| B8 | **RESOLVED** ✅ | Same migration — legacy global UNIQUE on `teams.name` dropped; IntegrityError → 409; re-verified 2026-06-25 (`[FIX-B8-*]` pytest) |
 
 ---
 
-### OPEN — B7: Multi-contest round creation fails (global `rounds.number` UNIQUE)
+## Resolved appendix
 
-- **Why:** E2E `[E2E-SUPERVISOR-CREATE-ROUND]`, API `POST /api/v1/contests/{id}/admin/rounds` returns `500 INTERNAL_ERROR`. SQLite indexes: `sqlite_autoindex_rounds_1` UNIQUE(`number`) **and** `sqlite_autoindex_rounds_2` UNIQUE(`contest_id`,`number`). Inserting round `number=1` for contest `id=2` violates legacy index.
-- **Evidence:** `IntegrityError: UNIQUE constraint failed: rounds.number` on `INSERT INTO rounds (contest_id, number, …) VALUES (2, 1, …)`.
-- **Blocks:** 2.3 fresh-contest round flows (create/activate/24h/results pipeline), 2.4 if multi-contest E2E needed.
-- **Fallback:** Tests limited to loaded contest `id=1` only; cannot validate SETUP→round lifecycle on fresh contests.
-- **Required fix (@Coder/backend):** Alembic migration must **drop** legacy global UNIQUE on `rounds.number` when adding `uq_rounds_contest_number`; document `dev_setup.py --ensure-running-only` in tester bootstrap.
+### B7: Multi-contest round creation fails (global `rounds.number` UNIQUE)
+
+- **Root cause:** Migration `c4d5e6f7a8b9` added per-contest `uq_rounds_contest_number` but retained singleton-era `sqlite_autoindex_rounds_1` UNIQUE(`number`).
+- **Fix:** `d5e6f7a8b9c0_drop_legacy_global_uniques.py` recreates `rounds` with composite unique only.
+- **Verified:** `[FIX-B7-ROUND]`, `[FIX-B7-DUP-IN-CONTEST]` pytest green; post-migration indexes: `rounds` → `['contest_id', 'number']` only.
+
+### B8: Team create returns 500 on duplicate name across contests
+
+- **Root cause:** Legacy `sqlite_autoindex_teams_1` UNIQUE(`name`) coexisted with `uq_teams_contest_name`.
+- **Fix:** Same migration drops global `teams.name` unique; `ConflictError` (409) handler for remaining `IntegrityError` UNIQUE violations.
+- **Verified:** `[FIX-B8-TEAM]`, `[FIX-B8-DUP-IN-CONTEST]` pytest green; post-migration indexes: `teams` → `['contest_id', 'name']` only.
 
 ---
 
-### OPEN — B8: Team create returns 500 on duplicate name across contests
+### Historical evidence (pre-fix)
 
-- **Why:** E2E `[E2E-ADMIN-SETUP]` API helper `addTeam` with name `E2E Team 1` → `500`. `IntegrityError: UNIQUE constraint failed: teams.name`.
-- **Evidence:** Legacy `sqlite_autoindex_teams_1` UNIQUE(`name`) coexists with `uq_teams_contest_name`.
-- **Blocks:** 2.3 SETUP E2E on fresh contests when names collide with loaded CSV teams.
-- **Fallback:** E2E uses unique suffixed team names (test-side); API should return `409` not `500`.
-- **Required fix (@Coder/backend):** Drop global `teams.name` UNIQUE in migration; map `IntegrityError` → `409` in `contest_teams.py`.
+**B7 evidence:** `IntegrityError: UNIQUE constraint failed: rounds.number` on `INSERT INTO rounds (contest_id, number, …) VALUES (2, 1, …)`.
+
+**B8 evidence:** `IntegrityError: UNIQUE constraint failed: teams.name` when creating `"E2E Team 1"` in contest 2 while contest 1 had same name.

@@ -25,10 +25,8 @@ export const contestAdmin = {
   teams: {
     list: (contestId: number) => `/api/v1/contests/${contestId}/teams`,
     create: (contestId: number) => `/api/v1/contests/${contestId}/teams`,
-    patch: (contestId: number, teamId: number) =>
-      `/api/v1/contests/${contestId}/teams/${teamId}`,
-    delete: (contestId: number, teamId: number) =>
-      `/api/v1/contests/${contestId}/teams/${teamId}`,
+    patch: (contestId: number, teamId: number) => `/api/v1/contests/${contestId}/teams/${teamId}`,
+    delete: (contestId: number, teamId: number) => `/api/v1/contests/${contestId}/teams/${teamId}`,
     logo: (contestId: number, teamId: number) =>
       `/api/v1/contests/${contestId}/teams/${teamId}/logo`,
   },

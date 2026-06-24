@@ -9,9 +9,7 @@ describe("deadlineRule", () => {
   const matchTime = "2026-07-01T18:00:00.000Z";
 
   it("reads deadline_rule_hours from rules_json", () => {
-    expect(
-      getDeadlineRuleHours({ contest_structure: { deadline_rule_hours: 48 } }),
-    ).toBe(48);
+    expect(getDeadlineRuleHours({ contest_structure: { deadline_rule_hours: 48 } })).toBe(48);
     expect(getDeadlineRuleHours({})).toBe(24);
   });
 

@@ -110,7 +110,9 @@ export function ContestParametersForm({ contest, readonly, onSave }: ContestPara
       </div>
 
       <section>
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">Правила начисления (только просмотр)</h3>
+        <h3 className="text-sm font-semibold text-gray-900 mb-2">
+          Правила начисления (только просмотр)
+        </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           {Object.entries(scoring).map(([key, val]) => (
             <div key={key} className="border border-gray-200 rounded p-2">

@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { execSync } from "child_process";
+import { loginAsAdmin, loginAsSupervisor } from "./auth";
 import {
   ACTIVE_CONTEST_KEY,
   ADMIN_LOGIN,
@@ -7,7 +9,6 @@ import {
   API_BASE,
   SUPERVISOR_LOGIN,
   SUPERVISOR_PASSWORD,
-  TOKEN_KEY,
 } from "./credentials";
 
 function authHeaders(token: string, json = true): Record<string, string> {
@@ -77,6 +78,11 @@ export async function apiLogin(login: string, password: string): Promise<string>
 export async function supervisorToken(): Promise<string> {
   if (!SUPERVISOR_PASSWORD) throw new Error("SEED_SUPERVISOR_PASSWORD missing");
   return apiLogin(SUPERVISOR_LOGIN, SUPERVISOR_PASSWORD);
+}
+
+export async function adminToken(): Promise<string> {
+  if (!ADMIN_PASSWORD) throw new Error("SEED_ADMIN_PASSWORD missing");
+  return apiLogin(ADMIN_LOGIN, ADMIN_PASSWORD);
 }
 
 export async function createDraftContest(
@@ -152,13 +158,13 @@ export async function createDraftRound(
     deadline: string;
     matches: { team1_id: number; team2_id: number; date_time: string }[];
   },
-): Promise<{ id: number }> {
+): Promise<{ round_id: number }> {
   const res = await fetch(`${API_BASE}/api/v1/contests/${contestId}/admin/rounds`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(body),
   });
-  return apiJson<{ id: number }>(res, "createDraftRound");
+  return apiJson<{ round_id: number }>(res, "createDraftRound");
 }
 
 export async function activateRound(
@@ -201,6 +207,30 @@ export async function closeRound(
   if (!res.ok) throw new Error(`closeRound: ${res.status} ${await res.text()}`);
 }
 
+export async function calculateRound(
+  token: string,
+  contestId: number,
+  roundId: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/v1/contests/${contestId}/admin/rounds/${roundId}/calculate`,
+    { method: "POST", headers: authHeaders(token), body: "{}" },
+  );
+  if (!res.ok) throw new Error(`calculateRound: ${res.status} ${await res.text()}`);
+}
+
+export async function publishRound(
+  token: string,
+  contestId: number,
+  roundId: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/v1/contests/${contestId}/admin/rounds/${roundId}/publish`,
+    { method: "POST", headers: authHeaders(token), body: "{}" },
+  );
+  if (!res.ok) throw new Error(`publishRound: ${res.status} ${await res.text()}`);
+}
+
 export async function getRounds(token: string, contestId: number): Promise<RoundOut[]> {
   const res = await fetch(`${API_BASE}/api/v1/contests/${contestId}/rounds`, {
     headers: authHeaders(token),
@@ -240,10 +270,13 @@ export async function resumeContest(token: string, contestId: number): Promise<v
 }
 
 export async function ensureContestRunning(contestId = 1): Promise<void> {
-  const token = await supervisorToken();
+  const token = await adminToken();
   const contest = await getContest(token, contestId);
   if (contest.status === "PAUSED") {
     await resumeContest(token, contestId);
+  }
+  if (contest.status === "DRAFT") {
+    ensureLoadedContestDevState();
   }
 }
 
@@ -302,30 +335,20 @@ export async function gotoAdminContest(
   await page.waitForLoadState("networkidle");
 }
 
-export async function seedStaffSession(
-  page: Page,
-  login: string,
-  password: string,
-): Promise<void> {
-  const token = await apiLogin(login, password);
-  await page.goto("/");
-  await page.evaluate(
-    ({ key, value }) => {
-      localStorage.setItem(key, value);
-    },
-    { key: TOKEN_KEY, value: token },
-  );
-  await page.reload();
+export async function waitForAdminShell(page: Page): Promise<void> {
+  await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 export async function seedSupervisorSession(page: Page): Promise<void> {
   if (!SUPERVISOR_PASSWORD) throw new Error("SEED_SUPERVISOR_PASSWORD missing");
-  await seedStaffSession(page, SUPERVISOR_LOGIN, SUPERVISOR_PASSWORD);
+  await loginAsSupervisor(page);
 }
 
 export async function seedAdminSession(page: Page): Promise<void> {
   if (!ADMIN_PASSWORD) throw new Error("SEED_ADMIN_PASSWORD missing");
-  await seedStaffSession(page, ADMIN_LOGIN, ADMIN_PASSWORD);
+  await loginAsAdmin(page);
 }
 
 export function ensureLoadedContestDevState(): void {
@@ -335,8 +358,89 @@ export function ensureLoadedContestDevState(): void {
   );
 }
 
-export async function ensureRound10Active(): Promise<void> {
+export function reloadLoadedContestFixture(): void {
+  execSync(
+    "cd /work/football_prog && uv run python src/scripts/load_test_data.py --reset && " +
+      "uv run python src/scripts/bootstrap_users.py && " +
+      "uv run python src/scripts/dev_setup.py --ensure-running-only",
+    { stdio: "pipe", timeout: 120_000 },
+  );
+}
+
+const ROUND_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Черновик",
+  ACTIVE: "Активен",
+  CLOSED: "Закрыт",
+  CALCULATED: "Рассчитан",
+  PUBLISHED: "Опубликован",
+};
+
+export function roundOptionLabel(roundNumber: number, status: string): string {
+  return `Тур ${roundNumber} — ${ROUND_STATUS_LABELS[status] ?? status}`;
+}
+
+export async function ensureRound10Active(contestId = 1): Promise<RoundOut> {
   ensureLoadedContestDevState();
+  let token = await supervisorToken();
+  let rounds = await getRounds(token, contestId);
+  let round10 = rounds.find((r) => r.number === 10);
+  if (!round10 || round10.status !== "ACTIVE") {
+    reloadLoadedContestFixture();
+    token = await supervisorToken();
+    rounds = await getRounds(token, contestId);
+    round10 = rounds.find((r) => r.number === 10);
+  }
+  if (!round10 || round10.status !== "ACTIVE") {
+    throw new Error(`Round 10 not ACTIVE after reload (status=${round10?.status ?? "missing"})`);
+  }
+  return round10;
+}
+
+export async function ensureRoundPublished(
+  token: string,
+  contestId: number,
+  roundNumber: number,
+): Promise<RoundOut> {
+  let rounds = await getRounds(token, contestId);
+  let round = rounds.find((r) => r.number === roundNumber);
+  if (!round) throw new Error(`Round ${roundNumber} not found`);
+  if (round.status === "PUBLISHED") return round;
+  if (round.status === "CLOSED") {
+    await calculateRound(token, contestId, round.id);
+    rounds = await getRounds(token, contestId);
+    round = rounds.find((r) => r.number === roundNumber)!;
+  }
+  if (round.status === "CALCULATED") {
+    await publishRound(token, contestId, round.id);
+    rounds = await getRounds(token, contestId);
+    round = rounds.find((r) => r.number === roundNumber)!;
+  }
+  if (round.status !== "PUBLISHED") {
+    throw new Error(`Round ${roundNumber} not PUBLISHED (status=${round.status})`);
+  }
+  return round;
+}
+
+/** Round selector on /admin/rounds and /admin/results (not the header contest picker). */
+export async function selectRoundByLabel(page: Page, label: string): Promise<void> {
+  const roundSelect = page.locator('label:text-is("Тур:") + select');
+  await roundSelect.waitFor({ state: "visible", timeout: 15_000 });
+  await roundSelect.selectOption({ label });
+}
+
+export async function selectRoundByNumber(
+  page: Page,
+  token: string,
+  contestId: number,
+  roundNumber: number,
+): Promise<RoundOut> {
+  const rounds = await getRounds(token, contestId);
+  const round = rounds.find((r) => r.number === roundNumber);
+  if (!round) throw new Error(`Round ${roundNumber} not found`);
+  const roundSelect = page.locator('label:text-is("Тур:") + select');
+  await roundSelect.waitFor({ state: "visible", timeout: 15_000 });
+  await roundSelect.selectOption(String(round.id));
+  return round;
 }
 
 export async function selectContestInPicker(page: Page, contestName: string): Promise<void> {

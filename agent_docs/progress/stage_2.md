@@ -61,3 +61,51 @@
 - Env: `load_test_data.py --reset` + `bootstrap_users.py` + `dev_setup.py --ensure-running-only` required
 - Manual UX checklist: reminded in report §10
 - Next: @Coder fix B7/B8, VOID UX, Prettier; re-run tester_2.3.md
+
+## 2026-06-25 — Coder (1.10 fix — 2.3 unblock)
+- STATUS: READY_FOR_RETEST
+- Frontend: canVoidMatch on PUBLISHED, MatchResultRow scoresReadonly/canVoid split, prettier on admin files
+- Backend: B7/B8 resolved — see stage_1 handoff
+- Verified: npm run test:unit (37 passed), format:check (0), lint (0), build (0); type-check fails on pre-existing e2e/*.spec.ts TS errors (out of scope)
+- Next: re-run agent_docs/instructions/tester_2.3.md
+
+## 2026-06-25 — Retest (2.3 after 1.10 fix)
+- STATUS: TEST_FAIL (partial)
+- Blockers B7/B8: RESOLVED ✅ — pytest 7/7; BLOCKED.md updated
+- Unit: 37 passed; Prettier/build/lint: OK; TSC: fail (e2e/*.spec.ts pre-existing)
+- E2E 2.3: 4 passed / 13 failed (E2E spec bugs + PAUSED contest teardown, not migration)
+- Bootstrap order fix: load_test_data --reset → bootstrap_users → dev_setup --ensure-running-only
+- Report: agent_docs/reports/test_2.3.md § Retest
+- Next: tester fixes E2E helpers + re-run tester_2.3.md
+
+## 2026-06-25 — Planner (2.3.1 E2E fix instructions)
+- STATUS: INSTRUCTIONS_READY
+- Artifact: agent_docs/instructions/tester_2.3.1_fix.md
+- Scope: E2E fixtures T1–T9, bootstrap order, type-check green, full tester_2.3 re-run
+- Prerequisite: Coder 1.10 fix (B7/B8 RESOLVED)
+- Next: @Tester → tester_2.3.1_fix.md
+
+## 2026-06-25 — Planner (2.3.2 E2E fix + .env credentials)
+- STATUS: INSTRUCTIONS_READY
+- Artifact: agent_docs/instructions/tester_2.3.2_fix.md
+- Scope: U1–U9 loaded contest reset, round id helpers, .env-only passwords, create-round API workaround
+- Next: @Tester → tester_2.3.2_fix.md
+
+## 2026-06-25 — Tester (2.3.1 fix)
+- STATUS: TEST_FAIL (partial improvement)
+- Report: agent_docs/reports/test_2.3.md § Retest 2.3.1
+- Fixed: T1–T9 (adminApi adminToken, imports, TS, selectors, setup team limit, global-setup passwords, tester_2.3 bootstrap)
+- Unit: 37 passed; Lint/TSC/Prettier/Build: OK
+- E2E 2.3: **8 passed / 9 failed** (was 4/17)
+- BLOCKED.md: B7/B8 confirmed RESOLVED
+- Next: second E2E fix pass (contest context, round labels, credentials) or Coder if UI defect
+
+## 2026-06-25 — Tester (2.3.2 fix)
+- STATUS: TEST_PASS ✅
+- Report: agent_docs/reports/test_2.3.md § Retest 2.3.2
+- Fixed: U1–U9; dev_setup round-10 date shift (auto-close root cause); UI login for E2E sessions; locked/pause assertions (`not.toBeVisible` for hidden save buttons)
+- Unit: 37 passed; Lint/TSC/Prettier/Build: OK
+- E2E 2.3: **17 passed / 0 failed** (was 8/17)
+- Credentials: root `.env` `SEED_*` only (no `E2E_*` in Playwright)
+- BLOCKED.md: B7/B8 RESOLVED; B9 not required
+- Next: @Coder → agent_docs/instructions/coder_2.4.md

@@ -91,7 +91,8 @@ export function ResultsEntryPanel({
                     key={m.id}
                     match={m}
                     maxScore={maxScore}
-                    readonly={uiMode.resultsReadonly || !uiMode.canEnterResults}
+                    scoresReadonly={uiMode.resultsReadonly || !uiMode.canEnterResults}
+                    canVoid={uiMode.canVoidMatch && m.status !== "VOID"}
                     onSave={onSaveResult}
                     onVoid={(id) => setVoidId(id)}
                   />

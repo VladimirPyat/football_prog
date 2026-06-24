@@ -16,8 +16,12 @@ export default function AdminRoundsPage() {
     useAdminRounds(contestId);
   const { teams } = useTeams(contestId);
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
-  const { matches, deadlinePassed, loading: matchesLoading, refetch: refetchMatches } =
-    useRoundMatches(contestId, selectedRoundId);
+  const {
+    matches,
+    deadlinePassed,
+    loading: matchesLoading,
+    refetch: refetchMatches,
+  } = useRoundMatches(contestId, selectedRoundId);
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {

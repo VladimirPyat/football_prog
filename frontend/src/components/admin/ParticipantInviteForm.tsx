@@ -52,7 +52,10 @@ export function ParticipantInviteForm({ disabled = false, onSubmit }: Participan
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-w-md border border-gray-200 rounded-lg p-4">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-3 max-w-md border border-gray-200 rounded-lg p-4"
+    >
       <h3 className="text-sm font-semibold text-gray-900">Пригласить участника</h3>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -88,7 +91,9 @@ export function ParticipantInviteForm({ disabled = false, onSubmit }: Participan
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Логин (необязательно)</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Логин (необязательно)
+        </label>
         <input
           value={login}
           onChange={(e) => setLogin(e.target.value)}

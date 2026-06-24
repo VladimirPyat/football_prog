@@ -29,5 +29,11 @@ export function useRoundMatches(contestId: number, roundId: number | null) {
     void refetch();
   }, [refetch]);
 
-  return { view, matches: view?.matches ?? [], deadlinePassed: view?.deadline_passed ?? false, loading, refetch };
+  return {
+    view,
+    matches: view?.matches ?? [],
+    deadlinePassed: view?.deadline_passed ?? false,
+    loading,
+    refetch,
+  };
 }

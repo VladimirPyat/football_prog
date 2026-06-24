@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { clearAuthStorage, loginAsDemoUser } from "./fixtures/auth";
-import { seedSupervisorSession } from "./fixtures/adminApi";
+import { seedSupervisorSession, waitForAdminShell } from "./fixtures/adminApi";
 import { SUPERVISOR_PASSWORD } from "./fixtures/credentials";
 
 test.describe("[E2E-ADMIN-RBAC]", () => {
@@ -28,7 +28,11 @@ test.describe("[E2E-ADMIN-RBAC]", () => {
     await clearAuthStorage(page);
     await seedSupervisorSession(page);
     await page.goto("/admin/settings/parameters");
-    await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await waitForAdminShell(page);
+    await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByRole("link", { name: "Туры" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Рассылки" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Результаты" })).toBeVisible();
@@ -42,7 +46,9 @@ test.describe("[E2E-ADMIN-RBAC]", () => {
     await clearAuthStorage(page);
     await seedSupervisorSession(page);
     await page.goto("/admin/newsletters");
+    await page.waitForLoadState("networkidle");
+    await waitForAdminShell(page);
     await expect(page.getByText(/Stage 3/i)).toBeVisible();
-    await expect(page.getByText(/недоступн/i)).toBeVisible();
+    await expect(page.getByText("Создание и отправка писем пока недоступны")).toBeVisible();
   });
 });

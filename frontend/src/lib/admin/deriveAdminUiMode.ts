@@ -17,6 +17,7 @@ export interface AdminUiMode {
   canCalculate: boolean;
   canPublish: boolean;
   resultsReadonly: boolean;
+  canVoidMatch: boolean;
   showAppliedBadge: boolean;
 }
 
@@ -67,6 +68,9 @@ export function deriveAdminUiMode({
   const canPublish = roundStatus === "CALCULATED" && !disableAllMutations;
   const resultsReadonly =
     roundStatus === "CALCULATED" || roundStatus === "PUBLISHED" || disableAllMutations;
+  const canVoidMatch =
+    (roundStatus === "CLOSED" || roundStatus === "CALCULATED" || roundStatus === "PUBLISHED") &&
+    !disableAllMutations;
   const showAppliedBadge = roundStatus === "PUBLISHED";
 
   return {
@@ -86,6 +90,7 @@ export function deriveAdminUiMode({
     canCalculate,
     canPublish,
     resultsReadonly,
+    canVoidMatch,
     showAppliedBadge,
   };
 }

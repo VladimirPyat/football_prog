@@ -78,5 +78,18 @@ describe("deriveAdminUiMode", () => {
     const mode = deriveAdminUiMode({ contest: baseContest, round: publishedRound });
     expect(mode.showAppliedBadge).toBe(true);
     expect(mode.resultsReadonly).toBe(true);
+    expect(mode.canVoidMatch).toBe(true);
+  });
+
+  it("allows void on PUBLISHED but not when paused", () => {
+    const published = deriveAdminUiMode({ contest: baseContest, round: publishedRound });
+    expect(published.canVoidMatch).toBe(true);
+    expect(published.resultsReadonly).toBe(true);
+
+    const paused = deriveAdminUiMode({
+      contest: { ...baseContest, status: "PAUSED" },
+      round: publishedRound,
+    });
+    expect(paused.canVoidMatch).toBe(false);
   });
 });

@@ -34,10 +34,13 @@ Verify Stage **2.3** frontend deliverables:
 ```bash
 cd /work/football_prog
 uv run alembic upgrade head
+uv run python src/scripts/load_test_data.py --reset
 uv run python src/scripts/bootstrap_users.py
-uv run python src/scripts/load_test_data.py    # contest id=1 RUNNING, rounds 1–9 CLOSED, round 10 ACTIVE
+uv run python src/scripts/dev_setup.py --ensure-running-only
 uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+> **`bootstrap_users` after `load_test_data --reset`** — the loader clears the `users` table; re-create admin, supervisor, and demo user before E2E.
 
 Health: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
 

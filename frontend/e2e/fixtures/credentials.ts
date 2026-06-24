@@ -36,12 +36,10 @@ const rootEnv = parseRootEnv();
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 export const SUPERVISOR_LOGIN = rootEnv.SEED_SUPERVISOR_LOGIN ?? "supervisor";
-export const SUPERVISOR_PASSWORD =
-  process.env.E2E_SUPERVISOR_PASSWORD ?? rootEnv.SEED_SUPERVISOR_PASSWORD ?? "";
+export const SUPERVISOR_PASSWORD = rootEnv.SEED_SUPERVISOR_PASSWORD ?? "";
 
 export const ADMIN_LOGIN = rootEnv.SEED_ADMIN_LOGIN ?? "admin";
-export const ADMIN_PASSWORD =
-  process.env.E2E_ADMIN_PASSWORD ?? rootEnv.SEED_ADMIN_PASSWORD ?? "";
+export const ADMIN_PASSWORD = rootEnv.SEED_ADMIN_PASSWORD ?? "";
 
 /** Bootstrap demo user from `bootstrap_users.py` (Stage 2.1.1). */
 export const DEMO_USER_LOGIN = "user";

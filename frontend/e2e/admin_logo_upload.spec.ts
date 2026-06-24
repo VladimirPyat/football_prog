@@ -4,9 +4,11 @@ import { clearAuthStorage } from "./fixtures/auth";
 import {
   addTeam,
   createDraftContest,
+  getContest,
   gotoAdminContest,
   seedSupervisorSession,
   supervisorToken,
+  waitForAdminShell,
 } from "./fixtures/adminApi";
 import { SUPERVISOR_PASSWORD } from "./fixtures/credentials";
 
@@ -21,6 +23,7 @@ test.describe("[E2E-ADMIN-LOGO]", () => {
     await clearAuthStorage(page);
     await seedSupervisorSession(page);
     await gotoAdminContest(page, contest.id, "/admin/settings/teams");
+    await waitForAdminShell(page);
 
     const logoPath = path.resolve(__dirname, "../public/assets/default-team-logo.jpg");
     const uploadBtn = page.getByRole("button", { name: "Загрузить логотип" }).first();

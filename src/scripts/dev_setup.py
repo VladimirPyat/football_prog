@@ -206,11 +206,13 @@ def run_dev_servers() -> None:
 
 
 async def ensure_dev_contest_running(contest_id: int = DEFAULT_CONTEST_ID) -> None:
-    """Set contest RUNNING + is_locked so public discovery and frontend dev work."""
+    """Set contest RUNNING + is_locked; keep round 10 ACTIVE with future deadline."""
+    from datetime import datetime, timedelta, timezone
+
     from sqlalchemy import select
 
     from database.engine import create_engine, create_session_factory
-    from database.models import Contest, ContestLifecycleStatus, Round, RoundStatus
+    from database.models import Contest, ContestLifecycleStatus, Match, Round, RoundStatus
 
     engine = create_engine()
     session_factory = create_session_factory(engine)
@@ -228,9 +230,21 @@ async def ensure_dev_contest_running(contest_id: int = DEFAULT_CONTEST_ID) -> No
                     Round.number == 10,
                 )
             )
-            if round_10 and round_10.status != RoundStatus.ACTIVE.value:
+            if round_10:
+                matches = (
+                    await session.scalars(select(Match).where(Match.round_id == round_10.id))
+                ).all()
+                if matches:
+                    base = datetime.now(timezone.utc) + timedelta(days=14)
+                    for i, match in enumerate(sorted(matches, key=lambda m: m.id)):
+                        match.date_time = base + timedelta(hours=i)
+                    earliest = min(m.date_time for m in matches)
+                    deadline_rule_hours: int = contest.rules_json["contest_structure"][
+                        "deadline_rule_hours"
+                    ]
+                    round_10.deadline = earliest - timedelta(hours=deadline_rule_hours)
                 round_10.status = RoundStatus.ACTIVE.value
-                logger.info("Round 10 set ACTIVE")
+                logger.info("Round 10 shifted forward and set ACTIVE")
 
             contest.status = ContestLifecycleStatus.RUNNING.value
             contest.is_locked = True

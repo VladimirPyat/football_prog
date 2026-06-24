@@ -1,31 +1,37 @@
 import { test, expect } from "@playwright/test";
 import { clearAuthStorage } from "./fixtures/auth";
 import {
+  addDays,
   ensureContestRunning,
+  ensureRound10Active,
   getRoundMatches,
-  getRounds,
   gotoAdminContest,
-  patchRound,
+  reloadLoadedContestFixture,
   seedSupervisorSession,
+  selectRoundByNumber,
+  patchRound,
   supervisorToken,
   toDatetimeLocal,
-  addDays,
+  waitForAdminShell,
 } from "./fixtures/adminApi";
 import { SUPERVISOR_PASSWORD } from "./fixtures/credentials";
 
 test.describe("[E2E-SUPERVISOR-FREE-TOUR]", () => {
   test.skip(!SUPERVISOR_PASSWORD, "SEED_SUPERVISOR_PASSWORD not configured");
 
+  test.beforeAll(() => {
+    reloadLoadedContestFixture();
+  });
+
   test.beforeEach(async () => {
     await ensureContestRunning(1);
-    await ensureRound10Active(1);
+    await ensureRound10Active();
   });
 
   test("free tour lists only POSTPONED matches", async ({ page }) => {
     const token = await supervisorToken();
     const contestId = 1;
-    const rounds = await getRounds(token, contestId);
-    const round10 = rounds.find((r) => r.number === 10)!;
+    const round10 = await ensureRound10Active();
     const beforeMatches = await getRoundMatches(token, contestId, round10.id);
     const scheduled = beforeMatches.find((m) => m.status === "SCHEDULED");
     const target = beforeMatches.find((m) => m.status === "SCHEDULED") ?? beforeMatches[0];
@@ -38,7 +44,8 @@ test.describe("[E2E-SUPERVISOR-FREE-TOUR]", () => {
     await clearAuthStorage(page);
     await seedSupervisorSession(page);
     await gotoAdminContest(page, contestId, "/admin/rounds");
-    await page.locator("select").first().selectOption({ label: /Тур 10/ });
+    await waitForAdminShell(page);
+    await selectRoundByNumber(page, token, contestId, 10);
     await page.getByRole("button", { name: "+ Добавить свободный тур" }).click();
 
     const modal = page.locator(".fixed.inset-0");

@@ -72,7 +72,5 @@ export default function AdminLifecyclePage() {
   if (loading || !user) return <LoadingState />;
   if (user.role !== "ADMIN") return <LoadingState message="Доступ запрещён" />;
 
-  return (
-    <LifecycleContent />
-  );
+  return <LifecycleContent />;
 }

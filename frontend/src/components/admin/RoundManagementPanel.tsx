@@ -8,7 +8,12 @@ import {
   getDeadlineRuleHours,
   isDeadlineValid,
 } from "@/lib/admin/deadlineRule";
-import { formatDateTimeRu, fromDatetimeLocal, roundStatusLabel, toDatetimeLocal } from "@/lib/admin/format";
+import {
+  formatDateTimeRu,
+  fromDatetimeLocal,
+  roundStatusLabel,
+  toDatetimeLocal,
+} from "@/lib/admin/format";
 import type { ContestOut, MatchOut, RoundOut, TeamOut } from "@/types/api";
 import { RoundBuilderForm } from "@/components/admin/RoundBuilderForm";
 import { MatchEditorRow } from "@/components/admin/MatchEditorRow";
@@ -34,7 +39,10 @@ interface RoundManagementPanelProps {
   onActivate: (roundId: number) => Promise<void>;
   onUpdateRound: (
     roundId: number,
-    body: { deadline?: string; matches?: { match_id: number; date_time?: string; status?: string }[] },
+    body: {
+      deadline?: string;
+      matches?: { match_id: number; date_time?: string; status?: string }[];
+    },
   ) => Promise<void>;
   onCreateFreeTour: (data: {
     deadline: string;

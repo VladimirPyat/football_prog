@@ -245,3 +245,11 @@
 - Regression: 305 passed, 2 skipped
 - CRITICAL findings: 1 (bandit B608 medium in load_test_data.py)
 - Next: coder_1_lint_fix.md for CRITICAL + mypy config + ruff cleanup
+
+## 2026-06-25 — Coder (1.10 fix — multi-contest UNIQUE)
+- STATUS: READY_FOR_TEST
+- Blockers closed: B7, B8
+- Migration: d5e6f7a8b9c0_drop_legacy_global_uniques.py
+- Files: alembic/versions/d5e6f7a8b9c0_drop_legacy_global_uniques.py, src/core/exceptions.py (ConflictError), src/api/error_handlers.py (IntegrityError→409), tests/api/test_multi_contest_unique_fix_1_10.py
+- Verified: alembic upgrade head (0); pytest multi_contest fix + 1_4 (7 passed); post-migration indexes — rounds/teams composite-only
+- Next: tester_1.10_fix.md (or re-run tester_2.3 after frontend Part B)
