@@ -11,12 +11,12 @@ Components grouped by layer. Props are TypeScript-ish sketches; exact types live
 ## 1. Layout / shell
 
 ### `AppShell` (public) — **Implemented (2.1)** → `frontend/src/components/layout/AppShell.tsx`
-Header bar: brand `Sport Prognosis` (left); right side `Личный кабинет` + `Выйти` when authenticated, else `Вход` (opens `LoginModal`). Footer `© 2024 SportPrognosis. Все права защищены.`
+Header bar: brand `Sport Prognosis` (left); right side role-aware nav — USER: `Личный кабинет` → `/profile`; SUPERVISOR+: `Управление` → `/admin` + `ContestPicker`. Visitor: `Вход` (opens `LoginModal`). Footer: copyright + link «Вход для организаторов» → `/staff/login`.
 - props: `{ children }`; reads `useAuth`.
 
-### `AdminTopNav` (supervisor)
-Top nav: brand `SportPrognosis` + `Сегодня DD.MM.YYYY`; tabs `Настройки` `Туры` `Рассылки` `Результаты`; right `ContestPicker` + `NewContestButton`.
-- props: `{ activeTab }`.
+### `AdminTopNav` (supervisor) — **Stub (2.1.1)** → `frontend/src/components/admin/AdminTopNav.tsx`
+Top nav: brand `SportPrognosis` + `Сегодня DD.MM.YYYY`; tabs `Настройки` `Туры` `Рассылки` `Результаты` (disabled, `title="Скоро 2.3"`); right `ContestPicker`. Brand link → `/admin`.
+- props: `{ activeTab? }`.
 
 ### `ContestPicker` — **Implemented (2.1)** → `frontend/src/components/contest/ContestPicker.tsx`
 Dropdown of contests. Supervisor → `GET /contests`; User → `GET /me/contests` (B1); Visitor → `GET /contests/public` (B2).
@@ -29,7 +29,10 @@ Dropdown of contests. Supervisor → `GET /contests`; User → `GET /me/contests
 Overlay with `LoginForm`; closes on success; shows API `detail` on 401.
 
 ### `ProtectedRoute` — **Implemented (2.1)** → `frontend/src/components/auth/ProtectedRoute.tsx`
-Client guard: `requireAuth` / `requireRole(role)` / `requireNotTempPassword`. Redirects: unauthenticated→login, wrong role→`/`, temp-pw→`/change-password`.
+Client guard: `requireAuth` / `requireRole(role)` / `requireNotTempPassword`. Redirects: unauthenticated→`/`, wrong role→`/` (USER-only routes send staff→`/admin`), temp-pw→`/change-password`, completed change-password→`resolvePostLoginPath(user)`.
+
+### `resolvePostLoginPath` — **Implemented (2.1.1)** → `frontend/src/lib/auth/resolvePostLoginPath.ts`
+Pure function: temp password → `/change-password`; USER → `/profile`; SUPERVISOR → `/admin/settings/parameters`; ADMIN → `/admin`. Used by `AuthProvider` and `ProtectedRoute`.
 
 ### `TempPasswordGuard` — **Implemented (2.1)** → `frontend/src/components/auth/TempPasswordGuard.tsx`
 Global layout guard; redirects authenticated `is_temp_password` users to `/change-password`.
@@ -140,3 +143,4 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 |------|--------|
 | 2026-06-21 | Initial catalogue across layout/shared/data/forms/admin, derived from plan §5 + screenshots §11. Props to refine per sub-stage. |
 | 2026-06-23 | Stage 2.1: marked implemented components with `frontend/src/...` paths; added `TempPasswordGuard`, `ContestList`, `ProfileMenu`. |
+| 2026-06-24 | Stage 2.1.1: `AdminTopNav` stub; `resolvePostLoginPath`; role-aware `AppShell` nav; `ProtectedRoute` staff redirect from `/profile`. |

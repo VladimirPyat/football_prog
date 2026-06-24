@@ -14,6 +14,7 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const { isAuthenticated, user, logout } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
+  const isStaff = isSupervisorOrAbove(user?.role ?? null);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -23,15 +24,24 @@ export function AppShell({ children }: AppShellProps) {
             Sport Prognosis
           </Link>
           <div className="flex items-center gap-4">
-            {isAuthenticated && isSupervisorOrAbove(user?.role ?? null) && <ContestPicker />}
+            {isAuthenticated && isStaff && <ContestPicker />}
             {isAuthenticated ? (
               <>
-                <Link
-                  href="/profile"
-                  className="text-sm text-gray-700 hover:text-blue-600 font-medium"
-                >
-                  Личный кабинет
-                </Link>
+                {isStaff ? (
+                  <Link
+                    href="/admin"
+                    className="text-sm text-gray-700 hover:text-blue-600 font-medium"
+                  >
+                    Управление
+                  </Link>
+                ) : (
+                  <Link
+                    href="/profile"
+                    className="text-sm text-gray-700 hover:text-blue-600 font-medium"
+                  >
+                    Личный кабинет
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={logout}
@@ -56,7 +66,14 @@ export function AppShell({ children }: AppShellProps) {
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">{children}</main>
 
       <footer className="border-t border-gray-200 bg-white py-4 text-center text-sm text-gray-500">
-        © 2024 SportPrognosis. Все права защищены.
+        <p>© 2024 SportPrognosis. Все права защищены.</p>
+        {!isAuthenticated && (
+          <p className="mt-1">
+            <Link href="/staff/login" className="text-blue-600 hover:underline">
+              Вход для организаторов
+            </Link>
+          </p>
+        )}
       </footer>
 
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />

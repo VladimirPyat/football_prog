@@ -39,6 +39,14 @@ export const SUPERVISOR_LOGIN = rootEnv.SEED_SUPERVISOR_LOGIN ?? "supervisor";
 export const SUPERVISOR_PASSWORD =
   process.env.E2E_SUPERVISOR_PASSWORD ?? rootEnv.SEED_SUPERVISOR_PASSWORD ?? "";
 
+export const ADMIN_LOGIN = rootEnv.SEED_ADMIN_LOGIN ?? "admin";
+export const ADMIN_PASSWORD =
+  process.env.E2E_ADMIN_PASSWORD ?? rootEnv.SEED_ADMIN_PASSWORD ?? "";
+
+/** Bootstrap demo user from `bootstrap_users.py` (Stage 2.1.1). */
+export const DEMO_USER_LOGIN = "user";
+export const DEMO_USER_PASSWORD = "user";
+
 export const TOKEN_KEY = "fp_access_token";
 export const ACTIVE_CONTEST_KEY = "fp_active_contest_id";
 

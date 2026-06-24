@@ -1,7 +1,7 @@
 # Tester Instructions — Stage 2.3: Supervisor Admin UI
 
 > **Status gate:** @Coder `READY_FOR_TEST` for 2.3 in `agent_docs/progress/stage_2.md`.
-> **Prerequisites:** Sub-stages **2.1** and **2.2** at `TEST_PASS`; backend B1–B6 **RESOLVED** — see `agent_docs/reports/BLOCKED.md`.
+> **Prerequisites:** Sub-stages **2.1** and **2.1.1** at `TEST_PASS` (role routing + `/admin` stubs); **2.2 not required**. Backend B1–B6 **RESOLVED** — see `agent_docs/reports/BLOCKED.md`.
 > **Reference:** `instructions/coder_2.3.md`, `docs/04_supervisor_scenario.md` (E2E §), `docs/06_front_tests.md`, `agent_docs/contracts/frontend_api_integration.md`.
 > **Strategy:** Unit (Vitest) + E2E (Playwright) — **agent runs**; visual/mobile UX — **human** (agent reminds in report).
 
@@ -50,6 +50,8 @@ Health: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
 
 Fresh contests avoid polluting loaded contest state. Prefer **API setup in `beforeEach`** + UI assertions (real backend, no route mocks).
 
+> **`CONTEST_LOCKED` on contest `id=1`:** after `dev_setup.py`, contest `1` is RUNNING and locked — `POST …/participants` invite returns `403`. **Do not** use contest `1` for invite E2E; use **Fresh DRAFT** profile only. See `agent_docs/reports/todo.md`.
+
 ### 2.2 Frontend env
 
 `frontend/.env.local`:
@@ -66,7 +68,7 @@ NEXT_PUBLIC_DEFAULT_TEAM_LOGO_URL=/assets/default-team-logo.jpg
 |------|-------|-----------------|
 | SUPERVISOR | `supervisor` | `SEED_SUPERVISOR_PASSWORD` from root `.env` |
 | ADMIN | `admin` | `SEED_ADMIN_PASSWORD` from root `.env` |
-| USER | `user` | `user` (loader) |
+| USER | `user` | `user` | `bootstrap_users.py` (2.1.1 demo seed) |
 
 Do **not** commit passwords.
 

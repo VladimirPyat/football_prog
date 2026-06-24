@@ -1,7 +1,8 @@
 # Tester Instructions — Stage 2.2: Predictions & Privacy
 
 > **Status gate:** @Coder `READY_FOR_TEST` for 2.2 in `agent_docs/progress/stage_2.md`.
-> **Prerequisites:** Sub-stage **2.1** at `TEST_PASS`. Backend predictions API Stage 1.3+ (`test_1.3.md` / `test_operational_gaps_1_4.py`).
+> **Prerequisites:** Sub-stages **2.1**, **2.1.1**, and **2.3** at `TEST_PASS`. Backend predictions API Stage 1.3+ (`test_1.3.md` / `test_operational_gaps_1_4.py`).
+> **Dev note:** Test user `user/user` comes from `bootstrap_users.py` (2.1.1) until invite UI removes demo seed — see `agent_docs/reports/todo.md`.
 > **Reference:** `instructions/coder_2.2.md`, `docs/03_user_scenarios.md` §3–§4 (E2E §), `docs/06_front_tests.md`, `agent_docs/contracts/frontend_api_integration.md`.
 > **Strategy:** Unit (Vitest) + E2E (Playwright) — **agent runs**; visual/mobile UX — **human** (agent reminds in report).
 
@@ -47,7 +48,7 @@ Health: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
 | Past round | **9** — CLOSED, deadline passed (privacy / full matrix tests) |
 | `matches_per_round` | 8 (from contest defaults) |
 | `maxScore` | from `rules_json.constraints.score_validation_range[1]` — verify via `GET /contests/1`, do not assume 20 |
-| Test user | `user` / `user` (loader participant) |
+| Test user | `user` / `user` (bootstrap demo user, 2.1.1) |
 | Second user | `shutov` / `user` or another loader login for privacy cross-check |
 
 ### 2.2 Frontend env
@@ -327,7 +328,7 @@ Russian summary. Table:
 
 **Verdict:** `TEST_PASS` / `TEST_FAIL`.
 
-On **TEST_PASS:** ready for **2.3** (admin UI) or parallel if team splits work — dependency graph: 2.3 also lists 2.2; 2.2 does not require 2.3.
+On **TEST_PASS:** ready for **2.4** (leaderboard & integration). Dependency graph: `2.1 → 2.1.1 → 2.3 → 2.2 → 2.4`.
 
 ---
 
@@ -360,7 +361,7 @@ On **TEST_PASS**, append to `agent_docs/progress/stage_2.md`:
 - Report: agent_docs/reports/test_2.2.md
 - Unit: N passed; E2E: M passed (K skipped)
 - Build: OK
-- Next: instructions/coder_2.3.md (if not done) or coder_2.4.md
+- Next: instructions/coder_2.4.md
 ```
 
 ---

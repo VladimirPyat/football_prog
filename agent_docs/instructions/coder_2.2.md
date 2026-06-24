@@ -1,7 +1,8 @@
 # Coder Instructions — Stage 2.2: Predictions & Privacy
 
 > **Status gate:** `INSTRUCTIONS_READY`
-> **Prerequisite:** Sub-stage **2.1** at `TEST_PASS` (auth shell + contest context). Backend prediction API Stage 1.3+ (`GET/POST …/predictions`, privacy filter). See `agent_docs/reports/BLOCKED.md`.
+> **Prerequisite:** Sub-stages **2.1**, **2.1.1**, and **2.3** at `TEST_PASS` (auth shell, role routing, admin UI). Backend prediction API Stage 1.3+ (`GET/POST …/predictions`, privacy filter). See `agent_docs/reports/BLOCKED.md`.
+> **Dev note:** Until 2.3 invite UI replaces bootstrap seed, use demo `user/user` from `bootstrap_users.py` (2.1.1) for prediction E2E — see `agent_docs/reports/todo.md`.
 > **Plan:** `agent_docs/plans/draft_2.md` § Sub-stage 2.2, §3.6, §7.3.
 > **Specs:** `agent_docs/ui/{components,pages,forms_validation,state_management}.md`, `agent_docs/contracts/frontend_api_integration.md`, `docs/03_user_scenarios.md` §3–§4.
 > **Screenshots:** `docs/screens/user_predict.jpg` — prediction form + matrix layout reference.
@@ -50,7 +51,7 @@ Implement **user prediction entry** and **privacy-aware predictions viewing**. A
 
 **Score range:** `maxScore = contest.rules_json.constraints.score_validation_range[1]` — **never hardcode 20** in validation or labels.
 
-**Test data:** `load_test_data.py` → contest `id=1`, round **10** ACTIVE with open deadline; `user/user` enrolled.
+**Test data:** `load_test_data.py` → contest `id=1`, round **10** ACTIVE; demo `user/user` enrolled via `bootstrap_users.py` (2.1.1).
 
 ---
 

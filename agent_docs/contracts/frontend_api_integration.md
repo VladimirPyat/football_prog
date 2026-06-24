@@ -47,8 +47,36 @@ GET /api/v1/auth/me (Bearer) → UserOut {id, login, role, first_name, last_name
 
 - Attach `Authorization: Bearer <token>` to every authenticated request.
 - While `is_temp_password=true`, backend allows only `/auth/change-password` and `/auth/me`; all mutations return `403`. UI must hard-gate to `/change-password`.
-- Test credentials (seed/bootstrap, `manuals/BOOTSTRAP_USERS.md`): `admin/…`, `supervisor/…`; scenarios reference `user/user`.
+- Test credentials (seed/bootstrap, `manuals/BOOTSTRAP_USERS.md`): `admin/…`, `supervisor/…`; demo participant `user/user` from `bootstrap_users.py` (2.1.1, **TEMPORARY** until 2.3 invite UI).
 - Roles: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
+
+### 2.4 Post-login routing by role
+
+After successful `POST /auth/login` and `GET /auth/me`, the frontend **must not** hardcode `/profile` for all roles. Use a single resolver: `resolvePostLoginPath(user)` in `frontend/src/lib/auth/resolvePostLoginPath.ts`.
+
+| Condition | Redirect target |
+|-----------|-----------------|
+| `is_temp_password === true` | `/change-password` |
+| `role === 'USER'` | `/profile` (participant hub) |
+| `role === 'SUPERVISOR'` | `/admin/settings/parameters` (or `/admin` with redirect to settings stub) |
+| `role === 'ADMIN'` | `/admin` (dashboard stub until 2.3) |
+
+**Same resolver** applies after `POST /auth/change-password` success (not hardcoded `/profile`).
+
+**Route guards (2.1.1+):**
+
+| Route | Allowed roles | Notes |
+|-------|---------------|-------|
+| `/profile` | USER only | SUPERVISOR+/ADMIN → redirect `/admin` |
+| `/admin/*` | SUPERVISOR+ | USER → redirect `/` or `/profile` |
+| `/` (authenticated) | all | USER → participant flow (`/contests`); SUPERVISOR+/ADMIN → `/admin` |
+| `/staff/login` | Visitor (login form) | Same API as modal login; staff-oriented copy |
+
+**Staff login:** optional dedicated page `/staff/login` — still `POST /auth/login`; no second auth mechanism.
+
+**App shell nav:** USER sees «Личный кабинет» → `/profile`; SUPERVISOR+ sees «Управление» → `/admin`.
+
+Introduced in **Stage 2.1.1** — fixes bug where all roles landed on `/profile` (`AuthProvider` hardcode).
 
 ### 2.3 Token storage decision
 
@@ -264,3 +292,4 @@ types/api.ts       // interfaces from §7
 |------|--------|
 | 2026-06-22 | B1–B3 RESOLVED (Stage 1.8); fallback table for B1/B2/B3; `NEXT_PUBLIC_DEFAULT_CONTEST_ID` naming. |
 | 2026-06-23 | Stage 2.1: `fp:unauthorized` custom event (not generic `unauthorized`); Pydantic 422 array parsed in `parseErrorDetail()` (`frontend/src/lib/api/errors.ts`); `localStorage` key `fp_active_contest_id` for contest picker persistence. |
+| 2026-06-24 | Stage 2.1.1: §2.4 Post-login routing by role (`resolvePostLoginPath`); `/profile` USER-only; `/admin/*` SUPERVISOR+; demo `user/user` from bootstrap (TEMPORARY until 2.3 invite UI). |

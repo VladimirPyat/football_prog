@@ -9,7 +9,7 @@ test.describe("[E2E-SUPERVISOR-PICKER]", () => {
     await clearAuthStorage(page);
     await loginAsSupervisor(page);
 
-    const picker = page.getByLabel("Выбор конкурса");
+    const picker = page.locator("header").getByLabel("Выбор конкурса");
     await expect(picker).toBeVisible();
     const options = picker.locator("option");
     await expect(options).not.toHaveCount(0);

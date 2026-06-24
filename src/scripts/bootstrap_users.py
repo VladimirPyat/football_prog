@@ -66,7 +66,7 @@ async def seed_admin_user(session: AsyncSession, settings: Settings, contest_id:
             role=UserRole.ADMIN,
             first_name=settings.seed_admin_first_name,
             last_name=settings.seed_admin_last_name,
-            is_temp_password=True,
+            is_temp_password=False,
         )
         session.add(user)
         await session.flush()
@@ -123,6 +123,52 @@ async def seed_supervisor_user(session: AsyncSession, settings: Settings) -> Use
     return user
 
 
+async def seed_demo_user(
+    session: AsyncSession, settings: Settings, contest_id: int | None
+) -> User | None:
+    # TEMPORARY (2.1.1): remove after Stage 2.3 when supervisor invite UI seeds participants.
+    # Tracked in agent_docs/reports/todo.md
+    if not settings.seed_demo_user_password:
+        logger.info(
+            "SEED_DEMO_USER_PASSWORD not set — skipping demo participant bootstrap (login=%s)",
+            settings.seed_demo_user_login,
+        )
+        return None
+
+    existing = await session.scalar(
+        select(User).where(User.login == settings.seed_demo_user_login)
+    )
+    if existing is not None:
+        logger.info("Demo user already exists (login=%s), skipping create", existing.login)
+        user = existing
+    else:
+        password_hash = hash_password(settings.seed_demo_user_password)
+        user = User(
+            login=settings.seed_demo_user_login,
+            password_hash=password_hash,
+            role=UserRole.USER,
+            first_name=settings.seed_demo_user_first_name,
+            last_name=settings.seed_demo_user_last_name,
+            is_temp_password=False,
+        )
+        session.add(user)
+        await session.flush()
+        logger.info("Created demo user (login=%s, id=%s)", user.login, user.id)
+
+    if contest_id is not None:
+        participant = await session.get(ContestParticipant, (contest_id, user.id))
+        if participant is None:
+            session.add(
+                ContestParticipant(
+                    contest_id=contest_id,
+                    user_id=user.id,
+                    status=ParticipantStatus.ACCEPTED,
+                )
+            )
+            logger.info("Enrolled demo user as participant in contest id=%s", contest_id)
+    return user
+
+
 async def run_bootstrap(database_url: str | None = None, *, enroll_contest: bool = True) -> None:
     settings = get_settings()
     engine = create_engine(database_url)
@@ -143,6 +189,7 @@ async def run_bootstrap(database_url: str | None = None, *, enroll_contest: bool
 
             await seed_admin_user(session, settings, contest_id)
             await seed_supervisor_user(session, settings)
+            await seed_demo_user(session, settings, contest_id)
 
     await engine.dispose()
 

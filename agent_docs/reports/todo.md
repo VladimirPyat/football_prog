@@ -24,9 +24,31 @@ Append-only notes for ideas not yet scheduled in a stage. When an item lands in 
 
 ## Dev environment
 
-### Fix loader user passwords for out-of-box login — **Open**
+### Fix loader user passwords for out-of-box login — **Resolved (2.1.1)**
 
-After `dev_setup.py`, document login should match CSV (`shutov` / `user`) or hash real password `user` in `load_test_data.py`. See `test_2.1.md` § `[ENV-LOADER-AUTH]`.
+Demo USER `user/user` seeded in `bootstrap_users.py` after loader. Loader CSV users still have placeholder hashes — use `shutov`/`user` only if hash fixed separately. See `test_2.1.md` § `[ENV-LOADER-AUTH]`.
+
+---
+
+## Stage 2 — Frontend cleanup
+
+### Remove demo user from bootstrap after 2.3 invite UI — **Open**
+
+**When:** Sub-stage **2.3** delivers supervisor participant invite UI (`POST …/participants`).
+
+**Action:** Remove `seed_demo_user()` from `src/scripts/bootstrap_users.py` and `SEED_DEMO_USER_*` from settings; update `DEV_SETUP.md` test logins to document invite-created users or a documented test fixture.
+
+**Tracked in:** `bootstrap_users.py` TEMPORARY comment; `coder_2.1.1.md` §3.1.
+
+### CONTEST_LOCKED vs invite E2E on dev_setup contest — **Open (documented for 2.3 tester)**
+
+After `dev_setup.py`, contest `id=1` is **RUNNING** and **`is_locked=true`**. Supervisor invite (`POST …/participants`) returns `403` with code `CONTEST_LOCKED`.
+
+**For 2.3 E2E:** use a **fresh DRAFT contest** (`POST /api/v1/contests`) for SETUP/invite flows — not contest `1`.
+
+**Not in scope for 2.1.1:** backend dev flag to unlock contest `1` or auto-create DRAFT contest in dev_setup.
+
+**Referenced in:** `tester_2.3.md` §2.1, `coder_2.1.1.md` §3.5.
 
 ---
 
@@ -38,4 +60,4 @@ Replace manual `dev_setup.py --run` with compose services for API, UI, and optio
 
 ---
 
-*Last updated: 2026-06-24 — file logging + log archive script added; auth.log noted for future middleware approach.*
+*Last updated: 2026-06-24 — Stage 2.1.1: demo user bootstrap, CONTEST_LOCKED invite note, loader auth marked resolved via bootstrap.*

@@ -149,11 +149,11 @@ Use `127.0.0.1` consistently (matches Playwright `baseURL` in tester instruction
 
 | Role | Login | Password | Source |
 |------|-------|----------|--------|
-| USER (participant) | `user` | `user` | `load_test_data.py` CSV |
+| USER (demo) | `user` | `user` | `bootstrap_users.py` (`SEED_DEMO_USER_*`; defaults work without `.env`) |
 | SUPERVISOR | `supervisor` | value from `.env` `SEED_SUPERVISOR_PASSWORD` | `bootstrap_users.py` |
 | ADMIN | `admin` | value from `.env` `SEED_ADMIN_PASSWORD` | `bootstrap_users.py` |
 
-Other loader users (`shutov`, `volchenko`, …) use password **`user`** unless CSV specifies otherwise.
+> **Note:** `load_test_data.py` CSV also defines a `user` row, but its password hash is a placeholder — after `--reset`, only `bootstrap_users.py` provides a working `user/user` login. Other loader users (`shutov`, `volchenko`, …) may still use password **`user`** if their CSV hash matches; rely on the demo row above for E2E.
 
 Do **not** commit `.env` or real passwords.
 
@@ -190,6 +190,7 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 | CORS errors from `:3000` | Ensure `CORS_ORIGINS` includes frontend origin or `["*"]` |
 | `load_test_data` unique constraint | Use `--reset` or run full `dev_setup.py` |
 | Admin missing after loader | Run `bootstrap_users.py` **after** `load_test_data --reset` |
+| `user/user` login fails (401) | Re-run `dev_setup.py` — demo USER is created by `bootstrap_users.py` after loader |
 | Playwright E2E cannot find browser | `npx playwright install chromium` in `frontend/` |
 | Port in use | Stop process on :8000/:3000 or change ports in script / `frontend/package.json` |
 | `--run` exits immediately | Check logs — missing `frontend/`, `node`, or `npm`; run `--check` |

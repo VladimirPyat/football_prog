@@ -3,24 +3,31 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { isSupervisorOrAbove } from "@/lib/auth/guards";
 import { usePublicContests } from "@/hooks/usePublicContests";
 import { useContest } from "@/hooks/useContest";
 import { ContestList } from "@/components/contest/ContestList";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { resolveDefaultContestId } from "@/lib/contest/resolveDefaultContestId";
+import { consumeSkipHomeRedirect } from "@/lib/auth/postLoginNavigation";
 
 export default function HomePage() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const { contests, loading: contestsLoading } = usePublicContests();
   const { setContestId } = useContest();
   const router = useRouter();
 
   useEffect(() => {
     if (authLoading) return;
-    if (isAuthenticated) {
-      router.replace("/contests");
+    if (consumeSkipHomeRedirect()) return;
+    if (isAuthenticated && user) {
+      if (isSupervisorOrAbove(user.role)) {
+        router.replace("/admin");
+      } else {
+        router.replace("/contests");
+      }
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, user, router]);
 
   useEffect(() => {
     if (authLoading || isAuthenticated || contestsLoading) return;

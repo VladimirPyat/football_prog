@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import { apiGet, apiPost } from "@/lib/api/client";
 import { auth as authEndpoints } from "@/lib/api/endpoints";
 import { clearToken, getToken, setToken, UNAUTHORIZED_EVENT } from "@/lib/auth/token";
+import { resolvePostLoginPath } from "@/lib/auth/resolvePostLoginPath";
+import { SKIP_HOME_REDIRECT_KEY } from "@/lib/auth/postLoginNavigation";
 import type { ChangePasswordRequest, LoginResponse, UserOut } from "@/types/api";
 
 interface AuthContextValue {
@@ -81,10 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       setToken(res.access_token);
       const me = await refreshUser();
-      if (me?.is_temp_password) {
-        router.push("/change-password");
-      } else {
-        router.push("/profile");
+      if (me) {
+        sessionStorage.setItem(SKIP_HOME_REDIRECT_KEY, "1");
+        router.replace(resolvePostLoginPath(me));
       }
     },
     [refreshUser, router],
@@ -97,8 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         new_password: newPassword,
       };
       await apiPost<void>(authEndpoints.changePassword(), body);
-      await refreshUser();
-      router.push("/profile");
+      const me = await refreshUser();
+      if (me) {
+        sessionStorage.setItem(SKIP_HOME_REDIRECT_KEY, "1");
+        router.replace(resolvePostLoginPath(me));
+      }
     },
     [refreshUser, router],
   );

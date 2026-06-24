@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { LoadingState } from "@/components/ui/LoadingState";
 import type { UserRole } from "@/types/api";
 import { hasMinRole } from "@/lib/auth/guards";
+import { resolvePostLoginPath } from "@/lib/auth/resolvePostLoginPath";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -33,6 +34,11 @@ export function ProtectedRoute({
       return;
     }
 
+    if (requireRole === "USER" && user && user.role !== "USER") {
+      router.replace("/admin");
+      return;
+    }
+
     if (requireRole && user && !hasMinRole(user.role, requireRole)) {
       router.replace("/");
       return;
@@ -48,8 +54,8 @@ export function ProtectedRoute({
       return;
     }
 
-    if (pathname === "/change-password" && isAuthenticated && !isTempPassword) {
-      router.replace("/profile");
+    if (pathname === "/change-password" && isAuthenticated && !isTempPassword && user) {
+      router.replace(resolvePostLoginPath(user));
       return;
     }
 

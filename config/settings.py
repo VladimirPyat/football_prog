@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     seed_admin_password_hash: str | None = None
     seed_supervisor_password: str | None = None
     seed_supervisor_password_hash: str | None = None
+    seed_demo_user_password: str | None = "user"
 
     # ── Bootstrap identities (non-secret; override rarely) ───────────────────
     seed_admin_login: str = "admin"
@@ -40,6 +41,9 @@ class Settings(BaseSettings):
     seed_supervisor_login: str = "supervisor"
     seed_supervisor_first_name: str = "Supervisor"
     seed_supervisor_last_name: str = "User"
+    seed_demo_user_login: str = "user"
+    seed_demo_user_first_name: str = "Demo"
+    seed_demo_user_last_name: str = "User"
 
     # ── JWT (non-secret parameters) ──────────────────────────────────────────
     jwt_algorithm: str = "HS256"

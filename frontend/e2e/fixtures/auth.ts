@@ -1,7 +1,11 @@
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import {
+  ADMIN_LOGIN,
+  ADMIN_PASSWORD,
   API_BASE,
+  DEMO_USER_LOGIN,
+  DEMO_USER_PASSWORD,
   SUPERVISOR_LOGIN,
   SUPERVISOR_PASSWORD,
   TOKEN_KEY,
@@ -36,28 +40,73 @@ export async function submitLogin(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Войти" }).click();
 }
 
-export async function waitForAuthenticatedHeader(page: Page): Promise<void> {
+export async function waitForUserAuthenticatedHeader(page: Page): Promise<void> {
   await expect(page.getByRole("link", { name: "Личный кабинет" })).toBeVisible({
     timeout: 10_000,
   });
   await expect(page.getByRole("button", { name: "Вход" })).not.toBeVisible();
 }
 
-export async function loginAsUser(page: Page): Promise<void> {
+/** @deprecated Use waitForUserAuthenticatedHeader or waitForStaffAuthenticatedHeader */
+export async function waitForAuthenticatedHeader(page: Page): Promise<void> {
+  await waitForUserAuthenticatedHeader(page);
+}
+
+export async function waitForStaffAuthenticatedHeader(page: Page): Promise<void> {
+  await expect(page.getByRole("link", { name: "Управление", exact: true })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByRole("button", { name: "Вход" })).not.toBeVisible();
+}
+
+export async function loginWithCredentials(
+  page: Page,
+  login: string,
+  password: string,
+  role: "USER" | "STAFF",
+): Promise<void> {
   await openLoginModal(page);
-  await fillLoginForm(page, USER_LOGIN, USER_PASSWORD);
+  await fillLoginForm(page, login, password);
   await submitLogin(page);
-  await waitForAuthenticatedHeader(page);
+  if (role === "STAFF") {
+    await waitForStaffAuthenticatedHeader(page);
+  } else {
+    await waitForUserAuthenticatedHeader(page);
+  }
+}
+
+export async function loginAsDemoUser(page: Page): Promise<void> {
+  await loginWithCredentials(page, DEMO_USER_LOGIN, DEMO_USER_PASSWORD, "USER");
+}
+
+export async function loginAsUser(page: Page): Promise<void> {
+  await loginWithCredentials(page, USER_LOGIN, USER_PASSWORD, "USER");
 }
 
 export async function loginAsSupervisor(page: Page): Promise<void> {
   if (!SUPERVISOR_PASSWORD) {
     throw new Error("SEED_SUPERVISOR_PASSWORD missing in root .env");
   }
-  await openLoginModal(page);
-  await fillLoginForm(page, SUPERVISOR_LOGIN, SUPERVISOR_PASSWORD);
+  await loginWithCredentials(page, SUPERVISOR_LOGIN, SUPERVISOR_PASSWORD, "STAFF");
+}
+
+export async function loginAsAdmin(page: Page): Promise<void> {
+  if (!ADMIN_PASSWORD) {
+    throw new Error("SEED_ADMIN_PASSWORD missing in root .env");
+  }
+  await loginWithCredentials(page, ADMIN_LOGIN, ADMIN_PASSWORD, "STAFF");
+}
+
+export async function loginOnStaffPage(
+  page: Page,
+  login: string,
+  password: string,
+): Promise<void> {
+  await page.goto("/staff/login");
+  await expect(page.getByRole("heading", { name: "Вход для организаторов" })).toBeVisible();
+  await fillLoginForm(page, login, password);
   await submitLogin(page);
-  await waitForAuthenticatedHeader(page);
+  await waitForStaffAuthenticatedHeader(page);
 }
 
 export async function gotoProfile(page: Page): Promise<void> {

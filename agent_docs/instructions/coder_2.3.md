@@ -1,7 +1,7 @@
 # Coder Instructions — Stage 2.3: Supervisor Admin UI
 
 > **Status gate:** `INSTRUCTIONS_READY`
-> **Prerequisite:** Sub-stages **2.1** and **2.2** at `TEST_PASS` (auth shell + prediction flow). Backend B1–B6 **RESOLVED** — see `agent_docs/reports/BLOCKED.md`.
+> **Prerequisite:** Sub-stages **2.1** and **2.1.1** at `TEST_PASS` (auth shell + role-based routing + admin stubs). **2.2 is not required** — admin UI can ship before prediction form. Backend B1–B6 **RESOLVED** — see `agent_docs/reports/BLOCKED.md`.
 > **Plan:** `agent_docs/plans/draft_2.md` § Sub-stage 2.3, §3.6, §11.2.
 > **Specs:** `agent_docs/ui/{components,pages,forms_validation,state_management}.md`, `agent_docs/contracts/frontend_api_integration.md`, `docs/04_supervisor_scenario.md`.
 > **Screenshots:** `docs/screens/supervisor_*.jpg` — layout/copy binding for admin shell.

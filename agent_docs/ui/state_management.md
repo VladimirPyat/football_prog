@@ -27,8 +27,9 @@
 | `isTempPassword` | `boolean` | `user.is_temp_password` |
 | `login(login, pwd)` | fn | `POST /auth/login` → store token → hydrate `me` |
 | `logout()` | fn | clear token → user=null → redirect `/` |
-| `changePassword(old,new)` | fn | `POST /auth/change-password` |
+| `changePassword(old,new)` | fn | `POST /auth/change-password` → `resolvePostLoginPath(user)` |
 
+- Post-login and post-change-password navigation uses `resolvePostLoginPath(user)` (2.1.1) — no hardcoded `/profile` for all roles.
 - Token in `localStorage: fp_access_token`.
 - On mount: if token → hydrate via `/auth/me`; on 401 → `logout()` silently (Visitor).
 - Listens to a global `fp:unauthorized` event emitted by the API client on any 401 → `logout()`.
@@ -121,3 +122,4 @@ Phase derivation (mirrors plan §3.6) lives in a pure helper `deriveUiMode(conte
 |------|--------|
 | 2026-06-22 | B1–B3 resolved note; fallback via `NEXT_PUBLIC_DEFAULT_CONTEST_ID`; contacts readonly fallback. |
 | 2026-06-23 | Stage 2.1: provider/hook file paths; `fp:unauthorized` event name; `TempPasswordGuard` in tree. |
+| 2026-06-24 | Stage 2.1.1: post-login routing via `resolvePostLoginPath` in `AuthProvider.login` / `changePassword`. |

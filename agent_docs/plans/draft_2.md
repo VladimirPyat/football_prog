@@ -89,6 +89,8 @@ Build a **Next.js 14+ (App Router) + TypeScript + Tailwind CSS** single-page app
 | `ui/state_management.md` | §3.4 | `instructions/coder_2.md` |
 | `instructions/coder_2.md` | — | Phase 2 only |
 | `instructions/coder_2.1.md` | § Sub-stage 2.1 | **Ready** — foundation & auth |
+| `instructions/coder_2.1.1.md` | § Sub-stage 2.1.1 | **Ready** — routing hotfix + admin stubs |
+| `instructions/tester_2.1.1.md` | § Sub-stage 2.1.1 | **Ready** — role routing E2E + demo user |
 | `instructions/coder_2.2.md` | § Sub-stage 2.2 | **Ready** — predictions & privacy |
 | `instructions/tester_2.2.md` | § Sub-stage 2.2 | **Ready** — prediction E2E + unit |
 | `instructions/coder_2.3.md` | § Sub-stage 2.3 | **Ready** — supervisor admin UI |
@@ -446,14 +448,19 @@ Data from `RoundPredictionsView`:
 2.1 Auth + Shell + Contest context
          │
          ▼
-2.2 Predictions + Privacy
+2.1.1 Role routing hotfix + demo user + admin stubs
          │
          ▼
 2.3 Supervisor Admin UI
          │
          ▼
+2.2 Predictions + Privacy
+         │
+         ▼
 2.4 Leaderboard + Results + E2E hardening
 ```
+
+**Recommended implementation order:** `2.1 → 2.1.1 → 2.3 → 2.2 → 2.4` (admin UI before prediction form; routing fix before admin work).
 
 ### Sub-stage 2.0 — Specification Authoring (living documents)
 
@@ -509,6 +516,43 @@ Data from `RoundPredictionsView`:
 
 ---
 
+### Sub-stage 2.1.1 — Role-Based Routing Hotfix + Dev Bootstrap Demo User + Admin Stubs
+
+**Goals:** Fix post-login routing by role; seed working `user/user` demo participant; minimal `/admin/*` shell stubs before full 2.3 UI.
+
+| Task | Details |
+|------|---------|
+| `resolvePostLoginPath` | temp → `/change-password`; USER → `/profile`; SUPERVISOR → `/admin/settings/parameters`; ADMIN → `/admin` |
+| `AuthProvider` | Use resolver after login and change-password (replace hardcoded `/profile`) |
+| `/profile` | USER-only; SUPERVISOR+/ADMIN redirect `/admin` |
+| `/` home | USER → participant flow; SUPERVISOR+/ADMIN → `/admin` |
+| `/admin/*` stubs | Layout + `AdminTopNav` (disabled tabs); dashboard stub; settings parameters placeholder |
+| `/staff/login` | Optional — same `POST /auth/login`, staff copy |
+| `AppShell` | «Личный кабинет» (USER); «Управление» → `/admin` (staff) |
+| Demo USER bootstrap | `bootstrap_users.py`: login `user`, password `user`, contest `1` ACCEPTED, `is_temp_password=false` |
+| `DEV_SETUP.md` | Fix test logins table — `user/user` from bootstrap, not loader CSV |
+
+**API endpoints:** unchanged — `POST /auth/login`, `GET /auth/me` only.
+
+**Dependencies:** 2.1 `TEST_PASS`.
+
+**Non-goals:** full admin CRUD (2.3); prediction form (2.2); new backend APIs; `CONTEST_LOCKED` fix for contest `1` invites (document for 2.3 tester).
+
+**Readiness checklist (2.1.1 done):**
+
+- [ ] `user/user` login → `/profile` (API login 200 after `dev_setup.py`)
+- [ ] `supervisor/…` login → `/admin/*` (not `/profile`)
+- [ ] `admin/…` login → `/admin` stub
+- [ ] Supervisor cannot remain on `/profile`
+- [ ] Unit tests: `resolvePostLoginPath` per role
+- [ ] Lint/build/unit pass
+
+**Instructions:** `agent_docs/instructions/coder_2.1.1.md`, `agent_docs/instructions/tester_2.1.1.md`.
+
+**Cleanup note:** remove demo user seed after 2.3 invite UI — `agent_docs/reports/todo.md`.
+
+---
+
 ### Sub-stage 2.2 — Predictions & Privacy
 
 **Goals:** Full prediction entry; privacy rules; deadline UX.
@@ -535,7 +579,7 @@ Data from `RoundPredictionsView`:
 - [ ] **Deadline passed:** countdown «Дедлайн прошёл»; Edit/Save disabled; POST → 403 handled
 - [ ] Profile **Сделать прогноз** → active round predict page
 
-**Dependencies:** 2.1; active round in test DB (`load_test_data.py` round 10).
+**Dependencies:** 2.1, 2.1.1, **2.3**; active round in test DB (`load_test_data.py` round 10); demo `user/user` from bootstrap (2.1.1).
 
 **Instructions:** `agent_docs/instructions/coder_2.2.md`, `agent_docs/instructions/tester_2.2.md`.
 
@@ -571,7 +615,7 @@ Data from `RoundPredictionsView`:
 - [ ] VOID match → leaderboard updated
 - [ ] ADMIN: pause blocks mutations
 
-**Dependencies:** 2.1, 2.2; supervisor credentials; backend B5/B6 resolved (`BLOCKED.md`).
+**Dependencies:** 2.1, **2.1.1** (routing + admin stubs); supervisor credentials; backend B5/B6 resolved (`BLOCKED.md`). **2.2 not required.**
 
 **Instructions:** `agent_docs/instructions/coder_2.3.md`, `agent_docs/instructions/tester_2.3.md`.
 
@@ -819,6 +863,8 @@ After user approval (✅), Planner Phase B will create:
 | `agent_docs/instructions/coder_2.md` | Step-by-step implementation per sub-stage 2.1–2.4 |
 | `agent_docs/instructions/coder_2.1.md` | ✅ Sub-stage 2.1 — foundation & auth (ready) |
 | `agent_docs/instructions/tester_2.1.md` | ✅ Sub-stage 2.1 — unit + E2E smoke (ready) |
+| `agent_docs/instructions/coder_2.1.1.md` | ✅ Sub-stage 2.1.1 — routing hotfix + admin stubs (ready) |
+| `agent_docs/instructions/tester_2.1.1.md` | ✅ Sub-stage 2.1.1 — role routing E2E (ready) |
 | `agent_docs/instructions/coder_2.2.md` | ✅ Sub-stage 2.2 — predictions & privacy (ready) |
 | `agent_docs/instructions/tester_2.2.md` | ✅ Sub-stage 2.2 — prediction tests (ready) |
 | `agent_docs/instructions/coder_2.3.md` | ✅ Sub-stage 2.3 — supervisor admin UI (ready) |
