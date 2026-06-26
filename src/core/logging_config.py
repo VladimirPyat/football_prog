@@ -8,6 +8,11 @@ from pathlib import Path
 
 _LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 
+# uvicorn --reload uses watchfiles; its INFO "N change(s) detected" lines are
+# written through the root logger and, with LOG_TO_FILE, append to app.log —
+# which triggers another change event (feedback loop that fills the log file).
+_QUIET_THIRD_PARTY_LOGGERS: tuple[str, ...] = ("watchfiles",)
+
 
 def setup_logging(level: str = "INFO", *, log_file: Path | None = None) -> None:
     """Configure root logger for console and optional file output."""
@@ -24,3 +29,6 @@ def setup_logging(level: str = "INFO", *, log_file: Path | None = None) -> None:
         handlers=handlers,
         force=True,
     )
+
+    for logger_name in _QUIET_THIRD_PARTY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)

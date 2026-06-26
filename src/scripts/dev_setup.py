@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import shutil
 import signal
 import subprocess
@@ -136,11 +137,17 @@ def run_dev_servers() -> None:
         "uvicorn",
         "main:app",
         "--reload",
+        "--reload-dir",
+        "src",
+        "--reload-dir",
+        "main.py",
         "--host",
         API_HOST,
         "--port",
         str(API_PORT),
     ]
+    # Avoid app.log feedback loop with watchfiles during hot reload (see logging_config).
+    api_env = {**os.environ, "LOG_TO_FILE": "false"}
     ui_cmd = ["npm", "run", "dev"]
 
     logger.info("Starting API → http://%s:%s", API_HOST, API_PORT)
@@ -163,7 +170,7 @@ def run_dev_servers() -> None:
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    api_proc = subprocess.Popen(api_cmd, cwd=PROJECT_ROOT)
+    api_proc = subprocess.Popen(api_cmd, cwd=PROJECT_ROOT, env=api_env)
     ui_proc = subprocess.Popen(ui_cmd, cwd=FRONTEND_DIR)
     processes.extend([api_proc, ui_proc])
 
@@ -275,7 +282,7 @@ def run_minimal_setup() -> None:
 
 def _print_manual_start_hint() -> None:
     print("✅ Dev setup complete")
-    print("   API:  uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000")
+    print("   API:  uv run uvicorn main:app --reload --reload-dir src --reload-dir main.py --host 127.0.0.1 --port 8000")
     print("   UI:   cd frontend && npm install && npm run dev")
     print("   Or:   uv run python src/scripts/dev_setup.py --run-only")
     print("   Docs: manuals/DEV_SETUP.md")

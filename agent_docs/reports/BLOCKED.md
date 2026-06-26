@@ -7,6 +7,8 @@
 | B1–B6 | RESOLVED | See prior stage reports / `frontend_api_integration.md` |
 | B7 | **RESOLVED** ✅ | Migration `d5e6f7a8b9c0` — legacy global UNIQUE on `rounds.number` dropped; re-verified 2026-06-25 (`[FIX-B7-*]` pytest) |
 | B8 | **RESOLVED** ✅ | Same migration — legacy global UNIQUE on `teams.name` dropped; IntegrityError → 409; re-verified 2026-06-25 (`[FIX-B8-*]` pytest) |
+| **B11** | Participant accept + password setup via signed link; dev scripts in `src/scripts/`. See `coder_1.12_fix.md` |
+| B12 | **OPEN** | Supervisor lifecycle + training mode (finish/delete/restore). See `coder_1.12_fix.md` §3 |
 
 ---
 

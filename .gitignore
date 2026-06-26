@@ -49,6 +49,8 @@ docs/
 
 # secrets
 .env
+.secrets
+src/scripts/.tokens
 *.pem
 *.key
 credentials.json
