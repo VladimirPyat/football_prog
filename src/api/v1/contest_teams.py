@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from config.settings import get_settings
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from api.deps import ContestContext, DbSession, RoleChecker
-from config.settings import get_settings
 from database.models import UserRole
 from schemas.contest import LogoUploadResponse, TeamCreateRequest, TeamOut, TeamPatchRequest
 from services.contest_setup_service import (

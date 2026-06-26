@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from config.settings import get_settings
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import get_settings
 from core.exceptions import NotFoundError
 from database.models import (
     Contest,

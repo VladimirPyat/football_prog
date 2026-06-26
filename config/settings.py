@@ -52,10 +52,17 @@ class Settings(BaseSettings):
     # ── HTTP / CORS ─────────────────────────────────────────────────────────
     cors_origins: list[str] = ["*"]
 
+    # ── Auth & invite links ───────────────────────────────────────────────────
+    frontend_base_url: str = "http://127.0.0.1:3000"
+    setup_token_expire_hours: int = 72
+    enforce_password_setup: bool = True
+
     # ── Contest lifecycle ────────────────────────────────────────────────────
     contest_delete_grace_seconds: int = 10
     contest_delete_enabled: bool = True
     contest_allow_instant_delete: bool = False
+    supervisor_training_mode: bool = False
+    contest_restore_window_seconds: int = 86400
 
     # ── HTTP caching (public leaderboard/results) ────────────────────────────
     cache_max_age_seconds: int = 300

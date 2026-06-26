@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Annotated
 
+from config.settings import get_settings
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import get_settings
 from core.security import decode_access_token
 from database.engine import create_engine, create_session_factory
 from database.models import Contest, ContestLifecycleStatus, User, UserRole

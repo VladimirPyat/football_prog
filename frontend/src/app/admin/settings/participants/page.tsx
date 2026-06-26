@@ -17,9 +17,11 @@ export default function AdminSettingsParticipantsPage() {
   const { participants, invite, remove, setTiebreak } = useParticipants(contestId);
   const { role } = useAuth();
   const { showSuccess, showError } = useToast();
-  const [inviteModal, setInviteModal] = useState<{ login: string; temp_password: string } | null>(
-    null,
-  );
+  const [inviteModal, setInviteModal] = useState<{
+    login: string;
+    temp_password: string;
+    setup_url: string;
+  } | null>(null);
 
   if (!contest) return null;
 
@@ -33,7 +35,11 @@ export default function AdminSettingsParticipantsPage() {
           onSubmit={async (data) => {
             try {
               const res = await invite(data);
-              setInviteModal({ login: res.login, temp_password: res.temp_password });
+              setInviteModal({
+                login: res.login,
+                temp_password: res.temp_password,
+                setup_url: res.setup_url,
+              });
               showSuccess("Участник приглашён");
             } catch (err) {
               showError(err instanceof AppError ? err.detail : "Ошибка приглашения");
@@ -67,6 +73,7 @@ export default function AdminSettingsParticipantsPage() {
           open
           login={inviteModal.login}
           tempPassword={inviteModal.temp_password}
+          setupUrl={inviteModal.setup_url}
           onClose={() => setInviteModal(null)}
         />
       )}

@@ -253,3 +253,18 @@
 - Files: alembic/versions/d5e6f7a8b9c0_drop_legacy_global_uniques.py, src/core/exceptions.py (ConflictError), src/api/error_handlers.py (IntegrityError→409), tests/api/test_multi_contest_unique_fix_1_10.py
 - Verified: alembic upgrade head (0); pytest multi_contest fix + 1_4 (7 passed); post-migration indexes — rounds/teams composite-only
 - Next: tester_1.10_fix.md (or re-run tester_2.3 after frontend Part B)
+
+## 2026-06-27 — Coder (1.12 fix — B11/B12 auth links + training mode)
+- STATUS: READY_FOR_TEST
+- Blockers targeted: B11, B12 (pending TEST_PASS)
+- Files: src/core/setup_tokens.py, src/services/auth_setup_service.py, src/services/contest_restore_service.py, src/scripts/dev_invite_setup.py, alembic/versions/e6f7a8b9c0d1_contest_restore_snapshots.py; edited auth.py, contests.py, contest_lifecycle_service.py, contest_setup_service.py, participant_service.py, models.py, schemas, config/settings.py, .env.example; frontend /auth/setup, LoginForm, ParticipantInviteModal, LifecyclePanel, lifecycle page; manuals/CONFIG.md, manuals/DEV_SETUP.md
+- Verified: alembic upgrade head (0); ruff on new files (0); test_contest_lifecycle_1_4.py (7 passed); frontend lint + type-check (0); legacy participant_accept tests fail under ENFORCE_PASSWORD_SETUP=true (expected — @Tester updates per tester_1.12_fix.md)
+- Next: tester_1.12_fix.md
+
+## 2026-06-27 — Tester (1.12 fix — B11/B12)
+- STATUS: TEST_FAIL
+- Tests: tests/api/stage_112_helpers.py, tests/api/test_auth_setup.py, tests/api/test_participant_purge.py, tests/api/test_contest_restore.py, tests/api/test_dev_invite_setup.py; updated tests/api/test_participant_accept.py
+- Executed: bootstrap (alembic, load_test_data, bootstrap_users); pytest 1.12 suite → 22 passed, 3 failed; ruff on new tests → 0
+- Blockers: B11 OPEN (purge-on-start: activate 403 CONTEST_LOCKED when PENDING temp users exist); B12 RESOLVED
+- Report: agent_docs/reports/test_1.12_fix.md
+- Next: @Coder fix purge/lock ordering in contest_ops.py

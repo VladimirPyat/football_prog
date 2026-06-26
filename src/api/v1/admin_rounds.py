@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta, timezone
+from datetime import UTC, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -11,7 +11,11 @@ from api.deps import DbSession, RoleChecker, resolve_default_contest_id
 from core.exceptions import NotFoundError, ValidationError
 from database.models import Contest, Match, MatchStatus, Round, RoundStatus, UserRole
 from schemas.admin import CreateRoundRequest, RoundActionResponse, UpdateRoundRequest
-from services.contest_lifecycle_service import assert_contest_running, ensure_running_on_first_activation
+from services.contest_lifecycle_service import (
+    assert_contest_running,
+    ensure_running_on_first_activation,
+    purge_before_first_activation,
+)
 from services.round_service import close_round, set_deadline, transition_round
 from services.scoring_persistence import calculate_round
 
@@ -46,9 +50,9 @@ async def create_round(body: CreateRoundRequest, session: DbSession) -> dict:
     deadline_rule = contest.rules_json["contest_structure"]["deadline_rule_hours"]
     earliest = min(m.date_time for m in body.matches)
     if earliest.tzinfo is None:
-        earliest = earliest.replace(tzinfo=timezone.utc)
+        earliest = earliest.replace(tzinfo=UTC)
     cutoff = earliest - timedelta(hours=deadline_rule)
-    dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=timezone.utc)
+    dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=UTC)
     if dl >= cutoff:
         raise ValidationError("Дедлайн нарушает правило 24 часов до первого матча")
 
@@ -69,7 +73,7 @@ async def create_round(body: CreateRoundRequest, session: DbSession) -> dict:
     await session.flush()
 
     for m in body.matches:
-        dt = m.date_time if m.date_time.tzinfo else m.date_time.replace(tzinfo=timezone.utc)
+        dt = m.date_time if m.date_time.tzinfo else m.date_time.replace(tzinfo=UTC)
         session.add(
             Match(
                 round_id=round_.id,
@@ -123,6 +127,7 @@ async def activate_round(round_id: int, session: DbSession) -> dict:
     """Активировать тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
+    await purge_before_first_activation(session, contest_id)
     round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
     await ensure_running_on_first_activation(session, contest_id)
     await session.commit()

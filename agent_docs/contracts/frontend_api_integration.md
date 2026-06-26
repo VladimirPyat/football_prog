@@ -32,16 +32,43 @@ JWT bearer. Payload `{ sub: user_id, role, exp }`. Default expiry 24h (`jwt_expi
 POST /api/v1/auth/login {login, password}
   → 200 {access_token, token_type:"bearer", is_temp_password}
   → 401 {detail:"Неверный логин или пароль"}   (no `code`)
+  → 403 {detail, code:"PASSWORD_SETUP_REQUIRED"}  when enforce_password_setup=true and temp password
 
 store token (localStorage: fp_access_token)
 
-if is_temp_password === true:
+if is_temp_password === true && enforce_password_setup === false:
    force redirect /change-password
    POST /api/v1/auth/change-password {old_password, new_password} (Bearer)
      → 200  → is_temp_password cleared server-side
 
+if PASSWORD_SETUP_REQUIRED on login:
+   redirect user to /auth/setup (link from invite letter or request-password-reset)
+
 GET /api/v1/auth/me (Bearer) → UserOut {id, login, role, first_name, last_name, is_temp_password}
 ```
+
+### 2.1.1 Invite / password setup (Stage 1.12)
+
+Signed link: `{FRONTEND_BASE_URL}/auth/setup?token=…`
+
+```
+GET /api/v1/auth/setup-preview?token=…
+  → 200 {login, mode:"password_form"|"confirm_only", already_completed}
+
+POST /api/v1/auth/complete-setup {token, new_password?}
+  → 200 {success, accepted, already_completed}  (idempotent)
+  → PENDING→ACCEPTED when contest_id in token
+
+POST /api/v1/auth/request-password-reset {email}
+  → 200 {message}  (always 200; re-issues temp password when email known)
+
+POST /api/v1/contests/{id}/participants (SUPERVISOR+)
+  → 200 ParticipantInviteOut {user_id, login, temp_password, status, setup_url}
+```
+
+UI `/auth/setup`: `password_form` → form + `new_password`; `confirm_only` → confirm button only. Success → redirect to login (no auto-JWT).
+
+Config: `ENFORCE_PASSWORD_SETUP`, `FRONTEND_BASE_URL`, `SUPERVISOR_TRAINING_MODE`, `CONTEST_RESTORE_WINDOW_SECONDS` — see `manuals/CONFIG.md`.
 
 ### 2.2 Rules
 
@@ -294,3 +321,4 @@ types/api.ts       // interfaces from §7
 | 2026-06-23 | Stage 2.1: `fp:unauthorized` custom event (not generic `unauthorized`); Pydantic 422 array parsed in `parseErrorDetail()` (`frontend/src/lib/api/errors.ts`); `localStorage` key `fp_active_contest_id` for contest picker persistence. |
 | 2026-06-24 | Stage 2.1.1: §2.4 Post-login routing by role (`resolvePostLoginPath`); `/profile` USER-only; `/admin/*` SUPERVISOR+; demo `user/user` from bootstrap (TEMPORARY until 2.3 invite UI). |
 | 2026-06-24 | Stage 2.3: B5 logo multipart via `apiUpload`; extended `contestAdmin` path builders in `endpoints.ts`; admin hook matrix. |
+| 2026-06-27 | Stage 1.12: §2.1.1 invite/setup flow (`setup-preview`, `complete-setup`, `request-password-reset`, `ParticipantInviteOut.setup_url`); `PASSWORD_SETUP_REQUIRED` login gate; training mode restore `POST /contests/{id}/restore`. |

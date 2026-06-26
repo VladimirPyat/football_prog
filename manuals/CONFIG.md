@@ -68,6 +68,11 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 | `jwt_algorithm` | `JWT_ALGORITHM` | `HS256` | JWT algorithm |
 | `jwt_expire_minutes` | `JWT_EXPIRE_MINUTES` | `1440` | Token lifetime (minutes) |
 | `cors_origins` | `CORS_ORIGINS` | `["*"]` | Allowed CORS origins (JSON list) |
+| `frontend_base_url` | `FRONTEND_BASE_URL` | `http://127.0.0.1:3000` | Base URL for `/auth/setup?token=…` links |
+| `setup_token_expire_hours` | `SETUP_TOKEN_EXPIRE_HOURS` | `72` | Invite/reset setup token TTL |
+| `enforce_password_setup` | `ENFORCE_PASSWORD_SETUP` | `true` | Block temp-password login until `complete-setup` |
+| `supervisor_training_mode` | `SUPERVISOR_TRAINING_MODE` | `false` | Supervisor may finish/delete/restore (training) |
+| `contest_restore_window_seconds` | `CONTEST_RESTORE_WINDOW_SECONDS` | `86400` | Undo window after training-mode delete |
 | `contest_delete_grace_seconds` | `CONTEST_DELETE_GRACE_SECONDS` | `10` | Grace before safe delete after pause |
 | `contest_delete_enabled` | `CONTEST_DELETE_ENABLED` | `true` | Enable contest delete endpoint |
 | `contest_allow_instant_delete` | `CONTEST_ALLOW_INSTANT_DELETE` | `false` | Skip grace (test/dev only) |

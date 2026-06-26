@@ -7,11 +7,13 @@ import re
 import secrets
 from pathlib import Path
 
+from config.settings import get_settings
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import get_settings
+from core.exceptions import NotFoundError, ValidationError
 from core.security import hash_password
+from core.setup_tokens import build_setup_url, create_setup_token
 from database.models import (
     Contact,
     Contest,
@@ -22,7 +24,6 @@ from database.models import (
     User,
     UserRole,
 )
-from core.exceptions import NotFoundError, ValidationError
 from services.contest_lifecycle_service import require_unlocked
 from services.team_logo_service import delete_uploaded_logo_if_custom
 
@@ -251,12 +252,41 @@ async def add_participant(
     )
     await session.flush()
 
+    token = create_setup_token(user_id=user.id, contest_id=contest_id)
     return {
         "user_id": user.id,
         "login": user.login,
         "temp_password": temp_password,
         "status": ParticipantStatus.PENDING,
+        "setup_url": build_setup_url(token),
     }
+
+
+async def purge_unconfirmed_participants(session: AsyncSession, contest_id: int) -> int:
+    """Remove PENDING USER participants before contest goes live."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    rows = (
+        await session.execute(
+            select(ContestParticipant.user_id)
+            .join(User, User.id == ContestParticipant.user_id)
+            .where(
+                ContestParticipant.contest_id == contest_id,
+                ContestParticipant.status == ParticipantStatus.PENDING,
+                User.role == UserRole.USER.value,
+            )
+        )
+    ).all()
+    removed = 0
+    for (user_id,) in rows:
+        await remove_participant(session, contest_id, user_id)
+        removed += 1
+    if removed:
+        logger.info(
+            "purged unconfirmed participants contest_id=%s count=%s", contest_id, removed
+        )
+    return removed
 
 
 async def remove_participant(

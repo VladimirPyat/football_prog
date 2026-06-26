@@ -125,6 +125,11 @@ class ParticipantInviteOut(BaseModel):
     login: str
     temp_password: str
     status: str
+    setup_url: str
+
+
+class ContestRestoreResponse(BaseModel):
+    restored: bool = True
 
 
 class FreeTourMatchItem(BaseModel):

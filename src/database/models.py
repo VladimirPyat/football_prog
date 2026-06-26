@@ -4,12 +4,12 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
-    JSON,
     String,
     UniqueConstraint,
 )
@@ -112,6 +112,20 @@ class Contest(Base):
     )
     teams: Mapped[list[Team]] = relationship(back_populates="contest", cascade="all, delete-orphan")
     rounds: Mapped[list[Round]] = relationship(back_populates="contest", cascade="all, delete-orphan")
+
+
+class ContestRestoreSnapshot(Base):
+    __tablename__ = "contest_restore_snapshots"
+
+    contest_id: Mapped[int] = mapped_column(
+        ForeignKey("contests.id"), primary_key=True
+    )
+    snapshot_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    deleted_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
 
 
 class ContestParticipant(Base):

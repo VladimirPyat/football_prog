@@ -1,11 +1,10 @@
 openapi: 3.0.3
 info:
   title: Football Predictions API
-  version: 1.2.0
+  version: 1.2.1
   description: >-
-    Stage 1.2.0 — frontend prerequisites bundle: discovery/contacts (1.8),
-    leaderboard count_* fields (1.7), invite accept on password change (1.7),
-    team logo upload + static assets (1.9).
+    Stage 1.2.1 — auth setup links (B11), supervisor training mode + contest restore (B12).
+    Prior: discovery/contacts (1.8), leaderboard count_* (1.7), team logo (1.9).
     Primary prefix: /api/v1/contests/{contest_id}/...
     Legacy paths without contest_id are DEPRECATED shims (resolve default contest for loader regression).
     Auth via JWT (Bearer). Score fields integers [0, max_score_value]; MISSING prediction = absent row, never 0.
@@ -46,6 +45,63 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TokenResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/PasswordSetupRequired' }
+
+  /api/v1/auth/setup-preview:
+    get:
+      tags: [auth]
+      summary: Preview invite/reset link (login, UI mode, completion state)
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupPreviewResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/auth/complete-setup:
+    post:
+      tags: [auth]
+      summary: Accept invite and/or set password via signed token (idempotent)
+      description: >-
+        Token payload: { sub, contest_id?, purpose: setup_password, exp }.
+        When contest_id present and participant PENDING → ACCEPTED.
+        new_password required when enforce_password_setup=true (password_form mode).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteSetupRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompleteSetupResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/auth/request-password-reset:
+    post:
+      tags: [auth]
+      summary: Request password reset by email (always 200 for privacy)
+      description: >-
+        When email is known: new temp password + signed setup token issued (no SMTP in v1).
+        Same triple as invite: login + temp_password + setup_url (returned only in dev/logs).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetRequest' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasswordResetResponse' }
 
   /api/v1/auth/change-password:
     post:
@@ -194,6 +250,9 @@ paths:
     delete:
       tags: [admin (contest)]
       summary: Safe delete one contest (PAUSED + grace + confirm)
+      description: >-
+        RBAC: ADMIN always; SUPERVISOR when supervisor_training_mode=true.
+        Instant delete (skip grace) when contest_allow_instant_delete or supervisor_training_mode.
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/contest_id' }]
       requestBody:
@@ -234,6 +293,8 @@ paths:
     post:
       tags: [admin (contest)]
       summary: Early finish (RUNNING|PAUSED -> FINISHED)
+      description: >-
+        RBAC: ADMIN always; SUPERVISOR when supervisor_training_mode=true.
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/contest_id' }]
       responses:
@@ -241,6 +302,26 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ContestLifecycleOut' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/contests/{contest_id}/restore:
+    post:
+      tags: [admin (contest)]
+      summary: Restore contest from training-mode snapshot (within restore window)
+      description: >-
+        Available only when supervisor_training_mode=true (SUPERVISOR + ADMIN).
+        After DELETE wipe: replays snapshot (teams, rounds, matches, participants).
+        Snapshot consumed on success; 404/410 when missing or expired.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/contest_id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContestRestoreResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No snapshot for contest }
+        '410': { description: Snapshot expired (contest_restore_window_seconds) }
 
   # ─── Setup: teams ───
   /api/v1/contests/{contest_id}/teams:
@@ -759,6 +840,17 @@ components:
     ValidationError: { description: Pydantic validation error }
     ContestLocked: { description: contests.is_locked — no structural/rule changes allowed }
     GracePeriodActive: { description: Delete grace period not yet elapsed since pause }
+    PasswordSetupRequired:
+      description: >-
+        Login with temp password blocked when enforce_password_setup=true.
+        User must complete /auth/setup via signed link first.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail: { type: string }
+              code: { type: string, enum: [PASSWORD_SETUP_REQUIRED] }
 
   schemas:
     LoginRequest:
@@ -779,6 +871,37 @@ components:
       properties:
         old_password: { type: string }
         new_password: { type: string }
+    CompleteSetupRequest:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, description: Signed JWT from setup_url query param }
+        new_password: { type: string, nullable: true, description: Required when enforce_password_setup=true }
+    CompleteSetupResponse:
+      type: object
+      properties:
+        success: { type: boolean, default: true }
+        accepted: { type: boolean, default: false }
+        already_completed: { type: boolean, default: false }
+    SetupPreviewResponse:
+      type: object
+      properties:
+        login: { type: string }
+        mode: { type: string, enum: [password_form, confirm_only] }
+        already_completed: { type: boolean }
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+    PasswordResetResponse:
+      type: object
+      properties:
+        message: { type: string }
+    ContestRestoreResponse:
+      type: object
+      properties:
+        restored: { type: boolean, default: true }
     UserOut:
       type: object
       properties:
@@ -937,6 +1060,7 @@ components:
         login: { type: string }
         temp_password: { type: string }
         status: { type: string, enum: [PENDING, ACCEPTED] }
+        setup_url: { type: string, description: '{FRONTEND_BASE_URL}/auth/setup?token=…' }
     ExceptionalTiebreakRequest:
       type: object
       required: [points]

@@ -72,6 +72,21 @@ class ConflictError(AppError):
     code = "CONFLICT"
 
 
+class PasswordSetupRequiredError(AppError):
+    http_status = 403
+    code = "PASSWORD_SETUP_REQUIRED"
+
+
+class SnapshotNotFoundError(AppError):
+    http_status = 404
+    code = "SNAPSHOT_NOT_FOUND"
+
+
+class SnapshotExpiredError(AppError):
+    http_status = 410
+    code = "SNAPSHOT_EXPIRED"
+
+
 class CriticalError(AppError):
     http_status = 500
     code = "INTERNAL_ERROR"

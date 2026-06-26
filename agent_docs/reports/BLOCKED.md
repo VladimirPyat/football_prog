@@ -7,8 +7,8 @@
 | B1–B6 | RESOLVED | See prior stage reports / `frontend_api_integration.md` |
 | B7 | **RESOLVED** ✅ | Migration `d5e6f7a8b9c0` — legacy global UNIQUE on `rounds.number` dropped; re-verified 2026-06-25 (`[FIX-B7-*]` pytest) |
 | B8 | **RESOLVED** ✅ | Same migration — legacy global UNIQUE on `teams.name` dropped; IntegrityError → 409; re-verified 2026-06-25 (`[FIX-B8-*]` pytest) |
-| **B11** | Participant accept + password setup via signed link; dev scripts in `src/scripts/`. See `coder_1.12_fix.md` |
-| B12 | **OPEN** | Supervisor lifecycle + training mode (finish/delete/restore). See `coder_1.12_fix.md` §3 |
+| **B11** | **RESOLVED** ✅ | Auth setup links, invite `setup_url`, purge on start, dev scripts — verified 2026-06-27 (`test_1.12_fix`, 25/25 pytest) |
+| **B12** | **RESOLVED** ✅ | Supervisor training mode (finish/delete/restore), snapshot restore — verified 2026-06-27 (`test_1.12_fix`) |
 
 ---
 
@@ -25,6 +25,17 @@
 - **Root cause:** Legacy `sqlite_autoindex_teams_1` UNIQUE(`name`) coexisted with `uq_teams_contest_name`.
 - **Fix:** Same migration drops global `teams.name` unique; `ConflictError` (409) handler for remaining `IntegrityError` UNIQUE violations.
 - **Verified:** `[FIX-B8-TEAM]`, `[FIX-B8-DUP-IN-CONTEST]` pytest green; post-migration indexes: `teams` → `['contest_id', 'name']` only.
+
+### B11: Participant accept + password setup via signed link
+
+- **Deliverables:** `setup-preview`, `complete-setup`, `request-password-reset`; invite returns `setup_url`; purge PENDING on first activate; `dev_invite_setup.py`.
+- **Fix (post-test):** Purge moved before `is_locked` in `activate_round`; purge removes all PENDING USER rows.
+- **Verified:** `tests/api/test_auth_setup.py`, `test_participant_purge.py`, `test_dev_invite_setup.py`, `test_participant_accept.py` — 25/25 green (2026-06-27).
+
+### B12: Supervisor lifecycle + training mode
+
+- **Deliverables:** `supervisor_training_mode` enables SUPERVISOR finish/delete/restore; `contest_restore_snapshots` + `POST …/restore` within window.
+- **Verified:** `tests/api/test_contest_restore.py` — pause/finish/delete/restore gates green (2026-06-27).
 
 ---
 

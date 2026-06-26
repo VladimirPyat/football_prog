@@ -198,6 +198,30 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 
 ---
 
+## Invite confirm without SMTP — `dev_invite_setup.py` (Stage 1.12)
+
+When SMTP is not configured, use the dev script to export PENDING invitees and confirm via `complete-setup`:
+
+```bash
+# Export unconfirmed participants (optional: regenerate setup links)
+uv run python src/scripts/dev_invite_setup.py get-unconfirmed --contest-id 2 \
+  --out src/scripts/dev_unconfirmed.tsv \
+  --links-out src/scripts/.tokens
+
+# Confirm rows from TSV (# lines skipped)
+uv run python src/scripts/dev_invite_setup.py confirm-list \
+  --file src/scripts/dev_unconfirmed.tsv \
+  --password 'DevPass123!'
+
+# Export + confirm all in one step
+uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id 2
+```
+
+`src/scripts/.tokens` is gitignored (one JSON object per line with `setup_url`).  
+Recommended local flags: `ENFORCE_PASSWORD_SETUP=false`, `SUPERVISOR_TRAINING_MODE=true`, `CONTEST_DELETE_GRACE_SECONDS=0` — see [CONFIG.md](CONFIG.md).
+
+---
+
 ## Daily workflow
 
 | Task | Command |

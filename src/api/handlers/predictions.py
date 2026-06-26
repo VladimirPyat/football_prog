@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,10 +35,10 @@ async def build_round_predictions_view(
     if round_ is None or round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не найден")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     deadline = round_.deadline
     if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
+        deadline = deadline.replace(tzinfo=UTC)
 
     matches = (
         await session.scalars(select(Match).where(Match.round_id == round_id))

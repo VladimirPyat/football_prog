@@ -3,6 +3,9 @@ export const auth = {
   me: () => "/api/v1/auth/me",
   changePassword: () => "/api/v1/auth/change-password",
   contacts: () => "/api/v1/auth/me/contacts",
+  setupPreview: () => "/api/v1/auth/setup-preview",
+  completeSetup: () => "/api/v1/auth/complete-setup",
+  requestPasswordReset: () => "/api/v1/auth/request-password-reset",
 };
 
 export const me = {
@@ -19,6 +22,7 @@ export const contests = {
   resume: (id: number) => `/api/v1/contests/${id}/resume`,
   finish: (id: number) => `/api/v1/contests/${id}/finish`,
   delete: (id: number) => `/api/v1/contests/${id}`,
+  restore: (id: number) => `/api/v1/contests/${id}/restore`,
 };
 
 export const contestAdmin = {

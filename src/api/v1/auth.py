@@ -2,20 +2,28 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from config.settings import get_settings
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from api.deps import CurrentUser, DbSession
+from core.exceptions import PasswordSetupRequiredError
 from core.security import create_access_token, hash_password, verify_password
 from database.models import User
 from schemas.auth import (
     ChangePasswordRequest,
+    CompleteSetupRequest,
+    CompleteSetupResponse,
     ContactOut,
     ContactPatchRequest,
     LoginRequest,
+    PasswordResetRequest,
+    PasswordResetResponse,
+    SetupPreviewResponse,
     TokenResponse,
     UserOut,
 )
+from services.auth_setup_service import complete_setup, preview_setup, request_password_reset
 from services.contact_service import get_contacts, upsert_contacts
 from services.participant_service import accept_pending_participations
 
@@ -29,11 +37,44 @@ async def login(body: LoginRequest, session: DbSession) -> TokenResponse:
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Неверный логин или пароль")
 
+    settings = get_settings()
+    if settings.enforce_password_setup and user.is_temp_password:
+        raise PasswordSetupRequiredError(
+            "Подтвердите участие и установите пароль по ссылке из письма"
+        )
+
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return TokenResponse(
         access_token=token,
         is_temp_password=user.is_temp_password,
     )
+
+
+@router.get("/setup-preview", response_model=SetupPreviewResponse)
+async def setup_preview(token: str = Query(...), session: DbSession = ...) -> SetupPreviewResponse:
+    """Preview invite/reset link: login, UI mode, completion state."""
+    result = await preview_setup(session, token)
+    return SetupPreviewResponse(**result)
+
+
+@router.post("/complete-setup", response_model=CompleteSetupResponse)
+async def post_complete_setup(
+    body: CompleteSetupRequest, session: DbSession
+) -> CompleteSetupResponse:
+    """Accept invite and/or set password via signed token (idempotent)."""
+    result = await complete_setup(session, body.token, body.new_password)
+    await session.commit()
+    return CompleteSetupResponse(**result)
+
+
+@router.post("/request-password-reset", response_model=PasswordResetResponse)
+async def post_request_password_reset(
+    body: PasswordResetRequest, session: DbSession
+) -> PasswordResetResponse:
+    """Always 200 — re-issue temp password when email is known (no SMTP in v1)."""
+    result = await request_password_reset(session, body.email)
+    await session.commit()
+    return PasswordResetResponse(**result)
 
 
 @router.post("/change-password")

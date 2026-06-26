@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta, timezone
+from datetime import UTC, timedelta
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
@@ -33,9 +33,17 @@ from schemas.admin import (
 )
 from schemas.contest import FreeTourRequest
 from schemas.leaderboard import LeaderboardOut, RoundResultsOut
-from schemas.predictions import PredictionBatchRequest, PredictionBatchResponse, RoundPredictionsView
+from schemas.predictions import (
+    PredictionBatchRequest,
+    PredictionBatchResponse,
+    RoundPredictionsView,
+)
 from schemas.rounds import RoundOut
-from services.contest_lifecycle_service import assert_contest_running, ensure_running_on_first_activation
+from services.contest_lifecycle_service import (
+    assert_contest_running,
+    ensure_running_on_first_activation,
+    purge_before_first_activation,
+)
 from services.leaderboard_service import compute_etag
 from services.match_service import change_status, set_result
 from services.prediction_service import submit_batch
@@ -172,9 +180,9 @@ async def create_round(
     deadline_rule = contest.rules_json["contest_structure"]["deadline_rule_hours"]
     earliest = min(m.date_time for m in body.matches)
     if earliest.tzinfo is None:
-        earliest = earliest.replace(tzinfo=timezone.utc)
+        earliest = earliest.replace(tzinfo=UTC)
     cutoff = earliest - timedelta(hours=deadline_rule)
-    dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=timezone.utc)
+    dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=UTC)
     if dl >= cutoff:
         raise ValidationError("Дедлайн нарушает правило 24 часов до первого матча")
 
@@ -195,7 +203,7 @@ async def create_round(
     await session.flush()
 
     for m in body.matches:
-        dt = m.date_time if m.date_time.tzinfo else m.date_time.replace(tzinfo=timezone.utc)
+        dt = m.date_time if m.date_time.tzinfo else m.date_time.replace(tzinfo=UTC)
         session.add(
             Match(
                 round_id=round_.id,
@@ -264,6 +272,7 @@ async def activate_round(
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не найден")
+    await purge_before_first_activation(session, contest_id)
     round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
     await ensure_running_on_first_activation(session, contest_id)
     await session.commit()

@@ -29,6 +29,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import UTC
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -214,7 +215,7 @@ def run_dev_servers() -> None:
 
 async def ensure_dev_contest_running(contest_id: int = DEFAULT_CONTEST_ID) -> None:
     """Set contest RUNNING + is_locked; keep round 10 ACTIVE with future deadline."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from sqlalchemy import select
 
@@ -242,7 +243,7 @@ async def ensure_dev_contest_running(contest_id: int = DEFAULT_CONTEST_ID) -> No
                     await session.scalars(select(Match).where(Match.round_id == round_10.id))
                 ).all()
                 if matches:
-                    base = datetime.now(timezone.utc) + timedelta(days=14)
+                    base = datetime.now(UTC) + timedelta(days=14)
                     for i, match in enumerate(sorted(matches, key=lambda m: m.id)):
                         match.date_time = base + timedelta(hours=i)
                     earliest = min(m.date_time for m in matches)

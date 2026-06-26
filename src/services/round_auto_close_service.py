@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def auto_close_expired_rounds(session: AsyncSession, contest_id: int) -> list[int]:
     """ACTIVE rounds with deadline <= now(UTC) → CLOSED. Returns closed round ids."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     active_rounds = (
         await session.scalars(
             select(Round).where(
@@ -31,7 +31,7 @@ async def auto_close_expired_rounds(session: AsyncSession, contest_id: int) -> l
     for round_ in active_rounds:
         deadline = round_.deadline
         if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
+            deadline = deadline.replace(tzinfo=UTC)
         if deadline <= now:
             try:
                 await close_round(session, contest_id, round_.id)

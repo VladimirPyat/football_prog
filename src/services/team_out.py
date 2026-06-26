@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from config.settings import Settings, get_settings
+
 from database.models import Team
 from schemas.contest import TeamOut
 from services.team_logo_service import resolve_team_logo_url

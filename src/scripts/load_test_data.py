@@ -20,7 +20,7 @@ import csv
 import json
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -29,10 +29,10 @@ for _p in (str(PROJECT_ROOT), str(SRC_ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from config.settings import get_settings
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import get_settings
 from database.base import Base
 from database.engine import create_engine, create_session_factory
 from database.models import (
@@ -45,10 +45,8 @@ from database.models import (
     Prediction,
     Round,
     RoundStatus,
-    Score,
     Team,
     User,
-    UserRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -142,7 +140,7 @@ def _parse_dt(value: str, fmt: str, tz_name: str) -> datetime:
     """Parse a datetime string per loader config format into an aware datetime."""
     dt = datetime.strptime(value.strip(), fmt)
     if tz_name.upper() == "UTC":
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     raise ValueError(f"Unsupported timezone in config: {tz_name}")
 
 
@@ -481,6 +479,7 @@ async def run_load(
             # Build round_number → round_id map from the inserted matches.
             round_numbers = {key[0] for key in match_key_to_id}
             from sqlalchemy import select as _select
+
             from database.models import Round as _Round
             round_rows = (
                 await session.scalars(_select(_Round).where(_Round.number.in_(round_numbers)))

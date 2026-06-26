@@ -21,6 +21,31 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=1)
 
 
+class CompleteSetupRequest(BaseModel):
+    token: str
+    new_password: str | None = Field(default=None, min_length=1)
+
+
+class CompleteSetupResponse(BaseModel):
+    success: bool = True
+    accepted: bool = False
+    already_completed: bool = False
+
+
+class SetupPreviewResponse(BaseModel):
+    login: str
+    mode: str
+    already_completed: bool
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordResetResponse(BaseModel):
+    message: str
+
+
 class UserOut(BaseModel):
     id: int
     login: str

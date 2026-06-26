@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,10 +58,10 @@ async def submit_batch(
     if round_ is None:
         raise NotFoundError(f"Тур {round_id} не найден")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     deadline = round_.deadline
     if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
+        deadline = deadline.replace(tzinfo=UTC)
 
     if round_.status != RoundStatus.ACTIVE:
         raise ContestRuleError(
@@ -160,10 +160,10 @@ async def visible_predictions(
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     deadline = round_.deadline
     if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
+        deadline = deadline.replace(tzinfo=UTC)
 
     after_deadline = now >= deadline
     is_privileged = viewer_role == UserRole.ADMIN

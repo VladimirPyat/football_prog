@@ -6,10 +6,10 @@ import io
 import logging
 from pathlib import Path
 
+from config.settings import Settings
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import Settings
 from core.exceptions import NotFoundError, ValidationError
 from database.models import Team
 from services.contest_lifecycle_service import require_unlocked

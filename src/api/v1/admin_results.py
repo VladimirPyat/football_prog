@@ -7,7 +7,12 @@ from fastapi import APIRouter, Depends
 from api.deps import DbSession, RoleChecker, resolve_default_contest_id
 from core.exceptions import NotFoundError
 from database.models import Match, MatchStatus, Round, RoundStatus, UserRole
-from schemas.admin import MatchResultRequest, MatchResultResponse, MatchStatusPatch, MatchStatusResponse
+from schemas.admin import (
+    MatchResultRequest,
+    MatchResultResponse,
+    MatchStatusPatch,
+    MatchStatusResponse,
+)
 from services.contest_lifecycle_service import assert_contest_running
 from services.match_service import change_status, set_result
 

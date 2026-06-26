@@ -18,8 +18,8 @@ from database.models import (
     RoundStatus,
     Score,
 )
-from scoring.rules import ScoringRules
 from scoring.engine import score_round
+from scoring.rules import ScoringRules
 from scoring.types import MatchResult, UserPrediction
 
 logger = logging.getLogger(__name__)

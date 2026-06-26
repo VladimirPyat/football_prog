@@ -15,7 +15,6 @@ from src.scoring.types import (
     UserRoundScore,
 )
 
-
 # --------------------------------------------------------------------------- helpers
 
 

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+from config.settings import get_settings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import get_settings
 from core.exceptions import (
     ContestDeleteDisabledError,
     ContestLockedError,
@@ -19,7 +19,13 @@ from core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from database.models import Contest, ContestLifecycleStatus, Round, RoundStatus
+from database.models import (
+    Contest,
+    ContestLifecycleStatus,
+    Round,
+    RoundStatus,
+)
+from services.contest_restore_service import save_restore_snapshot
 from services.contest_teardown import reset_contest_to_draft
 
 logger = logging.getLogger(__name__)
@@ -30,7 +36,7 @@ def _ensure_utc_aware(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -73,6 +79,16 @@ async def assert_contest_running(session: AsyncSession, contest_id: int) -> Cont
     return contest
 
 
+async def purge_before_first_activation(session: AsyncSession, contest_id: int) -> int:
+    """Remove unconfirmed participants while contest is still unlocked (before first activate)."""
+    from services.contest_setup_service import purge_unconfirmed_participants  # noqa: PLC0415
+
+    contest = await get_contest(session, contest_id)
+    if contest.status != ContestLifecycleStatus.DRAFT:
+        return 0
+    return await purge_unconfirmed_participants(session, contest_id)
+
+
 async def ensure_running_on_first_activation(
     session: AsyncSession, contest_id: int
 ) -> Contest:
@@ -91,7 +107,7 @@ async def pause_contest(session: AsyncSession, contest_id: int) -> Contest:
             f"Недопустимый переход статуса: {contest.status} → PAUSED (требуется RUNNING)"
         )
     contest.status = ContestLifecycleStatus.PAUSED
-    contest.paused_at = datetime.now(timezone.utc)
+    contest.paused_at = datetime.now(UTC)
     logger.info("contest paused contest_id=%s", contest_id)
     return contest
 
@@ -117,7 +133,7 @@ async def finish_contest(session: AsyncSession, contest_id: int) -> Contest:
             f"Недопустимый переход статуса: {contest.status} → FINISHED "
             "(требуется RUNNING или PAUSED)"
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     contest.status = ContestLifecycleStatus.FINISHED
     contest.finished_at = now
 
@@ -148,7 +164,7 @@ def seconds_until_deletable(paused_at: datetime | None) -> int | None:
     deletable_at = compute_deletable_at(paused_at)
     if deletable_at is None:
         return None
-    remaining = (deletable_at - datetime.now(timezone.utc)).total_seconds()
+    remaining = (deletable_at - datetime.now(UTC)).total_seconds()
     return max(0, int(remaining))
 
 
@@ -175,7 +191,7 @@ async def assert_deletable(
         )
 
     deletable_at = compute_deletable_at(paused_at)
-    if deletable_at is None or datetime.now(timezone.utc) < deletable_at:
+    if deletable_at is None or datetime.now(UTC) < deletable_at:
         remaining = seconds_until_deletable(paused_at)
         raise GracePeriodError(
             f"Период ожидания после паузы ещё не истёк — осталось {remaining} с"
@@ -184,9 +200,15 @@ async def assert_deletable(
 
 
 async def delete_contest_data(
-    session: AsyncSession, contest_id: int, *, keep_admin_users: bool = True
+    session: AsyncSession,
+    contest_id: int,
+    *,
+    keep_admin_users: bool = True,
+    deleted_by_user_id: int | None = None,
 ) -> Contest:
-    """FK-safe wipe and reset contest to DRAFT."""
+    """FK-safe wipe and reset contest to DRAFT; optional restore snapshot."""
+    del keep_admin_users
+    await save_restore_snapshot(session, contest_id, deleted_by_user_id=deleted_by_user_id)
     return await reset_contest_to_draft(session, contest_id)
 
 

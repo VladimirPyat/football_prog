@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,10 +79,10 @@ async def set_deadline(
 
     earliest = await _earliest_match_dt(session, round_id)
     if earliest.tzinfo is None:
-        earliest = earliest.replace(tzinfo=timezone.utc)
+        earliest = earliest.replace(tzinfo=UTC)
 
     cutoff = earliest - timedelta(hours=deadline_rule_hours)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if now > cutoff:
         raise ContestRuleError(
@@ -116,8 +116,8 @@ async def close_round(session: AsyncSession, contest_id: int, round_id: int) -> 
 
     deadline = round_.deadline
     if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
-    now = datetime.now(timezone.utc)
+        deadline = deadline.replace(tzinfo=UTC)
+    now = datetime.now(UTC)
     if now < deadline:
         raise ValidationError("Дедлайн тура ещё не наступил")
 
@@ -156,7 +156,7 @@ async def create_free_tour(
         match_id = item["match_id"]
         new_date_time = item["new_date_time"]
         if new_date_time.tzinfo is None:
-            new_date_time = new_date_time.replace(tzinfo=timezone.utc)
+            new_date_time = new_date_time.replace(tzinfo=UTC)
 
         match = await session.get(Match, match_id)
         if match is None:

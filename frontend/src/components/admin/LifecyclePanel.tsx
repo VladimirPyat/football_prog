@@ -10,8 +10,11 @@ interface LifecyclePanelProps {
   onResume: () => Promise<void>;
   onFinish: () => Promise<void>;
   onDelete: () => Promise<void>;
+  onRestore?: () => Promise<void>;
   onRecalculate: () => Promise<void>;
   disabled: boolean;
+  showFinishDelete?: boolean;
+  restoreAvailable?: boolean;
 }
 
 export function LifecyclePanel({
@@ -20,11 +23,14 @@ export function LifecyclePanel({
   onResume,
   onFinish,
   onDelete,
+  onRestore,
   onRecalculate,
   disabled,
+  showFinishDelete = true,
+  restoreAvailable = false,
 }: LifecyclePanelProps) {
   const [confirmAction, setConfirmAction] = useState<
-    "pause" | "resume" | "finish" | "delete" | "recalculate" | null
+    "pause" | "resume" | "finish" | "delete" | "recalculate" | "restore" | null
   >(null);
   const [working, setWorking] = useState(false);
 
@@ -37,6 +43,7 @@ export function LifecyclePanel({
       if (action === "finish") await onFinish();
       if (action === "delete") await onDelete();
       if (action === "recalculate") await onRecalculate();
+      if (action === "restore" && onRestore) await onRestore();
     } finally {
       setWorking(false);
       setConfirmAction(null);
@@ -64,6 +71,10 @@ export function LifecyclePanel({
     recalculate: {
       title: "Пересчитать конкурс?",
       message: "Будет выполнен полный пересчёт очков по всем турам.",
+    },
+    restore: {
+      title: "Восстановить конкурс?",
+      message: "Данные конкурса будут восстановлены из последнего снимка.",
     },
   };
 
@@ -97,7 +108,7 @@ export function LifecyclePanel({
             Возобновить
           </button>
         )}
-        {contest.status !== "FINISHED" && (
+        {contest.status !== "FINISHED" && showFinishDelete && (
           <button
             type="button"
             disabled={disabled}
@@ -115,14 +126,26 @@ export function LifecyclePanel({
         >
           Пересчитать
         </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setConfirmAction("delete")}
-          className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50 disabled:opacity-50"
-        >
-          Удалить конкурс
-        </button>
+        {showFinishDelete && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setConfirmAction("delete")}
+            className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50 disabled:opacity-50"
+          >
+            Удалить конкурс
+          </button>
+        )}
+        {restoreAvailable && onRestore && contest.status === "DRAFT" && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setConfirmAction("restore")}
+            className="px-4 py-2 text-sm text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50"
+          >
+            Восстановить
+          </button>
+        )}
       </div>
 
       {confirmAction && (

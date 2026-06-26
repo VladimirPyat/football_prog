@@ -618,3 +618,18 @@ async def empty_api(
         tmp_path, monkeypatch, "empty_api.db", instant_delete=False, load_data=False
     ):
         yield item
+
+
+@pytest_asyncio.fixture
+async def stage_112_api(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncIterator[tuple[httpx.AsyncClient, async_sessionmaker[AsyncSession], str]]:
+    """Stage 1.12 API client with enforce_password_setup + training mode env."""
+    from tests.api.stage_112_helpers import apply_env
+
+    apply_env(monkeypatch)
+    async for item in _make_api_client(
+        tmp_path, monkeypatch, "stage_112.db", instant_delete=False, load_data=False
+    ):
+        yield item

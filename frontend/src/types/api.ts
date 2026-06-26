@@ -103,6 +103,11 @@ export interface ParticipantInviteOut {
   login: string;
   temp_password: string;
   status: ParticipantStatus;
+  setup_url: string;
+}
+
+export interface PasswordResetResponse {
+  message: string;
 }
 
 export interface RoundOut {

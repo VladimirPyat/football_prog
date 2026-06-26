@@ -6,7 +6,11 @@ from fastapi import APIRouter
 
 from api.deps import CurrentUser, DbSession, resolve_default_contest_id
 from api.handlers.predictions import build_round_predictions_view
-from schemas.predictions import PredictionBatchRequest, PredictionBatchResponse, RoundPredictionsView
+from schemas.predictions import (
+    PredictionBatchRequest,
+    PredictionBatchResponse,
+    RoundPredictionsView,
+)
 from services.contest_lifecycle_service import assert_contest_running
 from services.prediction_service import submit_batch
 

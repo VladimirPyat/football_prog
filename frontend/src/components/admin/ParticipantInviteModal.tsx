@@ -4,6 +4,7 @@ interface ParticipantInviteModalProps {
   open: boolean;
   login: string;
   tempPassword: string;
+  setupUrl: string;
   onClose: () => void;
 }
 
@@ -11,12 +12,13 @@ export function ParticipantInviteModal({
   open,
   login,
   tempPassword,
+  setupUrl,
   onClose,
 }: ParticipantInviteModalProps) {
   if (!open) return null;
 
   const copyCredentials = async () => {
-    const text = `Логин: ${login}\nВременный пароль: ${tempPassword}`;
+    const text = `Логин: ${login}\nВременный пароль: ${tempPassword}\nСсылка: ${setupUrl}`;
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -36,11 +38,15 @@ export function ParticipantInviteModal({
         <dl className="space-y-2 text-sm mb-6">
           <div>
             <dt className="text-gray-500">Логин</dt>
-            <dd className="font-mono font-medium">{login}</dd>
+            <dd className="font-mono font-medium break-all">{login}</dd>
           </div>
           <div>
             <dt className="text-gray-500">Временный пароль</dt>
-            <dd className="font-mono font-medium">{tempPassword}</dd>
+            <dd className="font-mono font-medium break-all">{tempPassword}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Ссылка для подтверждения</dt>
+            <dd className="font-mono text-xs break-all text-blue-700">{setupUrl}</dd>
           </div>
         </dl>
         <div className="flex justify-end gap-3">

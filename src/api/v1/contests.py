@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+from config.settings import get_settings
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from api.deps import DbSession, RoleChecker, cache_control_header
-from database.models import UserRole
+from api.deps import CurrentUser, DbSession, RoleChecker, cache_control_header
+from database.models import User, UserRole
 from schemas.contest import (
     ContestDeleteConfirmRequest,
     ContestDeleteResponse,
     ContestLifecycleOut,
     ContestOut,
     ContestPatchRequest,
+    ContestRestoreResponse,
     CreateContestRequest,
     PublicContestOut,
 )
+from services.contest_discovery_service import list_public_contests
 from services.contest_lifecycle_service import (
     assert_deletable,
     compute_deletable_at,
@@ -25,13 +28,38 @@ from services.contest_lifecycle_service import (
     resume_contest,
     seconds_until_deletable,
 )
+from services.contest_restore_service import restore_contest_from_snapshot
 from services.contest_setup_service import create_contest, update_contest
-from services.contest_discovery_service import list_public_contests
 
 router = APIRouter(prefix="/contests", tags=["contests"])
 
 _supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
 _admin = Depends(RoleChecker(UserRole.ADMIN))
+
+
+async def require_finish_delete_role(user: CurrentUser) -> User:
+    """ADMIN always; SUPERVISOR when supervisor_training_mode is enabled."""
+    settings = get_settings()
+    allowed = {UserRole.ADMIN.value}
+    if settings.supervisor_training_mode:
+        allowed.add(UserRole.SUPERVISOR.value)
+    if user.role not in allowed:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
+    return user
+
+
+async def require_restore_role(user: CurrentUser) -> User:
+    """Restore is available only in supervisor training mode."""
+    settings = get_settings()
+    if not settings.supervisor_training_mode:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Восстановление отключено")
+    if user.role not in {UserRole.SUPERVISOR.value, UserRole.ADMIN.value}:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
+    return user
+
+
+_finish_delete = Depends(require_finish_delete_role)
+_restore = Depends(require_restore_role)
 
 
 def _lifecycle_out(contest) -> ContestLifecycleOut:
@@ -48,6 +76,7 @@ def _lifecycle_out(contest) -> ContestLifecycleOut:
 async def list_contests(session: DbSession) -> list[ContestOut]:
     """Список всех конкурсов (SUPERVISOR+)."""
     from sqlalchemy import select  # noqa: PLC0415
+
     from database.models import Contest  # noqa: PLC0415
 
     contests = (await session.scalars(select(Contest).order_by(Contest.id))).all()
@@ -105,7 +134,7 @@ async def patch_one(
     return ContestOut.model_validate(contest)
 
 
-@router.post("/{contest_id}/pause", response_model=ContestLifecycleOut, dependencies=[_admin])
+@router.post("/{contest_id}/pause", response_model=ContestLifecycleOut, dependencies=[_supervisor])
 async def pause(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     """Приостановить конкурс (RUNNING → PAUSED)."""
     contest = await pause_contest(session, contest_id)
@@ -113,7 +142,7 @@ async def pause(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     return _lifecycle_out(contest)
 
 
-@router.post("/{contest_id}/resume", response_model=ContestLifecycleOut, dependencies=[_admin])
+@router.post("/{contest_id}/resume", response_model=ContestLifecycleOut, dependencies=[_supervisor])
 async def resume(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     """Возобновить конкурс (PAUSED → RUNNING)."""
     contest = await resume_contest(session, contest_id)
@@ -121,7 +150,11 @@ async def resume(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     return _lifecycle_out(contest)
 
 
-@router.post("/{contest_id}/finish", response_model=ContestLifecycleOut, dependencies=[_admin])
+@router.post(
+    "/{contest_id}/finish",
+    response_model=ContestLifecycleOut,
+    dependencies=[_finish_delete],
+)
 async def finish(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     """Досрочно завершить конкурс (RUNNING|PAUSED → FINISHED)."""
     contest = await finish_contest(session, contest_id)
@@ -129,9 +162,16 @@ async def finish(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     return _lifecycle_out(contest)
 
 
-@router.delete("/{contest_id}", response_model=ContestDeleteResponse, dependencies=[_admin])
+@router.delete(
+    "/{contest_id}",
+    response_model=ContestDeleteResponse,
+    dependencies=[_finish_delete],
+)
 async def delete_one(
-    contest_id: int, body: ContestDeleteConfirmRequest, session: DbSession
+    contest_id: int,
+    body: ContestDeleteConfirmRequest,
+    session: DbSession,
+    user: CurrentUser,
 ) -> ContestDeleteResponse:
     """Безопасно удалить данные конкурса (PAUSED + grace + confirm DELETE).
 
@@ -139,7 +179,21 @@ async def delete_one(
         contest_id: идентификатор конкурса
         body: подтверждение удаления
     """
-    await assert_deletable(session, contest_id)
-    await delete_contest_data(session, contest_id)
+    settings = get_settings()
+    instant = settings.contest_allow_instant_delete or settings.supervisor_training_mode
+    await assert_deletable(session, contest_id, instant=instant)
+    await delete_contest_data(session, contest_id, deleted_by_user_id=user.id)
     await session.commit()
     return ContestDeleteResponse()
+
+
+@router.post(
+    "/{contest_id}/restore",
+    response_model=ContestRestoreResponse,
+    dependencies=[_restore],
+)
+async def restore_one(contest_id: int, session: DbSession) -> ContestRestoreResponse:
+    """Restore contest from training-mode snapshot within the restore window."""
+    await restore_contest_from_snapshot(session, contest_id)
+    await session.commit()
+    return ContestRestoreResponse()

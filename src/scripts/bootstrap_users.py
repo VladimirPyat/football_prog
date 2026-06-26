@@ -24,10 +24,10 @@ for path in (str(PROJECT_ROOT), str(SRC_ROOT)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
+from config.settings import Settings, get_settings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import Settings, get_settings
 from core.security import hash_password
 from database.base import Base
 from database.engine import create_engine, create_session_factory

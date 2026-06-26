@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends
 
 from api.deps import DbSession, RoleChecker
 from database.models import UserRole
-from schemas.users import CreateSupervisorRequest, CreateSupervisorResponse
 from schemas.auth import UserOut
+from schemas.users import CreateSupervisorRequest, CreateSupervisorResponse
 from services.user_admin_service import create_supervisor
 
 router = APIRouter(prefix="/admin/users", tags=["admin (users)"])

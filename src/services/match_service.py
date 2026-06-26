@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,10 +55,10 @@ async def set_result(
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Матч {match_id} не принадлежит конкурсу {contest_id}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     deadline = round_.deadline
     if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
+        deadline = deadline.replace(tzinfo=UTC)
     if now < deadline:
         raise ContestRuleError(
             "Результат можно внести только после дедлайна тура",
