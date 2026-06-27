@@ -89,8 +89,7 @@ export default function AdminLifecyclePage() {
 
   useEffect(() => {
     if (!loading && user) {
-      const allowed =
-        user.role === "ADMIN" || (TRAINING_MODE && user.role === "SUPERVISOR");
+      const allowed = user.role === "ADMIN" || (TRAINING_MODE && user.role === "SUPERVISOR");
       if (!allowed) {
         router.replace("/admin");
       }

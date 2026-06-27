@@ -7,6 +7,7 @@ import {
   ensureRound10Active,
   getRoundMatches,
   gotoAdminContest,
+  patchRound,
   reloadLoadedContestFixture,
   seedSupervisorSession,
   selectRoundByNumber,
@@ -28,13 +29,17 @@ test.describe("[E2E-SUPERVISOR-24H]", () => {
     await ensureRound10Active();
   });
 
-  test("deadline 24h rule and newsletter stub on loaded round 10", async ({ page }) => {
+  test("placement allows deadline within 24h of match; lockout blocks late change", async ({
+    page,
+  }) => {
     const token = await supervisorToken();
     const round10 = await ensureRound10Active();
     const matches = await getRoundMatches(token, 1, round10.id);
     const earliest = new Date(Math.min(...matches.map((m) => Date.parse(m.date_time))));
-    const invalidDeadline = addHours(earliest, -12);
-    const validDeadline = addDays(earliest, -3);
+    const placementDeadline = addHours(earliest, -12);
+    const farDeadline = addDays(new Date(), 3);
+
+    await patchRound(token, 1, round10.id, { deadline: farDeadline.toISOString() });
 
     await clearAuthStorage(page);
     await seedSupervisorSession(page);
@@ -45,16 +50,20 @@ test.describe("[E2E-SUPERVISOR-24H]", () => {
     const deadlineInput = page
       .locator('div:has(> label:text-is("Дедлайн прогнозов")) input[type="datetime-local"]')
       .last();
-    await deadlineInput.fill(toDatetimeLocal(invalidDeadline));
-    await expect(page.getByText(/Дедлайн должен быть не позже/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Сохранить изменения" })).toBeDisabled();
 
-    await deadlineInput.fill(toDatetimeLocal(validDeadline));
+    await deadlineInput.fill(toDatetimeLocal(placementDeadline));
+    await expect(page.getByText(/Дедлайн должен быть раньше первого матча/i)).not.toBeVisible();
     await expect(page.getByRole("button", { name: "Сохранить изменения" })).toBeEnabled();
-    await page.getByRole("button", { name: "Сохранить изменения" }).click();
-    await expect(page.getByRole("dialog").getByText(/напоминание участникам/i)).toBeVisible({
-      timeout: 10_000,
-    });
-    await page.getByRole("button", { name: "Закрыть" }).click();
+
+    const nearDeadline = addHours(new Date(), 10);
+    await patchRound(token, 1, round10.id, { deadline: nearDeadline.toISOString() });
+    await page.reload();
+    await waitForAdminShell(page);
+    await selectRoundByNumber(page, token, 1, 10);
+
+    const blockedDeadline = addHours(new Date(), 8);
+    await deadlineInput.fill(toDatetimeLocal(blockedDeadline));
+    await expect(page.getByText(/Изменить дедлайн можно не позже/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Сохранить изменения" })).toBeDisabled();
   });
 });

@@ -34,7 +34,10 @@ export function ParticipantInviteModal({
         aria-modal="true"
       >
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Участник приглашён</h3>
-        <p className="text-sm text-gray-600 mb-4">Передайте участнику данные для входа:</p>
+        <p className="text-sm text-gray-600 mb-4">
+          Передайте участнику данные для входа. Подтверждение участия выполняется по ссылке
+          (complete-setup).
+        </p>
         <dl className="space-y-2 text-sm mb-6">
           <div>
             <dt className="text-gray-500">Логин</dt>

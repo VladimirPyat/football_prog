@@ -18,7 +18,7 @@ export default function AdminSettingsTeamsPage() {
   const uiMode = deriveAdminUiMode({ contest, round: null });
 
   return (
-    <AdminPageShell title="Настройки" showSettingsNav>
+    <AdminPageShell title="Настройки" showSettingsNav showSetupLockBanner>
       <TeamsGrid
         teams={teams}
         readonly={uiMode.setupReadonly}

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, timedelta
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
@@ -13,6 +14,7 @@ from api.deps import (
     DbSession,
     RoleChecker,
     cache_control_header,
+    get_optional_user,
 )
 from api.handlers.leaderboard import (
     get_global_leaderboard_response,
@@ -21,7 +23,7 @@ from api.handlers.leaderboard import (
 )
 from api.handlers.predictions import build_round_predictions_view
 from core.exceptions import NotFoundError, ValidationError
-from database.models import Contest, Match, MatchStatus, Round, RoundStatus, UserRole
+from database.models import Contest, Match, MatchStatus, Round, RoundStatus, User, UserRole
 from schemas.admin import (
     CreateRoundRequest,
     MatchResultRequest,
@@ -47,13 +49,21 @@ from services.contest_lifecycle_service import (
 from services.leaderboard_service import compute_etag
 from services.match_service import change_status, set_result
 from services.prediction_service import submit_batch
-from services.round_service import close_round, create_free_tour, set_deadline, transition_round
+from services.round_service import (
+    close_round,
+    create_free_tour,
+    set_deadline,
+    transition_round,
+    validate_round_deadline_placement,
+)
 from services.scoring_persistence import calculate_round, recalculate_contest
 
 router = APIRouter(prefix="/contests/{contest_id}", tags=["contest operations"])
 
 _supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
 _admin = Depends(RoleChecker(UserRole.ADMIN))
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 
 @router.get("/rounds", response_model=list[RoundOut])
@@ -111,10 +121,16 @@ async def post_predictions(
 
 @router.get("/rounds/{round_id}/leaderboard", response_model=LeaderboardOut)
 async def round_leaderboard(
-    contest_id: int, round_id: int, session: DbSession, response: Response, _contest: ContestContext
+    contest_id: int,
+    round_id: int,
+    session: DbSession,
+    response: Response,
+    _contest: ContestContext,
+    viewer: OptionalUser,
 ) -> LeaderboardOut:
     """Таблица лидеров тура (публичный, с кэшированием)."""
-    out = await get_round_leaderboard_response(session, contest_id, round_id)
+    viewer_role = viewer.role if viewer else None
+    out = await get_round_leaderboard_response(session, contest_id, round_id, viewer_role=viewer_role)
     etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
     for k, v in cache_control_header().items():
         response.headers[k] = v
@@ -124,10 +140,16 @@ async def round_leaderboard(
 
 @router.get("/rounds/{round_id}/results", response_model=RoundResultsOut)
 async def round_results(
-    contest_id: int, round_id: int, session: DbSession, response: Response, _contest: ContestContext
+    contest_id: int,
+    round_id: int,
+    session: DbSession,
+    response: Response,
+    _contest: ContestContext,
+    viewer: OptionalUser,
 ) -> RoundResultsOut:
     """Результаты матчей и очки участников тура."""
-    out = await get_round_results_response(session, contest_id, round_id)
+    viewer_role = viewer.role if viewer else None
+    out = await get_round_results_response(session, contest_id, round_id, viewer_role=viewer_role)
     etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
     for k, v in cache_control_header().items():
         response.headers[k] = v
@@ -181,10 +203,14 @@ async def create_round(
     earliest = min(m.date_time for m in body.matches)
     if earliest.tzinfo is None:
         earliest = earliest.replace(tzinfo=UTC)
-    cutoff = earliest - timedelta(hours=deadline_rule)
     dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=UTC)
-    if dl >= cutoff:
-        raise ValidationError("Дедлайн нарушает правило 24 часов до первого матча")
+    now = datetime.now(UTC)
+    for m in body.matches:
+        dt_check = m.date_time if m.date_time.tzinfo else m.date_time.replace(tzinfo=UTC)
+        if dt_check < now:
+            raise ValidationError("Дата матча не может быть в прошлом")
+    _ = deadline_rule  # rule_hours retained for future warnings; placement rule does not use it
+    validate_round_deadline_placement(dl, earliest, now=now)
 
     existing = await session.scalar(
         select(Round).where(Round.contest_id == contest_id, Round.number == body.number)
@@ -226,7 +252,7 @@ async def update_round(
     session: DbSession,
     _contest: ContestContext,
 ) -> dict:
-    """Обновить дедлайн или матчи активного тура.
+    """Обновить дедлайн или матчи тура в статусе Черновик или Активен.
 
     Args:
         contest_id: идентификатор конкурса
@@ -237,19 +263,30 @@ async def update_round(
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не найден")
-    if round_.status != RoundStatus.ACTIVE:
-        raise ValidationError("Редактировать можно только активный тур")
+    if round_.status not in {RoundStatus.DRAFT, RoundStatus.ACTIVE}:
+        raise ValidationError("Редактировать можно только тур в статусе Черновик или Активен")
+
+    now = datetime.now(UTC)
 
     if body.deadline is not None:
         await set_deadline(session, round_id, body.deadline)
 
     if body.matches:
+        deadline_passed = False
+        if round_.status == RoundStatus.ACTIVE:
+            current_deadline = round_.deadline
+            if current_deadline.tzinfo is None:
+                current_deadline = current_deadline.replace(tzinfo=UTC)
+            deadline_passed = now >= current_deadline
+
         for item in body.matches:
             if item.match_id is None:
                 continue
             match = await session.get(Match, item.match_id)
             if match is None or match.round_id != round_id:
                 raise NotFoundError(f"Матч {item.match_id} не найден")
+            if deadline_passed and (item.team1_id is not None or item.team2_id is not None):
+                raise ValidationError("После дедлайна нельзя менять состав матчей")
             if item.team1_id is not None:
                 match.team1_id = item.team1_id
             if item.team2_id is not None:

@@ -45,6 +45,46 @@ async def _earliest_match_dt(session: AsyncSession, round_id: int) -> datetime:
     return min(m.date_time for m in matches)
 
 
+def _ensure_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
+
+
+def validate_round_deadline_placement(
+    deadline: datetime,
+    earliest_match: datetime,
+    *,
+    now: datetime | None = None,
+) -> None:
+    """Deadline must be in the future and strictly before the first match kickoff."""
+    deadline = _ensure_utc(deadline)
+    earliest_match = _ensure_utc(earliest_match)
+    now = _ensure_utc(now or datetime.now(UTC))
+
+    if deadline >= earliest_match:
+        raise ValidationError("Дедлайн должен быть раньше первого матча тура")
+    if deadline <= now:
+        raise ValidationError("Дедлайн должен быть в будущем")
+
+
+def assert_deadline_change_allowed(
+    current_deadline: datetime,
+    deadline_rule_hours: int,
+    *,
+    now: datetime | None = None,
+) -> None:
+    """24h rule: supervisor may change deadline only while now <= current_deadline - N hours."""
+    current_deadline = _ensure_utc(current_deadline)
+    now = _ensure_utc(now or datetime.now(UTC))
+    change_cutoff = current_deadline - timedelta(hours=deadline_rule_hours)
+    if now > change_cutoff:
+        raise ContestRuleError(
+            "Окно изменения дедлайна закрыто",
+            code="DEADLINE_CHANGE_CLOSED",
+        )
+
+
 async def transition_round(
     session: AsyncSession, round_id: int, target_status: RoundStatus
 ) -> Round:
@@ -69,7 +109,13 @@ async def transition_round(
 async def set_deadline(
     session: AsyncSession, round_id: int, new_deadline: datetime
 ) -> Round:
-    """Update the round deadline, enforcing the deadline_rule_hours constraint."""
+    """Update the round deadline, enforcing 24h lockout and placement rules.
+
+    New policy (2026-06-27):
+    - 24h rule applies to CHANGING the deadline, not to match kickoff distance.
+    - Lockout: supervisor may change deadline only while now <= current_deadline - rule_hours.
+    - Placement: new_deadline must be: now < new_deadline < earliest_match.
+    """
     if new_deadline.tzinfo is None:
         raise ValidationError("Дедлайн должен содержать информацию о часовом поясе")
 
@@ -81,20 +127,12 @@ async def set_deadline(
     if earliest.tzinfo is None:
         earliest = earliest.replace(tzinfo=UTC)
 
-    cutoff = earliest - timedelta(hours=deadline_rule_hours)
     now = datetime.now(UTC)
 
-    if now > cutoff:
-        raise ContestRuleError(
-            "Окно изменения дедлайна закрыто",
-            code="DEADLINE_CHANGE_CLOSED",
-        )
+    if RoundStatus(round_.status) == RoundStatus.ACTIVE:
+        assert_deadline_change_allowed(round_.deadline, deadline_rule_hours, now=now)
 
-    if new_deadline >= cutoff:
-        raise ValidationError(
-            f"Новый дедлайн должен быть раньше {cutoff} "
-            f"(первый матч минус {deadline_rule_hours} ч)"
-        )
+    validate_round_deadline_placement(new_deadline, earliest, now=now)
 
     round_.deadline = new_deadline
     return round_

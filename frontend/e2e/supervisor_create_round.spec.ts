@@ -61,7 +61,7 @@ test.describe.serial("[E2E-SUPERVISOR-CREATE-ROUND] + [E2E-ADMIN-LOCK] Path A", 
     await page.locator("section").getByRole("button", { name: "Активировать" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Активировать", exact: true }).click();
 
-    await expect(page.getByText("ТУР АКТИВИРОВАН").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Тур активен/i).first()).toBeVisible({ timeout: 15_000 });
 
     const contest = await getContest(token, contestId);
     expect(contest.is_locked).toBe(true);

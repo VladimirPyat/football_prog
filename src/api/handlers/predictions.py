@@ -54,6 +54,8 @@ async def build_round_predictions_view(
         match_out.append(
             {
                 "id": m.id,
+                "team1_id": m.team1_id,
+                "team2_id": m.team2_id,
                 "team1": _team_display_name(teams, m.team1_id),
                 "team2": _team_display_name(teams, m.team2_id),
                 "date_time": m.date_time.isoformat(),

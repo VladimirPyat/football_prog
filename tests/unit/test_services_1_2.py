@@ -395,7 +395,7 @@ async def test_no_null_scores_in_predictions(loaded_session: AsyncSession):
 
 
 async def test_deadline_valid_accepted(session: AsyncSession):
-    """Setting deadline safely before (first_match - 24h) is accepted."""
+    """Setting deadline before first match is accepted."""
     async with session.begin():
         await _seed_settings(session)
         t1 = await _make_team(session, 1)
@@ -410,8 +410,24 @@ async def test_deadline_valid_accepted(session: AsyncSession):
     assert updated.deadline == new_deadline
 
 
-async def test_deadline_equal_to_cutoff_rejected(session: AsyncSession):
-    """Deadline exactly equal to (first_match - 24h) must be rejected."""
+async def test_deadline_12h_before_match_accepted(session: AsyncSession):
+    """Placement rule: deadline may be less than 24h before first match."""
+    async with session.begin():
+        await _seed_settings(session)
+        t1 = await _make_team(session, 1)
+        t2 = await _make_team(session, 2)
+        first_match_dt = datetime.now(timezone.utc) + timedelta(days=2)
+        r = await _make_round(session, deadline=first_match_dt - timedelta(hours=48))
+        await _make_match(session, r.id, t1.id, t2.id, date_time=first_match_dt, status=MatchStatus.SCHEDULED, score1=None, score2=None)
+
+    new_deadline = first_match_dt - timedelta(hours=12)
+    async with session.begin():
+        updated = await set_deadline(session, r.id, new_deadline)
+    assert updated.deadline == new_deadline
+
+
+async def test_deadline_at_first_match_rejected(session: AsyncSession):
+    """Deadline equal to first match kickoff must be rejected."""
     async with session.begin():
         await _seed_settings(session)
         t1 = await _make_team(session, 1)
@@ -420,14 +436,13 @@ async def test_deadline_equal_to_cutoff_rejected(session: AsyncSession):
         r = await _make_round(session, deadline=first_match_dt - timedelta(hours=48))
         await _make_match(session, r.id, t1.id, t2.id, date_time=first_match_dt, status=MatchStatus.SCHEDULED, score1=None, score2=None)
 
-    bad_deadline = first_match_dt - timedelta(hours=24)  # exactly at cutoff
     with pytest.raises(ValidationError, match="раньше"):
         async with session.begin():
-            await set_deadline(session, r.id, bad_deadline)
+            await set_deadline(session, r.id, first_match_dt)
 
 
-async def test_deadline_after_cutoff_rejected(session: AsyncSession):
-    """Deadline after (first_match - 24h) must be rejected."""
+async def test_deadline_after_first_match_rejected(session: AsyncSession):
+    """Deadline after first match must be rejected."""
     async with session.begin():
         await _seed_settings(session)
         t1 = await _make_team(session, 1)
@@ -436,24 +451,28 @@ async def test_deadline_after_cutoff_rejected(session: AsyncSession):
         r = await _make_round(session, deadline=first_match_dt - timedelta(hours=48))
         await _make_match(session, r.id, t1.id, t2.id, date_time=first_match_dt, status=MatchStatus.SCHEDULED, score1=None, score2=None)
 
-    bad_deadline = first_match_dt - timedelta(hours=12)  # after cutoff
+    bad_deadline = first_match_dt + timedelta(hours=1)
     with pytest.raises(ValidationError, match="раньше"):
         async with session.begin():
             await set_deadline(session, r.id, bad_deadline)
 
 
 async def test_deadline_window_closed_rejected(session: AsyncSession):
-    """Reject deadline change when the 24h window has already closed (match in the past)."""
+    """Reject deadline change on ACTIVE round when lockout window has closed."""
     async with session.begin():
         await _seed_settings(session)
         t1 = await _make_team(session, 1)
         t2 = await _make_team(session, 2)
-        # Match is only 10 hours away — the 24h cutoff is already in the past.
-        first_match_dt = datetime.now(timezone.utc) + timedelta(hours=10)
-        r = await _make_round(session, deadline=first_match_dt - timedelta(hours=48))
+        first_match_dt = datetime.now(timezone.utc) + timedelta(days=3)
+        current_deadline = datetime.now(timezone.utc) + timedelta(hours=10)
+        r = await _make_round(
+            session,
+            status=RoundStatus.ACTIVE,
+            deadline=current_deadline,
+        )
         await _make_match(session, r.id, t1.id, t2.id, date_time=first_match_dt, status=MatchStatus.SCHEDULED, score1=None, score2=None)
 
-    new_deadline = first_match_dt - timedelta(hours=36)
+    new_deadline = datetime.now(timezone.utc) + timedelta(hours=8)
     with pytest.raises(ContestRuleError, match="закрыто"):
         async with session.begin():
             await set_deadline(session, r.id, new_deadline)

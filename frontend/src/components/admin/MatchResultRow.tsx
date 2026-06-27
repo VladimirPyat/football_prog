@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDateTimeRu } from "@/lib/admin/format";
+import { formatDateTimeRu, matchStatusLabel } from "@/lib/admin/format";
 import { matchResultSchema } from "@/lib/validation/admin";
 import type { MatchOut } from "@/types/api";
 import { useState } from "react";
@@ -50,7 +50,7 @@ export function MatchResultRow({
         {match.team1} — {match.team2}
       </td>
       <td className="px-3 py-2 text-sm">{formatDateTimeRu(match.date_time)}</td>
-      <td className="px-3 py-2 text-sm">{match.status}</td>
+      <td className="px-3 py-2 text-sm">{matchStatusLabel(match.status)}</td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-2">
           <input
@@ -85,7 +85,7 @@ export function MatchResultRow({
             disabled={saving}
             className="text-sm text-green-600 hover:underline disabled:opacity-50"
           >
-            Завершён
+            Применить
           </button>
         )}
         {canVoid && match.status !== "VOID" && (

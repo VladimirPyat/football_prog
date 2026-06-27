@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   deadlineErrorMessage,
-  getDeadlineRuleHours,
   isDeadlineValid,
 } from "@/lib/admin/deadlineRule";
 
@@ -72,7 +71,7 @@ export const participantInviteSchema = z.object({
 });
 
 export function roundBuilderSchema(matchesPerRound: number, rules: Record<string, unknown>) {
-  const ruleHours = getDeadlineRuleHours(rules);
+  void rules;
   return z
     .object({
       number: z.coerce.number().int().positive(),
@@ -107,11 +106,11 @@ export function roundBuilderSchema(matchesPerRound: number, rules: Record<string
         });
       }
       const earliest = Math.min(...d.matches.map((m) => Date.parse(m.date_time)));
-      if (!isDeadlineValid(d.deadline, new Date(earliest).toISOString(), ruleHours)) {
+      if (!isDeadlineValid(d.deadline, new Date(earliest).toISOString())) {
         ctx.addIssue({
           code: "custom",
           path: ["deadline"],
-          message: deadlineErrorMessage(ruleHours),
+          message: deadlineErrorMessage(),
         });
       }
     });

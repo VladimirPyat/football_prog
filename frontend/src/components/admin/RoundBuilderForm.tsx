@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { fromDatetimeLocal } from "@/lib/admin/format";
+import { fromDatetimeLocal, toDatetimeLocal } from "@/lib/admin/format";
 import { roundBuilderSchema } from "@/lib/validation/admin";
 import type { TeamOut } from "@/types/api";
 
@@ -17,6 +17,12 @@ interface RoundBuilderFormProps {
   rules: Record<string, unknown>;
   nextRoundNumber: number;
   disabled?: boolean;
+  /** Pre-fill form for DRAFT editing (F10). */
+  initialValues?: {
+    number?: number;
+    deadline?: string;
+    matches?: MatchDraft[];
+  };
   onSubmit: (data: { number: number; deadline: string; matches: MatchDraft[] }) => Promise<void>;
 }
 
@@ -30,11 +36,16 @@ export function RoundBuilderForm({
   rules,
   nextRoundNumber,
   disabled = false,
+  initialValues,
   onSubmit,
 }: RoundBuilderFormProps) {
-  const [number, setNumber] = useState(nextRoundNumber);
-  const [deadline, setDeadline] = useState("");
-  const [matches, setMatches] = useState<MatchDraft[]>([emptyMatch()]);
+  const [number, setNumber] = useState(initialValues?.number ?? nextRoundNumber);
+  const [deadline, setDeadline] = useState(
+    initialValues?.deadline ? toDatetimeLocal(initialValues.deadline) : "",
+  );
+  const [matches, setMatches] = useState<MatchDraft[]>(
+    initialValues?.matches?.length ? initialValues.matches : [emptyMatch()],
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -68,16 +79,22 @@ export function RoundBuilderForm({
     setSubmitting(true);
     try {
       await onSubmit(parsed.data);
-      setMatches([emptyMatch()]);
-      setDeadline("");
+      if (!initialValues) {
+        setMatches([emptyMatch()]);
+        setDeadline("");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  const isEditing = !!initialValues;
+
   return (
     <form onSubmit={handleSubmit} className="border border-gray-200 rounded-lg p-4 space-y-4">
-      <h3 className="text-sm font-semibold text-gray-900">Создать тур (черновик)</h3>
+      <h3 className="text-sm font-semibold text-gray-900">
+        {isEditing ? "Редактировать черновик тура" : "Создать тур (черновик)"}
+      </h3>
       <div className="grid grid-cols-2 gap-4 max-w-md">
         <div>
           <label className="block text-sm text-gray-700 mb-1">Номер тура</label>
@@ -133,8 +150,10 @@ export function RoundBuilderForm({
             </select>
             <input
               type="datetime-local"
-              value={m.date_time}
-              onChange={(e) => updateMatch(i, { date_time: e.target.value })}
+              value={m.date_time ? toDatetimeLocal(m.date_time) : m.date_time}
+              onChange={(e) =>
+                updateMatch(i, { date_time: fromDatetimeLocal(e.target.value) })
+              }
               disabled={disabled}
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             />
@@ -167,7 +186,7 @@ export function RoundBuilderForm({
         disabled={disabled || submitting}
         className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
       >
-        Создать черновик тура
+        {isEditing ? "Сохранить черновик" : "Создать черновик тура"}
       </button>
     </form>
   );

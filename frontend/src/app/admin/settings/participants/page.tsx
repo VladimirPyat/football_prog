@@ -28,7 +28,7 @@ export default function AdminSettingsParticipantsPage() {
   const uiMode = deriveAdminUiMode({ contest, round: null });
 
   return (
-    <AdminPageShell title="Настройки" showSettingsNav>
+    <AdminPageShell title="Настройки" showSettingsNav showSetupLockBanner>
       <div className="space-y-6">
         <ParticipantInviteForm
           disabled={uiMode.setupReadonly}

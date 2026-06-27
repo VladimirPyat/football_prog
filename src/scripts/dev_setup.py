@@ -7,6 +7,7 @@ Usage::
     uv run python src/scripts/dev_setup.py --run-only   # start API & UI (skip setup)
     uv run python src/scripts/dev_setup.py --minimal
     uv run python src/scripts/dev_setup.py --check
+    uv run python src/scripts/dev_setup.py --check-ports
     uv run python src/scripts/dev_setup.py --ensure-running-only
 
 Full mode order (important):
@@ -24,6 +25,7 @@ import logging
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -47,6 +49,47 @@ API_PORT = 8000
 UI_HOST = "127.0.0.1"
 UI_PORT = 3000
 STARTUP_TIMEOUT_SEC = 90.0
+
+DEV_PORTS: tuple[tuple[str, int, str], ...] = (
+    (API_HOST, API_PORT, "API"),
+    (UI_HOST, UI_PORT, "UI"),
+)
+
+
+def is_port_in_use(host: str, port: int) -> bool:
+    """True when something is already accepting TCP connections on host:port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.3)
+        return sock.connect_ex((host, port)) == 0
+
+
+def check_dev_ports() -> list[str]:
+    """Return human-readable lines for ports that are already in use."""
+    busy: list[str] = []
+    for host, port, label in DEV_PORTS:
+        if is_port_in_use(host, port):
+            busy.append(f"{label}: {host}:{port} is in use")
+    return busy
+
+
+def assert_dev_ports_free() -> None:
+    """Abort before starting dev servers if API or UI port is taken."""
+    busy = check_dev_ports()
+    if not busy:
+        return
+    print("❌ Cannot start dev stack — port(s) already in use:", file=sys.stderr)
+    for line in busy:
+        print(f"   {line}", file=sys.stderr)
+    print(
+        "   Check:  uv run python src/scripts/dev_setup.py --check-ports",
+        file=sys.stderr,
+    )
+    print(
+        "   Hint:   stop the other stack (Ctrl+C in its terminal) or free the port:",
+        file=sys.stderr,
+    )
+    print("           ss -lntp | grep -E ':3000|:8000'", file=sys.stderr)
+    sys.exit(1)
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None) -> None:
@@ -129,6 +172,7 @@ def _terminate_processes(processes: list[subprocess.Popen[bytes]]) -> None:
 
 def run_dev_servers() -> None:
     """Start uvicorn and Next.js dev server; block until Ctrl+C or a child exits."""
+    assert_dev_ports_free()
     ensure_frontend_env()
     ensure_frontend_deps()
 
@@ -213,8 +257,12 @@ def run_dev_servers() -> None:
         shutdown()
 
 
-async def ensure_dev_contest_running(contest_id: int = DEFAULT_CONTEST_ID) -> None:
-    """Set contest RUNNING + is_locked; keep round 10 ACTIVE with future deadline."""
+async def ensure_dev_contest_running(
+    contest_id: int = DEFAULT_CONTEST_ID,
+    *,
+    e2e: bool = False,
+) -> None:
+    """Set contest RUNNING + is_locked; E2E profile keeps round 10 ACTIVE with future deadline."""
     from datetime import datetime, timedelta
 
     from sqlalchemy import select
@@ -232,27 +280,28 @@ async def ensure_dev_contest_running(contest_id: int = DEFAULT_CONTEST_ID) -> No
                 await engine.dispose()
                 return
 
-            round_10 = await session.scalar(
-                select(Round).where(
-                    Round.contest_id == contest_id,
-                    Round.number == 10,
+            if e2e:
+                round_10 = await session.scalar(
+                    select(Round).where(
+                        Round.contest_id == contest_id,
+                        Round.number == 10,
+                    )
                 )
-            )
-            if round_10:
-                matches = (
-                    await session.scalars(select(Match).where(Match.round_id == round_10.id))
-                ).all()
-                if matches:
-                    base = datetime.now(UTC) + timedelta(days=14)
-                    for i, match in enumerate(sorted(matches, key=lambda m: m.id)):
-                        match.date_time = base + timedelta(hours=i)
-                    earliest = min(m.date_time for m in matches)
-                    deadline_rule_hours: int = contest.rules_json["contest_structure"][
-                        "deadline_rule_hours"
-                    ]
-                    round_10.deadline = earliest - timedelta(hours=deadline_rule_hours)
-                round_10.status = RoundStatus.ACTIVE.value
-                logger.info("Round 10 shifted forward and set ACTIVE")
+                if round_10:
+                    matches = (
+                        await session.scalars(select(Match).where(Match.round_id == round_10.id))
+                    ).all()
+                    if matches:
+                        base = datetime.now(UTC) + timedelta(days=14)
+                        for i, match in enumerate(sorted(matches, key=lambda m: m.id)):
+                            match.date_time = base + timedelta(hours=i)
+                        earliest = min(m.date_time for m in matches)
+                        deadline_rule_hours: int = contest.rules_json["contest_structure"][
+                            "deadline_rule_hours"
+                        ]
+                        round_10.deadline = earliest - timedelta(hours=deadline_rule_hours)
+                    round_10.status = RoundStatus.ACTIVE.value
+                    logger.info("Round 10 shifted forward and set ACTIVE (e2e profile)")
 
             contest.status = ContestLifecycleStatus.RUNNING.value
             contest.is_locked = True
@@ -263,7 +312,13 @@ async def ensure_dev_contest_running(contest_id: int = DEFAULT_CONTEST_ID) -> No
     await engine.dispose()
 
 
-def run_full_setup(*, reset: bool) -> None:
+def _finalize_manual_fixture() -> None:
+    from scripts.finalize_dev_fixture import finalize_dev_fixture
+
+    asyncio.run(finalize_dev_fixture(contest_id=DEFAULT_CONTEST_ID, profile="manual"))
+
+
+def run_full_setup(*, reset: bool, e2e: bool = False) -> None:
     _run(["uv", "sync"])
     _run(["uv", "run", "alembic", "upgrade", "head"])
     loader_cmd = ["uv", "run", "python", "src/scripts/load_test_data.py"]
@@ -271,7 +326,9 @@ def run_full_setup(*, reset: bool) -> None:
         loader_cmd.append("--reset")
     _run(loader_cmd)
     _run(["uv", "run", "python", "src/scripts/bootstrap_users.py"])
-    asyncio.run(ensure_dev_contest_running())
+    asyncio.run(ensure_dev_contest_running(e2e=e2e))
+    if not e2e:
+        _finalize_manual_fixture()
 
 
 def run_minimal_setup() -> None:
@@ -310,9 +367,24 @@ def main() -> None:
         help="Check prerequisites only; exit 0 with warnings printed",
     )
     parser.add_argument(
+        "--check-ports",
+        action="store_true",
+        help="Check API (:8000) and UI (:3000) are free; exit 1 if either is in use",
+    )
+    parser.add_argument(
         "--ensure-running-only",
         action="store_true",
-        help="Only set contest 1 to RUNNING+locked (after manual loader/bootstrap)",
+        help="RUNNING+locked and manual dev fixture (or e2e round-10 ACTIVE with --e2e)",
+    )
+    parser.add_argument(
+        "--e2e",
+        action="store_true",
+        help="E2E profile: round 10 ACTIVE with future deadline; skip finalize fixture",
+    )
+    parser.add_argument(
+        "--finalize-fixture-only",
+        action="store_true",
+        help="Run finalize_dev_fixture on existing DB (repair without servers)",
     )
     parser.add_argument(
         "--run",
@@ -341,9 +413,28 @@ def main() -> None:
             logger.info("Prerequisites OK")
         sys.exit(0)
 
+    if args.check_ports:
+        busy = check_dev_ports()
+        if busy:
+            for line in busy:
+                print(f"❌ {line}")
+            sys.exit(1)
+        for host, port, label in DEV_PORTS:
+            print(f"✅ {label}: {host}:{port} is free")
+        sys.exit(0)
+
+    if args.finalize_fixture_only:
+        _finalize_manual_fixture()
+        print("✅ Dev fixture finalized (manual profile)")
+        sys.exit(0)
+
     if args.ensure_running_only:
-        asyncio.run(ensure_dev_contest_running())
-        print("✅ Contest dev state ensured (RUNNING + locked)")
+        asyncio.run(ensure_dev_contest_running(e2e=args.e2e))
+        if not args.e2e:
+            _finalize_manual_fixture()
+            print("✅ Contest dev state ensured (RUNNING + manual fixture)")
+        else:
+            print("✅ Contest dev state ensured (RUNNING + e2e round 10 ACTIVE)")
         sys.exit(0)
 
     if args.run_only:
@@ -359,7 +450,7 @@ def main() -> None:
         if args.minimal:
             run_minimal_setup()
         else:
-            run_full_setup(reset=not args.no_reset)
+            run_full_setup(reset=not args.no_reset, e2e=args.e2e)
     except subprocess.CalledProcessError as exc:
         print(f"❌ Setup failed (exit {exc.returncode})", file=sys.stderr)
         sys.exit(exc.returncode or 1)

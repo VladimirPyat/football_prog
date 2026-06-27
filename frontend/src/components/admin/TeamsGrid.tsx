@@ -1,6 +1,7 @@
 "use client";
 
 import { DEFAULT_TEAM_LOGO_URL } from "@/lib/admin/format";
+import { resolveAssetUrl } from "@/lib/api/resolveAssetUrl";
 import type { TeamOut } from "@/types/api";
 import { TeamForm } from "@/components/admin/TeamForm";
 import { TeamLogoUpload } from "@/components/admin/TeamLogoUpload";
@@ -42,11 +43,15 @@ export function TeamsGrid({
             <div className="flex items-center gap-3 mb-3">
               {/* eslint-disable-next-line @next/next/no-img-element -- team logos from API may be external */}
               <img
-                src={team.logo_url || DEFAULT_TEAM_LOGO_URL}
+                src={resolveAssetUrl(team.logo_url || DEFAULT_TEAM_LOGO_URL)}
                 alt=""
                 width={40}
                 height={40}
                 className="rounded object-cover w-10 h-10"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = resolveAssetUrl(DEFAULT_TEAM_LOGO_URL);
+                }}
               />
               <div>
                 <span className="inline-block text-xs font-bold bg-gray-100 px-2 py-0.5 rounded mr-2">

@@ -16,6 +16,23 @@ from scoring.types import UserRoundScore
 
 logger = logging.getLogger(__name__)
 
+_STAFF_ROLES: frozenset[str] = frozenset({"SUPERVISOR", "ADMIN"})
+
+
+def _allowed_round_statuses(viewer_role: str | None) -> set[RoundStatus]:
+    if viewer_role in _STAFF_ROLES:
+        return {RoundStatus.CALCULATED, RoundStatus.PUBLISHED}
+    return {RoundStatus.PUBLISHED}
+
+
+def _assert_round_visible(round_: Round, viewer_role: str | None) -> None:
+    allowed = _allowed_round_statuses(viewer_role)
+    if RoundStatus(round_.status) not in allowed:
+        raise ContestRuleError(
+            f"Таблица тура недоступна (статус: {round_.status})",
+            code="RESULTS_NOT_AVAILABLE",
+        )
+
 
 async def _user_name_map(session: AsyncSession) -> dict[int, str]:
     users = (await session.scalars(select(User))).all()
@@ -65,7 +82,7 @@ def _score_to_user_round(score: Score) -> UserRoundScore:
 
 
 async def get_round_leaderboard(
-    session: AsyncSession, contest_id: int, round_id: int
+    session: AsyncSession, contest_id: int, round_id: int, *, viewer_role: str | None = None
 ) -> dict:
     round_ = await session.get(Round, round_id)
     if round_ is None:
@@ -73,11 +90,7 @@ async def get_round_leaderboard(
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
-    if round_.status not in {RoundStatus.CALCULATED, RoundStatus.PUBLISHED}:
-        raise ContestRuleError(
-            f"Таблица тура недоступна (статус: {round_.status})",
-            code="RESULTS_NOT_AVAILABLE",
-        )
+    _assert_round_visible(round_, viewer_role)
 
     scores = (
         await session.scalars(select(Score).where(Score.round_id == round_id))
@@ -134,7 +147,7 @@ async def get_global_leaderboard(session: AsyncSession, contest_id: int) -> dict
             .join(Round)
             .where(
                 Round.contest_id == contest_id,
-                Round.status.in_([RoundStatus.CALCULATED, RoundStatus.PUBLISHED]),
+                Round.status == RoundStatus.PUBLISHED,  # aggregate PUBLISHED only
             )
         )
     ).all()
@@ -190,7 +203,7 @@ async def get_global_leaderboard(session: AsyncSession, contest_id: int) -> dict
 
 
 async def get_round_results(
-    session: AsyncSession, contest_id: int, round_id: int
+    session: AsyncSession, contest_id: int, round_id: int, *, viewer_role: str | None = None
 ) -> dict:
     round_ = await session.get(Round, round_id)
     if round_ is None:
@@ -198,11 +211,7 @@ async def get_round_results(
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
-    if round_.status not in {RoundStatus.CALCULATED, RoundStatus.PUBLISHED}:
-        raise ContestRuleError(
-            f"Таблица тура недоступна (статус: {round_.status})",
-            code="RESULTS_NOT_AVAILABLE",
-        )
+    _assert_round_visible(round_, viewer_role)
 
     matches = (
         await session.scalars(select(Match).where(Match.round_id == round_id))

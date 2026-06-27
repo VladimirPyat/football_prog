@@ -268,3 +268,16 @@
 - Blockers: B11 OPEN (purge-on-start: activate 403 CONTEST_LOCKED when PENDING temp users exist); B12 RESOLVED
 - Report: agent_docs/reports/test_1.12_fix.md
 - Next: @Coder fix purge/lock ordering in contest_ops.py
+
+## 2026-06-27 — Coder (1.14 data fix — dev fixture)
+- STATUS: READY_FOR_TEST
+- Files: src/scripts/finalize_dev_fixture.py, src/scripts/dev_setup.py (--e2e, --finalize-fixture-only); manuals/DEV_SETUP.md, STATUS_REFERENCE.md, MANUAL_SCORING_VERIFICATION.md
+- Fixture: rounds 1–9 PUBLISHED (90 scores), 10 CALCULATED (10), 11 CLOSED (0)
+- Next: tester_1.14_data_fix.md
+
+## 2026-06-27 — Tester (1.14 data fix)
+- STATUS: TEST_PASS
+- Report: agent_docs/reports/test_1.14_data_fix.md
+- Fixture: rounds 1–9 PUBLISHED (90 scores), 10 CALCULATED (10), 11 CLOSED (0)
+- Regression: test_calculate_persistence_1_2.py OK; tests/scripts/test_finalize_dev_fixture_1_14.py (5 passed)
+- Next: tester_2.3.1_fix_rounds.md (after coder_2.3.1 READY_FOR_TEST)

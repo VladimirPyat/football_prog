@@ -79,6 +79,8 @@ Do **not** commit passwords.
 
 Same as `tester_2.1.md` §2.4: `webServer` on `:3000`, `baseURL` `http://127.0.0.1:3000`. Both `:8000` and `:3000` must be up.
 
+**Mandatory after E2E:** `tester_2.1.md` §2.5 — verify ports free (`dev_setup.py --check-ports`); force-close orphan `next dev` / headless Chromium if a hung Playwright run left `:3000` busy (blocks `dev_setup --run-only`).
+
 ---
 
 ## 3. Scope — files you may create/modify
@@ -398,10 +400,13 @@ npm run lint && npm run type-check && npm run format:check
 # 3. E2E (backend + frontend up)
 npm run test:e2e
 
-# 4. Build
+# 4. Teardown — free :3000 / :8000 (tester_2.1 §2.5)
+uv run python src/scripts/dev_setup.py --check-ports
+
+# 5. Build
 npm run build
 
-# 5. Doc audit + BLOCKED review (read files)
+# 6. Doc audit + BLOCKED review (read files)
 ```
 
 Prefer running admin E2E in order: **RBAC → SETUP → create_round → 24h → active → results → void → free_tour → pause** to reduce DB contention. Use fresh contests where tests mutate SETUP state.
@@ -428,6 +433,7 @@ Russian summary. Table:
 | `[E2E-SUPERVISOR-VOID]` | PASS/FAIL | leaderboard delta noted |
 | `[E2E-ADMIN-PAUSE]` | PASS/FAIL | |
 | `[E2E-ADMIN-LOGO]` | PASS/FAIL/SKIP | |
+| `[E2E-TEARDOWN]` | PASS/FAIL | `--check-ports` exit 0 (tester_2.1 §2.5) |
 | `[LINT-ESLINT]` | PASS/FAIL | |
 | `[LINT-TSC]` | PASS/FAIL | |
 | `[LINT-PRETTIER]` | PASS/FAIL | |

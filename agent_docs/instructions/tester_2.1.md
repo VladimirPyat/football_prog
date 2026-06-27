@@ -87,6 +87,43 @@ use: { baseURL: 'http://127.0.0.1:3000' },
 
 **Both** `:8000` (API) and `:3000` (UI) must be up for E2E.
 
+### 2.5 Playwright teardown & port cleanup (mandatory after E2E)
+
+Playwright `webServer` starts `npm run dev` on **:3000**. If the run is interrupted (agent timeout, killed terminal, crash), **Next.js and/or Chromium headless may stay alive** and block `dev_setup.py --run-only` (UI port «занят», хотя «что-то работает»).
+
+**After every E2E run** (pass or fail), before manual dev stack or next test session:
+
+1. Ensure the `playwright test` / `npm run test:e2e` process has **fully exited** (no hung worker in background).
+2. Verify dev ports are free:
+
+```bash
+uv run python src/scripts/dev_setup.py --check-ports
+```
+
+→ exit **0** = both `:8000` (API) and `:3000` (UI) free. Required before handing off to `dev_setup.py --run-only`.
+
+3. If a port is still in use, identify and stop orphans:
+
+```bash
+ss -lntp | grep -E ':3000|:8000'
+# Typical Playwright / Next.js orphans on :3000:
+pkill -f "next dev" 2>/dev/null || true
+pkill -f "chromium.*headless" 2>/dev/null || true
+# Last resort (local dev only — kills whatever holds the port):
+fuser -k 3000/tcp 2>/dev/null || true
+fuser -k 8000/tcp 2>/dev/null || true
+```
+
+Re-run `--check-ports` until exit 0.
+
+4. **Do not** run `dev_setup --run-only` while Playwright still owns `:3000` or while a stray `uvicorn` holds `:8000` from an old session.
+
+| Tag | Pass criteria |
+|-----|---------------|
+| `[E2E-TEARDOWN]` | `--check-ports` exit 0 after E2E; no orphan `next` / headless Chromium on `:3000` |
+
+**CI:** `CI=1` → `reuseExistingServer: false` in `playwright.config.ts`; Playwright stops `webServer` on clean exit. Local runs still need §2.5 if the process was killed abruptly.
+
 ---
 
 ## 3. Scope — files you may create/modify
@@ -298,10 +335,13 @@ npm run lint && npm run type-check && npm run format:check
 # 3. E2E (backend must be running)
 npm run test:e2e          # or: npx playwright test
 
-# 4. Build
+# 4. Teardown — free :3000 / :8000 (see §2.5)
+uv run python src/scripts/dev_setup.py --check-ports
+
+# 5. Build
 npm run build
 
-# 5. Doc audit (read files)
+# 6. Doc audit (read files)
 ```
 
 Add `package.json` script if missing:
@@ -329,6 +369,7 @@ Russian summary. Table:
 | `[E2E-PROFILE-CONTACTS]` | PASS/FAIL | |
 | `[E2E-RBAC-GUARDS]` | PASS/FAIL | |
 | `[E2E-CORS-SMOKE]` | PASS/FAIL/MANUAL | |
+| `[E2E-TEARDOWN]` | PASS/FAIL | `--check-ports` exit 0 after E2E (§2.5) |
 | `[LINT-ESLINT]` | PASS/FAIL | warnings: … |
 | `[LINT-TSC]` | PASS/FAIL | |
 | `[LINT-PRETTIER]` | PASS/FAIL | |

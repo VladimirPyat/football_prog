@@ -14,12 +14,18 @@ import { AppError } from "@/lib/api/client";
 export default function AdminResultsPage() {
   const { contest, contestId } = useContestAdmin();
   const { maxScore } = useContest();
-  const { rounds, loading, calculateRound, publishRound, refetch } = useAdminRounds(contestId);
+  const { rounds, loading, calculateRound, publishRound, refetch, closeRound } =
+    useAdminRounds(contestId);
+  const activeRound = rounds.find((r) => r.status === "ACTIVE") ?? null;
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
+  const { deadlinePassed: activeDeadlinePassed } = useRoundMatches(
+    contestId,
+    activeRound?.id ?? null,
+  );
   const {
-    matches,
-    loading: matchesLoading,
-    refetch: refetchMatches,
+    matches: resultMatches,
+    loading: resultMatchesLoading,
+    refetch: refetchResultMatches,
   } = useRoundMatches(contestId, selectedRoundId);
   const { putResult, patchStatus } = useAdminResults(contestId);
   const { showSuccess, showError } = useToast();
@@ -40,13 +46,15 @@ export default function AdminResultsPage() {
         maxScore={maxScore}
         rounds={rounds}
         selectedRoundId={selectedRoundId}
-        matches={matches}
-        loading={loading || matchesLoading}
+        matches={resultMatches}
+        loading={loading || resultMatchesLoading}
+        activeRoundId={activeRound?.id ?? null}
+        activeDeadlinePassed={activeDeadlinePassed}
         onSelectRound={setSelectedRoundId}
         onSaveResult={async (matchId, score1, score2) => {
           try {
             await putResult(matchId, score1, score2);
-            await refetchMatches();
+            await refetchResultMatches();
             showSuccess("Результат сохранён");
           } catch (err) {
             showError(err instanceof AppError ? err.detail : "Ошибка");
@@ -55,7 +63,7 @@ export default function AdminResultsPage() {
         onVoid={async (matchId) => {
           try {
             const res = await patchStatus(matchId, "VOID");
-            await refetchMatches();
+            await refetchResultMatches();
             await refetch();
             if (res.recalculation_triggered) {
               showSuccess("Матч отменён, выполнен пересчёт");
@@ -82,6 +90,15 @@ export default function AdminResultsPage() {
             showSuccess("Результаты опубликованы");
           } catch (err) {
             showError(err instanceof AppError ? err.detail : "Ошибка публикации");
+          }
+        }}
+        onCloseRound={async (roundId) => {
+          try {
+            await closeRound(roundId);
+            await refetch();
+            showSuccess("Тур закрыт");
+          } catch (err) {
+            showError(err instanceof AppError ? err.detail : "Ошибка закрытия тура");
           }
         }}
       />

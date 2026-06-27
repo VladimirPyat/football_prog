@@ -113,7 +113,7 @@ async def test_api_cache_headers(loaded_api):
 
 @pytest.mark.asyncio
 async def test_api_cache_etag_changes(loaded_api):
-    """[API-CACHE-ETAG] ETag changes after calculate."""
+    """[API-CACHE-ETAG] ETag changes after calculate (supervisor preview on CALCULATED)."""
     client, sf, _ = loaded_api
     await ensure_contest_running(sf, client, DEFAULT_CONTEST_ID)
     sup = await api_login(client, "supervisor_api")
@@ -121,14 +121,16 @@ async def test_api_cache_etag_changes(loaded_api):
     rid = await get_round_id(sf, 2, DEFAULT_CONTEST_ID)
 
     first = await client.get(
-        contest_url(DEFAULT_CONTEST_ID, f"/rounds/{rid}/leaderboard")
+        contest_url(DEFAULT_CONTEST_ID, f"/rounds/{rid}/leaderboard"),
+        headers=h,
     )
     await client.post(
         contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid}/calculate"),
         headers=h,
     )
     second = await client.get(
-        contest_url(DEFAULT_CONTEST_ID, f"/rounds/{rid}/leaderboard")
+        contest_url(DEFAULT_CONTEST_ID, f"/rounds/{rid}/leaderboard"),
+        headers=h,
     )
     assert second.status_code == 200
     if first.status_code == 200 and "etag" in first.headers:
@@ -157,6 +159,16 @@ async def test_api_tiebreak_rank(loaded_api):
     """[API-TB-RANK] synthetic tie; exceptional points decide rank."""
     client, sf, _ = loaded_api
     await calculate_rounds_via_http(client, sf, DEFAULT_CONTEST_ID)
+    sup = await api_login(client, "supervisor_api")
+    sup_h = auth_header(sup)
+    for n in range(1, 10):
+        rid = await get_round_id(sf, n, DEFAULT_CONTEST_ID)
+        pub = await client.post(
+            contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid}/publish"),
+            headers=sup_h,
+        )
+        assert pub.status_code == 200, pub.text
+
     admin = await api_login(client, "admin_api")
     h = auth_header(admin)
 

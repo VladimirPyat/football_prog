@@ -8,6 +8,7 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 - [Running the Application](#running-the-application)
 - [Architecture](#architecture)
 - [Authentication](#authentication)
+- [Password Setup & Invite Links (Stage 1.12)](#password-setup--invite-links-stage-112)
 - [Role-Based Access Control](#role-based-access-control)
 - [Multi-Contest API](#multi-contest-api)
 - [Contest Discovery & User Contacts](#contest-discovery--user-contacts)
@@ -44,7 +45,10 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 | Contest discovery & user contacts | ✅ Stage 1.8 | `src/api/v1/me.py`, `contest_discovery_service`, `contact_service` |
 | Leaderboard count columns + invite accept | ✅ Stage 1.7 | `leaderboard_service`, `participant_service`, `prediction_service` |
 | Team logo upload & static assets | ✅ Stage 1.9 | `team_logo_service`, `contest_teams.py`, `main.py` static routes |
-| OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` (v1.2.0) |
+| Auth setup links + invite accept via token | ✅ Stage 1.12 | `setup_tokens.py`, `auth_setup_service.py`, `auth.py` |
+| Purge unconfirmed participants on contest start | ✅ Stage 1.12 | `contest_setup_service.purge_unconfirmed_participants`, `purge_before_first_activation` |
+| Supervisor training mode + contest restore | ✅ Stage 1.12 | `contest_restore_service.py`, `contests.py` restore route |
+| OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` (v1.2.1) |
 | HTTP integration tests | ✅ Stage 1.6 | `tests/api/` — loader DB + httpx ASGI |
 
 **Before → After (Stage 1.6):** ADMIN can create global `SUPERVISOR` accounts via `POST /admin/users/supervisor`. Initial ADMIN/SUPERVISOR on a fresh DB via `bootstrap_users.py` + `SEED_*` env vars (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
@@ -83,7 +87,7 @@ Client → FastAPI (Uvicorn) → CORS → logging
 | Services | `src/services/` | Business logic; raise `AppError`, never `HTTPException` |
 | Alerts | `src/services/notification_service.py` | `notify_admin()` stub for critical failures [NEW] |
 
-## Authentication [NEW]
+## Authentication [UPDATED]
 
 JWT bearer tokens. Payload: `{sub: user_id, role, exp}`.
 
@@ -95,11 +99,48 @@ JWT bearer tokens. Payload: `{sub: user_id, role, exp}`.
 | `GET` | `/api/v1/auth/me/contacts` | Bearer | Profile contacts (email, VK, TG, notify toggle) |
 | `PATCH` | `/api/v1/auth/me/contacts` | Bearer | Partial update / upsert contacts |
 
-**Temp password flow:** While `is_temp_password=true`, `/auth/change-password`, `/auth/me`, and `/auth/me/contacts` (GET/PATCH) are allowed without restriction. `POST .../predictions` returns `403` with `code=PARTICIPANT_NOT_ACCEPTED` until the user changes the temporary password (which also flips `contest_participants.status` to `ACCEPTED`).
+**Before → After (Stage 1.12):** When `enforce_password_setup=true` (default), login with a temp password returns **403** `{detail, code: "PASSWORD_SETUP_REQUIRED"}` — user must complete `/auth/setup` via signed link (see [Password Setup & Invite Links](#password-setup--invite-links-stage-112)). When `enforce_password_setup=false`, legacy temp-password login + `/auth/change-password` path remains.
 
-Bad credentials → `401` (`Неверный логин или пароль`). Invalid/expired token → `401`. Auth/RBAC responses use Russian `detail` only (no `code` field).
+**Temp password flow (legacy / `enforce_password_setup=false`):** While `is_temp_password=true`, `/auth/change-password`, `/auth/me`, and `/auth/me/contacts` (GET/PATCH) are allowed without restriction. `POST .../predictions` returns `403` with `code=PARTICIPANT_NOT_ACCEPTED` until the user changes the temporary password (which also flips `contest_participants.status` to `ACCEPTED`).
 
-Configuration: [CONFIG.md — JWT settings](CONFIG.md#environment-variables).
+Bad credentials → `401` (`Неверный логин или пароль`). Invalid/expired token → `401`. Auth/RBAC responses from `deps.py` use Russian `detail` only (no `code` field); domain errors from services include `code`.
+
+Configuration: [CONFIG.md — auth & training settings](CONFIG.md#application-defaults-configsettingspy).
+
+## Password Setup & Invite Links (Stage 1.12) [NEW]
+
+Signed JWT tokens (`purpose: setup_password`) power invite acceptance and password reset without SMTP.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/auth/setup-preview?token=…` | None | Preview link: `{login, mode, already_completed}` |
+| `POST` | `/api/v1/auth/complete-setup` | None | Idempotent accept + optional password set `{token, new_password?}` |
+| `POST` | `/api/v1/auth/request-password-reset` | None | Always **200**; re-issues temp password when email known |
+
+**`mode` values** (from `setup-preview`, driven by `ENFORCE_PASSWORD_SETUP`):
+
+| `enforce_password_setup` | `mode` | UI behaviour |
+|--------------------------|--------|--------------|
+| `true` | `password_form` | User must submit `new_password` in `complete-setup` |
+| `false` | `confirm_only` | Confirm participation only; login with temp password from letter |
+
+**Invite response** (`POST /contests/{id}/participants`):
+
+```json
+{
+  "user_id": 42,
+  "login": "ivanov",
+  "temp_password": "…",
+  "status": "PENDING",
+  "setup_url": "http://127.0.0.1:3000/auth/setup?token=…"
+}
+```
+
+Link base URL from `FRONTEND_BASE_URL`; token TTL from `SETUP_TOKEN_EXPIRE_HOURS` (default 72h). Implementation: `src/core/setup_tokens.py`, `src/services/auth_setup_service.py`.
+
+**Accept path:** `complete-setup` with `contest_id` in token sets `contest_participants.status` to `ACCEPTED`. Success does **not** auto-issue JWT — frontend redirects to login.
+
+Dev workflow without SMTP: [DEV_SETUP.md — New contest: confirm participants](DEV_SETUP.md#new-contest-confirm-participants-without-email-stage-112).
 
 ## Role-Based Access Control [NEW]
 
@@ -154,10 +195,11 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | `POST` | `/contests` | SUPERVISOR+ | Create contest (setup phase) |
 | `GET` | `/contests/{id}` | SUPERVISOR+ | Contest details |
 | `PATCH` | `/contests/{id}` | SUPERVISOR+ | Update settings (blocked when `is_locked`) |
-| `POST` | `/contests/{id}/pause` | ADMIN | RUNNING → PAUSED |
-| `POST` | `/contests/{id}/resume` | ADMIN | PAUSED → RUNNING |
-| `POST` | `/contests/{id}/finish` | ADMIN | RUNNING\|PAUSED → FINISHED |
-| `DELETE` | `/contests/{id}` | ADMIN | FK-safe wipe; body `{confirm: "DELETE"}` |
+| `POST` | `/contests/{id}/pause` | SUPERVISOR+ | RUNNING → PAUSED |
+| `POST` | `/contests/{id}/resume` | SUPERVISOR+ | PAUSED → RUNNING |
+| `POST` | `/contests/{id}/finish` | ADMIN; SUPERVISOR when `supervisor_training_mode=true` | RUNNING\|PAUSED → FINISHED |
+| `DELETE` | `/contests/{id}` | ADMIN; SUPERVISOR when `supervisor_training_mode=true` | FK-safe wipe; body `{confirm: "DELETE"}` |
+| `POST` | `/contests/{id}/restore` | SUPERVISOR+ when `supervisor_training_mode=true` | Replay training-mode snapshot within restore window |
 
 ### Setup phase (SUPERVISOR+)
 
@@ -282,13 +324,17 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 
 | Rule | Enforcement |
 |------|-------------|
-| First round activation | `round_service` sets `is_locked=true`; lifecycle sets `status=RUNNING` |
+| First round activation | **Before lock:** `purge_before_first_activation` removes all `PENDING` USER participants; then `transition_round` sets `is_locked=true`; lifecycle sets `status=RUNNING` |
+| Unconfirmed purge | On first activate, `contest_setup_service.purge_unconfirmed_participants` removes `contest_participants` rows with `status=PENDING` and `users.role=USER`; orphan users deleted unless enrolled in another contest |
 | Settings PATCH when locked | `403 ContestLocked` — structural fields and `rules_json` frozen |
 | Settings GET when locked | Always allowed (SUPERVISOR+) — read-only snapshot |
 | Exceptional tie-break update | Allowed by ADMIN even when locked — not part of contest rules |
-| Safe delete | ADMIN only; requires `PAUSED` + grace period elapsed (or `CONTEST_ALLOW_INSTANT_DELETE=true`) |
+| Safe delete | ADMIN always; SUPERVISOR when `supervisor_training_mode=true`; requires `PAUSED` + grace (or instant delete when training mode / `CONTEST_ALLOW_INSTANT_DELETE`) |
+| Training restore | After delete wipe, snapshot stored in `contest_restore_snapshots`; `POST /restore` replays within `contest_restore_window_seconds` |
 
-**Safe delete wipe** (`contest_teardown.wipe_contest_data`): deletes contest-scoped `predictions`, `scores`, `matches`, `rounds`, `teams`, `contest_participants`, and the `contests` row; keeps ADMIN users by default.
+**Before → After (Stage 1.12):** Pause/resume opened to SUPERVISOR (not ADMIN-only). Finish/delete/restore gated by `supervisor_training_mode`. Delete creates a JSON snapshot before wipe for optional undo in training mode.
+
+**Safe delete wipe** (`contest_teardown.wipe_contest_data`): deletes contest-scoped operational data and resets contest to empty DRAFT (contest row retained). When training mode is on, a restore snapshot is written first — see `contest_restore_service.py`.
 
 **Domain error mapping** (defined in `src/core/exceptions.py`, mapped in `src/api/error_handlers.py`):
 
@@ -303,6 +349,9 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 | `IllegalTransitionError` | 409 | `ILLEGAL_TRANSITION` |
 | `ContestNotPausedError` | 403 | `CONTEST_NOT_PAUSED` |
 | `ContestDeleteDisabledError` | 403 | `CONTEST_DELETE_DISABLED` |
+| `PasswordSetupRequiredError` | 403 | `PASSWORD_SETUP_REQUIRED` [NEW] |
+| `SnapshotNotFoundError` | 404 | `SNAPSHOT_NOT_FOUND` [NEW] |
+| `SnapshotExpiredError` | 410 | `SNAPSHOT_EXPIRED` [NEW] |
 | Unhandled / `CriticalError` | 500 | `INTERNAL_ERROR` |
 
 Response body: `{"detail": "<Russian message>", "code": "<CODE>"}`. See [Error Response Format](#error-response-format) and [ERROR_LOGGING.md](ERROR_LOGGING.md).
@@ -329,7 +378,7 @@ async def set_deadline(session, round_id, new_deadline: datetime) -> Round
 DRAFT → ACTIVE → CLOSED → CALCULATED → PUBLISHED
 ```
 
-**Activation side-effect:** `contests.is_locked = True` when transitioning to `ACTIVE`. API hook then calls `ensure_running_on_first_activation` → `status=RUNNING`.
+**Activation side-effect:** `contests.is_locked = True` when transitioning to `ACTIVE`. API calls `purge_before_first_activation` **before** lock, then `transition_round`, then `ensure_running_on_first_activation` → `status=RUNNING`.
 
 ### `match_service.py`
 
@@ -366,17 +415,46 @@ Password change (`POST /auth/change-password`) flips all `PENDING` participation
 
 See [SCORING_LOGIC.md — Scoring Persistence](SCORING_LOGIC.md#scoring-persistence).
 
-### `contest_lifecycle_service.py` [NEW]
+### `contest_lifecycle_service.py` [UPDATED]
 
 ```python
+async def purge_before_first_activation(session, contest_id: int) -> int
 async def require_unlocked(session, contest_id: int) -> Contest
 async def assert_contest_running(session, contest_id: int) -> Contest
 async def ensure_running_on_first_activation(session, contest_id: int) -> Contest
 async def pause_contest(session, contest_id: int) / resume_contest(session, contest_id: int) / finish_contest(session, contest_id: int)
 async def assert_deletable(session, contest_id: int, *, instant: bool) -> Contest
-async def delete_contest_data(session, contest_id: int, *, keep_admin_users: bool) -> None
+async def delete_contest_data(session, contest_id: int, *, deleted_by_user_id: int | None) -> None
 async def update_exceptional_tiebreak(session, contest_id: int, user_id, points) -> int
 ```
+
+### `auth_setup_service.py` [NEW]
+
+Stage 1.12 — signed-link preview, complete-setup, password reset.
+
+```python
+async def preview_setup(session, token: str) -> dict
+async def complete_setup(session, token: str, new_password: str | None) -> dict
+async def request_password_reset(session, email: str) -> dict
+```
+
+### `contest_restore_service.py` [NEW]
+
+Stage 1.12 — training-mode snapshot on delete and replay via `POST /contests/{id}/restore`.
+
+```python
+async def restore_contest_from_snapshot(session, contest_id: int) -> None
+```
+
+Snapshot payload (minimal): contest scalars + `rules_json`, teams, rounds, matches, participant `user_id` list.
+
+### `contest_setup_service.py` [UPDATED]
+
+```python
+async def purge_unconfirmed_participants(session, contest_id: int) -> int
+```
+
+Removes all `PENDING` USER participants before first activation (called while contest still unlocked).
 
 ### `leaderboard_service.py` [UPDATED]
 
@@ -527,6 +605,9 @@ Domain errors (`AppError` subclasses from `src/core/exceptions.py`) return:
 | `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `CONTEST_NOT_RUNNING` | 403 |
 | `PARTICIPANT_NOT_ENROLLED` / `PARTICIPANT_NOT_ACCEPTED` | 403 |
 | `CONTEST_LOCKED` | 403 |
+| `PASSWORD_SETUP_REQUIRED` | 403 [NEW] |
+| `SNAPSHOT_NOT_FOUND` | 404 [NEW] |
+| `SNAPSHOT_EXPIRED` | 410 [NEW] |
 | `GRACE_PERIOD_ACTIVE` | 400 |
 | `ILLEGAL_TRANSITION` | 409 |
 | `INTERNAL_ERROR` | 500 |

@@ -17,23 +17,30 @@ const baseContest: ContestOut = {
   rules_json: { contest_structure: { deadline_rule_hours: 24 } },
 };
 
+/** Deadline is 48h from now — change window open. */
+const farDeadline = new Date(Date.now() + 48 * 3_600_000).toISOString();
+/** Deadline is 10h from now — change window CLOSED (within 24h). */
+const nearDeadline = new Date(Date.now() + 10 * 3_600_000).toISOString();
+
 const draftRound: RoundOut = {
   id: 1,
   contest_id: 1,
   number: 1,
-  deadline: "2026-06-01T12:00:00.000Z",
+  deadline: farDeadline,
   status: "DRAFT",
   matches_count: 4,
 };
 
-const activeRound: RoundOut = { ...draftRound, status: "ACTIVE" };
+const activeRoundFarDeadline: RoundOut = { ...draftRound, status: "ACTIVE", deadline: farDeadline };
+const activeRoundNearDeadline: RoundOut = { ...draftRound, status: "ACTIVE", deadline: nearDeadline };
 const publishedRound: RoundOut = { ...draftRound, status: "PUBLISHED" };
 
 describe("deriveAdminUiMode", () => {
   it("allows setup when contest is unlocked", () => {
     const mode = deriveAdminUiMode({ contest: baseContest, round: null });
     expect(mode.setupReadonly).toBe(false);
-    expect(mode.showLockBanner).toBe(false);
+    expect(mode.showSetupLockBanner).toBe(false);
+    expect(mode.showLockBanner).toBe(false); // backward compat
   });
 
   it("locks setup when is_locked", () => {
@@ -42,28 +49,63 @@ describe("deriveAdminUiMode", () => {
       round: null,
     });
     expect(mode.setupReadonly).toBe(true);
-    expect(mode.showLockBanner).toBe(true);
+    expect(mode.showSetupLockBanner).toBe(true);
   });
 
   it("disables mutations when paused", () => {
     const mode = deriveAdminUiMode({
       contest: { ...baseContest, status: "PAUSED" },
-      round: activeRound,
+      round: activeRoundFarDeadline,
     });
     expect(mode.disableAllMutations).toBe(true);
     expect(mode.showPausedBanner).toBe(true);
     expect(mode.canEditMatchStatusAndDate).toBe(false);
   });
 
-  it("allows structure edit only in DRAFT", () => {
+  it("[UNIT-UI-MODE-PRE-DEADLINE] ACTIVE + !deadlinePassed → canEditRoundStructure true", () => {
+    const mode = deriveAdminUiMode({
+      contest: baseContest,
+      round: activeRoundFarDeadline,
+      deadlinePassed: false,
+    });
+    expect(mode.canEditRoundStructure).toBe(true);
+    expect(mode.canEditMatchStatusAndDate).toBe(true);
+  });
+
+  it("[UNIT-UI-MODE-PRE-DEADLINE] ACTIVE + deadlinePassed → canEditRoundStructure false, canEditMatchStatusAndDate true", () => {
+    const mode = deriveAdminUiMode({
+      contest: baseContest,
+      round: activeRoundFarDeadline,
+      deadlinePassed: true,
+    });
+    expect(mode.canEditRoundStructure).toBe(false);
+    expect(mode.canEditMatchStatusAndDate).toBe(true);
+  });
+
+  it("allows structure edit in DRAFT", () => {
     const draft = deriveAdminUiMode({ contest: baseContest, round: draftRound });
     expect(draft.canEditRoundStructure).toBe(true);
-    expect(draft.canEditMatchStatusAndDate).toBe(false);
+    expect(draft.canEditMatchStatusAndDate).toBe(true);
+  });
 
-    const active = deriveAdminUiMode({ contest: baseContest, round: activeRound });
-    expect(active.canEditRoundStructure).toBe(false);
-    expect(active.canEditMatchStatusAndDate).toBe(true);
-    expect(active.showActiveRoundHint).toBe(true);
+  it("[UNIT-DEADLINE-LOCKOUT] ACTIVE + near deadline → canChangeDeadline false", () => {
+    const mode = deriveAdminUiMode({
+      contest: baseContest,
+      round: activeRoundNearDeadline,
+      deadlinePassed: false,
+    });
+    expect(mode.canChangeDeadline).toBe(false);
+    expect(mode.canEditDeadline).toBe(false);
+  });
+
+  it("[UNIT-DEADLINE-LOCKOUT] ACTIVE + far deadline → canChangeDeadline true", () => {
+    const mode = deriveAdminUiMode({
+      contest: baseContest,
+      round: activeRoundFarDeadline,
+      deadlinePassed: false,
+    });
+    expect(mode.canChangeDeadline).toBe(true);
+    expect(mode.canEditDeadline).toBe(true);
   });
 
   it("enables results workflow for CLOSED round", () => {
@@ -79,6 +121,33 @@ describe("deriveAdminUiMode", () => {
     expect(mode.showAppliedBadge).toBe(true);
     expect(mode.resultsReadonly).toBe(true);
     expect(mode.canVoidMatch).toBe(true);
+  });
+
+  it("disables results entry for ACTIVE round even when deadline passed", () => {
+    const mode = deriveAdminUiMode({
+      contest: baseContest,
+      round: activeRoundFarDeadline,
+      deadlinePassed: true,
+    });
+    expect(mode.canEnterResults).toBe(false);
+  });
+
+  it("allows create round when no draft exists", () => {
+    const mode = deriveAdminUiMode({
+      contest: baseContest,
+      round: activeRoundFarDeadline,
+      hasDraftRound: false,
+    });
+    expect(mode.canCreateRound).toBe(true);
+  });
+
+  it("blocks create round when draft already exists", () => {
+    const mode = deriveAdminUiMode({
+      contest: baseContest,
+      round: activeRoundFarDeadline,
+      hasDraftRound: true,
+    });
+    expect(mode.canCreateRound).toBe(false);
   });
 
   it("allows void on PUBLISHED but not when paused", () => {

@@ -27,7 +27,7 @@ test.describe("[E2E-SUPERVISOR-ACTIVE-ROUND]", () => {
     await ensureRound10Active();
   });
 
-  test("ACTIVE round 10: structure frozen, status and date editable", async ({ page }) => {
+  test("ACTIVE round before deadline: structure and status/date editable", async ({ page }) => {
     const token = await supervisorToken();
     const round10 = await ensureRound10Active();
 
@@ -37,8 +37,8 @@ test.describe("[E2E-SUPERVISOR-ACTIVE-ROUND]", () => {
     await waitForAdminShell(page);
     await selectRoundByNumber(page, token, 1, 10);
 
-    await expect(page.getByText("ТУР АКТИВИРОВАН")).toBeVisible();
-    await expect(page.getByRole("button", { name: "+ Добавить матч" })).not.toBeVisible();
+    await expect(page.getByText(/Тур активен/i).first()).toBeVisible();
+    await expect(page.locator("tbody select").first()).toBeEnabled();
 
     const statusSelect = page.locator("tbody select").first();
     await statusSelect.selectOption({ value: "POSTPONED" });

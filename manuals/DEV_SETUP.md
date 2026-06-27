@@ -80,7 +80,9 @@ uv run python src/scripts/dev_setup.py --run-only     # start servers only (skip
 uv run python src/scripts/dev_setup.py --minimal    # empty contest + admin only (no CSV loader)
 uv run python src/scripts/dev_setup.py --no-reset   # full without wiping loader tables first
 uv run python src/scripts/dev_setup.py --check      # prerequisites only, no DB changes
-uv run python src/scripts/dev_setup.py --ensure-running-only
+uv run python src/scripts/dev_setup.py --ensure-running-only          # manual fixture after loader
+uv run python src/scripts/dev_setup.py --ensure-running-only --e2e    # E2E: round 10 ACTIVE only
+uv run python src/scripts/dev_setup.py --finalize-fixture-only      # repair fixture on existing DB
 uv run python src/scripts/dev_setup.py --help
 ```
 
@@ -100,15 +102,71 @@ uv run python src/scripts/dev_setup.py --help
 1. `uv sync` (install Python deps from `pyproject.toml`)
 2. Warn if `.env` missing (copy from `.env.example` manually)
 3. `alembic upgrade head`
-4. `load_test_data.py --reset` — contest **id=1**, 16 teams, 10 users (`user`/`user`, …), rounds 1–9 published, round **10 ACTIVE**
+4. `load_test_data.py --reset` — contest **id=1**, 16 teams, 10 users (`user`/`user`, …), rounds 1–10 from CSV
 5. `bootstrap_users.py` — **after loader** (loader `--reset` deletes all `users`; bootstrap restores `admin` / `supervisor` from `.env`)
-6. **Dev contest state** — sets contest `1` to `RUNNING` + `is_locked=true` so `GET /contests/public` and frontend discovery work
+6. **Dev contest state** — contest `1` → `RUNNING` + `is_locked=true`
+7. **`finalize_dev_fixture`** (manual profile, default) — rounds **1–9** `PUBLISHED` with `scores` (90 rows ≡ `expected_scores.csv`), round **10** `CALCULATED` (10 scores, not published), round **11** `CLOSED` (awaiting results entry)
+
+| Round | Status after finalize | `scores` rows |
+|-------|----------------------|---------------|
+| 1–9 | `PUBLISHED` | 10 each (90 total) |
+| 10 | `CALCULATED` | 10 |
+| 11 | `CLOSED` | 0 |
+
+**E2E profile** (`--e2e`): skip finalize; round **10** stays `ACTIVE` with a future deadline (prediction / 24h-rule tests). Use:
+
+```bash
+uv run python src/scripts/dev_setup.py --ensure-running-only --e2e
+```
+
+**Repair existing DB** without full reset:
+
+```bash
+uv run python src/scripts/dev_setup.py --finalize-fixture-only
+```
 
 ### What `--minimal` does
 
 1–3 as above, then `seed.py` + `bootstrap_users.py` (no CSV loader, no `user/user` test login).
 
 Use `--minimal` for a blank SETUP-phase contest; use **`--full`** for Stage 2 frontend / E2E.
+
+### Dev fixture — `finalize_dev_fixture` (Stage 1.14)
+
+Script: `src/scripts/finalize_dev_fixture.py`. Called automatically at the end of **default full setup** and `--ensure-running-only` (unless `--e2e`).
+
+**Purpose:** after CSV loader, contest `id=1` exposes all meaningful round phases for supervisor manual QA — not only `CLOSED` (1–9) + `ACTIVE` (10).
+
+| Step | What happens |
+|------|----------------|
+| Rounds 1–9 | `calculate_round` → `PUBLISHED`; `scores` rows ≡ `expected_scores.csv` (90 total) |
+| Round 10 | Synthetic match results → `CALCULATED` (10 scores); **not** published |
+| Round 11 | New round `CLOSED`, deadline passed (ref. **2026-06-27**), 8 `SCHEDULED` matches, 0 scores |
+| Contest | `RUNNING` + `is_locked=true` |
+| Participants | Bootstrap-only users (`admin`, demo `user`) set to `PENDING` so scoring stays 10 users/round |
+
+**Profiles:**
+
+| Profile | Command | Round 10 | Rounds 1–9 | Round 11 |
+|---------|---------|----------|------------|----------|
+| Manual (default) | `dev_setup.py` or `--ensure-running-only` | `CALCULATED` | `PUBLISHED` + scores | `CLOSED` |
+| E2E | `--ensure-running-only --e2e` | `ACTIVE`, future deadline | `CLOSED`, no finalize | not created |
+| Repair only | `--finalize-fixture-only` | (re-applies manual table) | | |
+
+**Verify fixture (SQLite):**
+
+```sql
+SELECT r.number, r.status,
+       (SELECT COUNT(*) FROM scores s WHERE s.round_id = r.id) AS score_rows
+FROM rounds r
+WHERE r.contest_id = 1
+ORDER BY r.number;
+-- Expected: 1–9 PUBLISHED (10 each), 10 CALCULATED (10), 11 CLOSED (0); total scores = 100
+```
+
+Status meanings and UI walkthrough: [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3 (dev fixture table).
+
+**Pytest isolation:** `load_test_data.py` alone keeps rounds 1–9 `CLOSED` and round 10 `ACTIVE` — finalize runs only from `dev_setup`, not from the loader.
 
 ---
 
@@ -123,7 +181,10 @@ uv run alembic upgrade head
 # Full dev data (order matters — bootstrap AFTER loader):
 uv run python src/scripts/load_test_data.py --reset
 uv run python src/scripts/bootstrap_users.py
-uv run python src/scripts/dev_setup.py --ensure-running-only   # or run full dev_setup once
+uv run python src/scripts/dev_setup.py --ensure-running-only   # RUNNING + finalize fixture (manual profile)
+
+# Same as three lines above in one shot:
+# uv run python src/scripts/dev_setup.py
 
 # Minimal alternative:
 # uv run python src/scripts/seed.py
@@ -167,6 +228,16 @@ Do **not** commit `.env` or real passwords.
 uv run pytest tests/ --ignore=tests/manual -q
 ```
 
+Stage 1.12 regression (auth setup, purge, training restore):
+
+```bash
+ENFORCE_PASSWORD_SETUP=true SUPERVISOR_TRAINING_MODE=true \
+  CONTEST_DELETE_GRACE_SECONDS=0 CONTEST_RESTORE_WINDOW_SECONDS=3600 \
+  uv run pytest tests/api/test_auth_setup.py tests/api/test_participant_purge.py \
+    tests/api/test_contest_restore.py tests/api/test_dev_invite_setup.py \
+    tests/api/test_participant_accept.py -v
+```
+
 ### Frontend (after Stage 2.1 scaffold)
 
 ```bash
@@ -198,7 +269,95 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 
 ---
 
-## Invite confirm without SMTP — `dev_invite_setup.py` (Stage 1.12)
+## New contest: confirm participants without email (Stage 1.12+)
+
+SMTP is **not** wired in dev. Invited players start as `PENDING` in `contest_participants` until they complete password setup (`ACCEPTED`). Until then they cannot submit predictions.
+
+> **Critical:** on **first round activation**, the API **purges** all `PENDING` USER participants. Confirm everyone **before** activating tour 1. See [API_GUIDE.md](API_GUIDE.md#password-setup--invite-links-stage-112).
+
+### Recommended `.env` for local invite testing
+
+```bash
+ENFORCE_PASSWORD_SETUP=true   # default — invite link required (production-like)
+SUPERVISOR_TRAINING_MODE=true # optional — supervisor can delete/restore test contests
+```
+
+Legacy automated login only: `ENFORCE_PASSWORD_SETUP=false` — see [CONFIG.md](CONFIG.md).
+
+### Workflow A — UI invite + setup link (one participant)
+
+1. Start stack: `uv run python src/scripts/dev_setup.py --run-only` (or `--run` on fresh DB).
+2. Log in as **supervisor** → **Настройки** → **Участники** (`/admin/settings/participants`).
+3. Select the target contest (multi-contest: switch contest in admin shell).
+4. Fill invite form (email, name) → **Пригласить**.
+5. Modal shows **login**, **temporary password**, and **`setup_url`** — copy all three (button «Скопировать»).
+6. **Confirm the participant** (pick one):
+   - **Browser:** open `setup_url` in a new tab (or incognito), set a permanent password → redirect to login → log in as the new user.
+   - **Share manually:** send login + `setup_url` to the player (no mail server needed).
+7. In **Участники**, status should change from «Ожидает» (`PENDING`) to «Принят» (`ACCEPTED`).
+8. User can open the contest and submit predictions once a tour is `ACTIVE`.
+
+`setup_url` format: `http://127.0.0.1:3000/auth/setup?token=…` (frontend host from `FRONTEND_BASE_URL` / settings).
+
+### Workflow B — bulk confirm via `dev_invite_setup.py` (dev / QA)
+
+Use when you invited many users and want to skip opening each link by hand.
+
+```bash
+# 1. List PENDING invitees for contest id=2; optional: write setup links
+uv run python src/scripts/dev_invite_setup.py get-unconfirmed --contest-id 2 \
+  --out src/scripts/dev_unconfirmed.tsv \
+  --links-out src/scripts/.tokens
+
+# 2a. Open links from .tokens (JSON lines with setup_url) — same as step 6 in Workflow A
+# 2b. Or confirm all server-side (sets password + ACCEPTED in one step):
+uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id 2 \
+  --password 'DevPass123!'
+
+# Partial list from TSV:
+uv run python src/scripts/dev_invite_setup.py confirm-list \
+  --file src/scripts/dev_unconfirmed.tsv \
+  --password 'DevPass123!'
+```
+
+`src/scripts/.tokens` is gitignored. TSV columns: `user_id`, `contest_id`, `email`, `login`.
+
+### Workflow C — create a blank contest (`--minimal`)
+
+For a **new** contest (not CSV contest `id=1`):
+
+```bash
+uv run python src/scripts/dev_setup.py --minimal
+# → empty DRAFT contest + admin/supervisor; no demo users
+```
+
+Then in UI: create/configure contest → invite participants (Workflow A or B) → add teams/rounds → activate first tour only after all needed users are `ACCEPTED`.
+
+### Verify in DB (optional)
+
+```sql
+SELECT u.login, cp.status
+FROM contest_participants cp
+JOIN users u ON u.id = cp.user_id
+WHERE cp.contest_id = 2
+ORDER BY u.login;
+-- Want ACCEPTED before POST .../rounds/{id}/activate
+```
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Invite modal has no `setup_url` | Check API logs; ensure `FRONTEND_BASE_URL` / frontend on `:3000` |
+| Login with temp password → 403 `PASSWORD_SETUP_REQUIRED` | Expected when `ENFORCE_PASSWORD_SETUP=true` — use `setup_url`, not temp password login |
+| Participant vanished after tour activation | Was still `PENDING` — re-invite or confirm before activate |
+| `confirm-all` finds 0 rows | Wrong `--contest-id`; or user already `ACCEPTED` / not temp-password |
+
+API details: [API_GUIDE.md — Password Setup & Invite Links](API_GUIDE.md#password-setup--invite-links-stage-112).
+
+---
+
+## Invite confirm without SMTP — `dev_invite_setup.py` (quick reference)
 
 When SMTP is not configured, use the dev script to export PENDING invitees and confirm via `complete-setup`:
 
@@ -231,6 +390,8 @@ Recommended local flags: `ENFORCE_PASSWORD_SETUP=false`, `SUPERVISOR_TRAINING_MO
 | Start API only | `uv run uvicorn main:app --reload --port 8000` |
 | Start UI only | `cd frontend && npm run dev` |
 | Reset DB to demo state | `uv run python src/scripts/dev_setup.py` |
+| Repair fixture only (no loader) | `uv run python src/scripts/dev_setup.py --finalize-fixture-only` |
+| E2E DB (round 10 ACTIVE) | `uv run python src/scripts/dev_setup.py --ensure-running-only --e2e` |
 | Archive application log | `uv run python src/scripts/archive_logs.py` |
 | Re-run migrations | `uv run alembic upgrade head` |
 
@@ -249,4 +410,4 @@ You **do not** re-run `bootstrap_users.py` on every API restart — users persis
 
 ---
 
-*Last updated: Stage 2.1 — `dev_setup.py --run` / `--run-only` for one-command local stack.*
+*Last updated: Stage 1.14 — `finalize_dev_fixture` manual profile; participant confirm without SMTP.*

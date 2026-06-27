@@ -16,11 +16,14 @@ interface ResultsEntryPanelProps {
   selectedRoundId: number | null;
   matches: MatchOut[];
   loading: boolean;
+  activeRoundId: number | null;
+  activeDeadlinePassed: boolean;
   onSelectRound: (id: number) => void;
   onSaveResult: (matchId: number, score1: number, score2: number) => Promise<void>;
   onVoid: (matchId: number) => Promise<void>;
   onCalculate: (roundId: number) => Promise<void>;
   onPublish: (roundId: number) => Promise<void>;
+  onCloseRound?: (roundId: number) => Promise<void>;
 }
 
 export function ResultsEntryPanel({
@@ -30,16 +33,24 @@ export function ResultsEntryPanel({
   selectedRoundId,
   matches,
   loading,
+  activeRoundId,
+  activeDeadlinePassed,
   onSelectRound,
   onSaveResult,
   onVoid,
   onCalculate,
   onPublish,
+  onCloseRound,
 }: ResultsEntryPanelProps) {
   const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
   const uiMode = deriveAdminUiMode({ contest, round: selectedRound, matches });
   const [voidId, setVoidId] = useState<number | null>(null);
   const [working, setWorking] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  const eligibleRounds = rounds.filter((r) =>
+    ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status),
+  );
 
   const allFinished = matches.every(
     (m) => m.status === "FINISHED" || m.status === "VOID" || m.status === "CANCELED",
@@ -49,6 +60,33 @@ export function ResultsEntryPanel({
 
   return (
     <div className="space-y-6">
+      {eligibleRounds.length === 0 && (
+        <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded px-4 py-3">
+          Нет туров, готовых к вводу результатов. Закройте активный тур на странице «Туры».
+        </p>
+      )}
+
+      {activeRoundId != null && activeDeadlinePassed && onCloseRound && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <span>Дедлайн прошёл. Закройте тур, чтобы ввести результаты.</span>
+          <button
+            type="button"
+            disabled={closing}
+            onClick={async () => {
+              setClosing(true);
+              try {
+                await onCloseRound(activeRoundId);
+              } finally {
+                setClosing(false);
+              }
+            }}
+            className="px-3 py-1.5 text-sm text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
+          >
+            {closing ? "Закрытие…" : "Закрыть тур"}
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-sm text-gray-700">Тур:</label>
         <select
@@ -57,13 +95,11 @@ export function ResultsEntryPanel({
           className="border border-gray-300 rounded px-3 py-1 text-sm"
         >
           <option value="">Выберите тур</option>
-          {rounds
-            .filter((r) => ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status))
-            .map((r) => (
-              <option key={r.id} value={r.id}>
-                Тур {r.number} — {roundStatusLabel(r.status)}
-              </option>
-            ))}
+          {eligibleRounds.map((r) => (
+            <option key={r.id} value={r.id}>
+              Тур {r.number} — {roundStatusLabel(r.status)}
+            </option>
+          ))}
         </select>
         {selectedRound && uiMode.showAppliedBadge && (
           <span className="text-sm font-medium text-green-700 bg-green-50 px-2 py-1 rounded">
@@ -74,6 +110,11 @@ export function ResultsEntryPanel({
 
       {selectedRound && (
         <>
+          <p className="text-sm text-gray-600">
+            Введите счёт для каждого матча и нажмите «Применить». Когда все матчи завершены —
+            «Рассчитать», затем «Опубликовать».
+          </p>
+
           <div className="overflow-x-auto border border-gray-200 rounded-lg">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
@@ -136,12 +177,21 @@ export function ResultsEntryPanel({
                 Опубликовать
               </button>
             )}
-            <Link
-              href={`/contest/${contest.id}`}
-              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Проверить публичные результаты
-            </Link>
+            {selectedRound.status === "PUBLISHED" ? (
+              <Link
+                href={`/contest/${contest.id}`}
+                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Проверить публичные результаты
+              </Link>
+            ) : (
+              <span
+                title="Сначала опубликуйте тур"
+                className="px-4 py-2 text-sm border border-gray-200 rounded text-gray-400 cursor-not-allowed"
+              >
+                Проверить публичные результаты
+              </span>
+            )}
           </div>
         </>
       )}

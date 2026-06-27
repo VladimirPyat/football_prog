@@ -121,6 +121,8 @@ export interface RoundOut {
 
 export interface MatchOut {
   id: number;
+  team1_id?: number;
+  team2_id?: number;
   team1: string;
   team2: string;
   date_time: string;

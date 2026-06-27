@@ -99,7 +99,7 @@ async def _user_id(sf, login: str) -> int:
 
 @pytest.mark.asyncio
 async def test_op_24h_rule(loaded_api):
-    """[OP-24H-RULE] PATCH round deadline violating 24h rule → 400."""
+    """[OP-24H-RULE] PATCH ACTIVE round deadline inside lockout window → 403 DEADLINE_CHANGE_CLOSED."""
     client, sf, _ = loaded_api
     await ensure_contest_running(sf, client, DEFAULT_CONTEST_ID)
     sup = await api_login(client, "supervisor_api")
@@ -107,18 +107,25 @@ async def test_op_24h_rule(loaded_api):
     rid = await get_round_id(sf, 10, DEFAULT_CONTEST_ID)
 
     async with sf() as session:
-        matches = (
-            await session.scalars(select(Match).where(Match.round_id == rid))
-        ).all()
-        earliest = min(m.date_time for m in matches)
+        from database.models import Round, RoundStatus
 
-    bad_deadline = (earliest - timedelta(hours=12)).isoformat()
+        round_ = await session.get(Round, rid)
+        assert round_ is not None
+        # Set round to ACTIVE with a deadline 10h from now so the lockout window is closed
+        round_.status = RoundStatus.ACTIVE
+        near_deadline = datetime.now(timezone.utc) + timedelta(hours=10)
+        round_.deadline = near_deadline
+        await session.commit()
+
+    # Try to move deadline 2 hours back — still in future and before matches, but lockout blocks it
+    new_deadline = (datetime.now(timezone.utc) + timedelta(hours=8)).isoformat()
     resp = await client.patch(
         contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid}"),
         headers=h,
-        json={"deadline": bad_deadline},
+        json={"deadline": new_deadline},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 403
+    assert resp.json().get("code") == "DEADLINE_CHANGE_CLOSED"
 
 
 @pytest.mark.asyncio

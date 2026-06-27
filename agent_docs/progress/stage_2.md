@@ -109,3 +109,26 @@
 - Credentials: root `.env` `SEED_*` only (no `E2E_*` in Playwright)
 - BLOCKED.md: B7/B8 RESOLVED; B9 not required
 - Next: @Coder → agent_docs/instructions/coder_2.4.md
+
+## 2026-06-27 — Coder (2.3.1 fix rounds/status/24h/LB gate)
+- STATUS: READY_FOR_TEST
+- Scope: F1–F12 — 24h policy (placement vs lockout), per-status round panels, pre-deadline ACTIVE edit, LockBanner scope, create-tour CTA, DRAFT edit, public LB PUBLISHED-only
+- Key paths: `round_service.py`, `leaderboard_service.py`, `deadlineRule.ts`, `deriveAdminUiMode.ts`, `RoundManagementPanel.tsx`, `RoundPhasePanel.tsx`, settings `showSetupLockBanner`
+- Tests updated: `deadlineRule.test.ts`, `deriveAdminUiMode.test.ts`, `test_deadline_batch_1_2.py`, `test_services_1_2.py`, `test_leaderboard_published_only_2_3_1.py`, `test_calculate_leaderboard_1_4.py`
+- Verified: frontend unit 46 passed; lint/tsc 0; backend deadline + LB pytest green
+- Next: `agent_docs/instructions/tester_2.3.1_fix_rounds.md`
+
+## 2026-06-27 — Tester (2.3.1 fix rounds)
+- STATUS: TEST_PASS (automated); E2E SKIP (API :8000 down)
+- Report: `agent_docs/reports/test_2.3.1_fix_rounds.md`
+- Unit: 46 passed; backend: deadline batch 20/20, LB gate 3/3, calculate regression 8/8 (1 skip)
+- E2E: not run — connection refused; manual 1.14 matrix not spot-checked
+- Gaps: new E2E specs for status panels / public LB gate; contracts sync
+- Next: run E2E with stack up; optional `coder_2.4` / supervisor rename queue
+
+## 2026-06-27 — Re-verify 2.3.1 (interrupted dev check)
+- Coder code: present (F1–F12); contracts + public LB UI stub wiring still open
+- Automated: frontend 60/60, backend 32/32 (+1 skip), lint/tsc OK
+- Fixed: `test_lb_public_published_round_allowed`, `admin.ts` lint, E2E spec semantics (24h/active/copy)
+- E2E: BLOCKED — global-setup `PASSWORD_SETUP_REQUIRED` for provision user
+- Report refreshed: `agent_docs/reports/test_2.3.1_fix_rounds.md`

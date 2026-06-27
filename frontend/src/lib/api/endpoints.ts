@@ -48,6 +48,8 @@ export const contestAdmin = {
       `/api/v1/contests/${contestId}/rounds/${roundId}/predictions`,
     results: (contestId: number, roundId: number) =>
       `/api/v1/contests/${contestId}/rounds/${roundId}/results`,
+    leaderboard: (contestId: number, roundId: number) =>
+      `/api/v1/contests/${contestId}/rounds/${roundId}/leaderboard`,
     create: (contestId: number) => `/api/v1/contests/${contestId}/admin/rounds`,
     freeTour: (contestId: number) => `/api/v1/contests/${contestId}/admin/rounds/free-tour`,
     patch: (contestId: number, roundId: number) =>

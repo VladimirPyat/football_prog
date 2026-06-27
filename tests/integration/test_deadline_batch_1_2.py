@@ -144,13 +144,29 @@ async def _create_synthetic_round(
 
 
 # ---------------------------------------------------------------------------
-# [DL-24H-FAIL]
+# [DL-PLACEMENT]
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_dl_24h_fail_at_exact_cutoff(minimal_db):
-    """[DL-24H-FAIL] Deadline == (first_match − 24h) must be rejected with ValueError."""
+async def test_dl_placement_ok_within_24h_of_match(minimal_db):
+    """[DL-PLACEMENT-OK] Deadline 23h before first match is accepted (no 24h gap)."""
+    sf = minimal_db
+    async with sf() as session:
+        async with session.begin():
+            _, round_, _, _ = await _create_synthetic_round(session)
+            round_id = round_.id
+
+    async with sf() as session:
+        async with session.begin():
+            await set_deadline(
+                session, round_id, _FUTURE_MATCH_DT - timedelta(hours=23)
+            )
+
+
+@pytest.mark.asyncio
+async def test_dl_placement_fail_at_first_match(minimal_db):
+    """[DL-PLACEMENT-FAIL] Deadline == first_match must be rejected."""
     sf = minimal_db
     async with sf() as session:
         async with session.begin():
@@ -160,28 +176,11 @@ async def test_dl_24h_fail_at_exact_cutoff(minimal_db):
     with pytest.raises(ValidationError):
         async with sf() as session:
             async with session.begin():
-                await set_deadline(session, round_id, _CUTOFF_DT)
-
-
-@pytest.mark.asyncio
-async def test_dl_24h_fail_within_23h_of_match(minimal_db):
-    """[DL-24H-FAIL] Deadline == (first_match − 23h) must also be rejected."""
-    sf = minimal_db
-    async with sf() as session:
-        async with session.begin():
-            _, round_, _, _ = await _create_synthetic_round(session)
-            round_id = round_.id
-
-    with pytest.raises(ValidationError):
-        async with sf() as session:
-            async with session.begin():
-                await set_deadline(
-                    session, round_id, _FUTURE_MATCH_DT - timedelta(hours=23)
-                )
+                await set_deadline(session, round_id, _FUTURE_MATCH_DT)
 
 
 # ---------------------------------------------------------------------------
-# [DL-24H-OK]
+# [DL-24H-OK] legacy id kept for placement far before match
 # ---------------------------------------------------------------------------
 
 

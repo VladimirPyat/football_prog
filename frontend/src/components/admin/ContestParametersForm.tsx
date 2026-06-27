@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { contestParametersSchema } from "@/lib/validation/admin";
 import type { ZodIssue } from "zod";
 import type { ContestOut } from "@/types/api";
-import { useAuth } from "@/hooks/useAuth";
+import { RulesDisplayPanel } from "@/components/admin/RulesDisplayPanel";
+import { ContestLifecycleActions } from "@/components/admin/ContestLifecycleActions";
 
 interface ContestParametersFormProps {
   contest: ContestOut;
@@ -16,20 +16,23 @@ interface ContestParametersFormProps {
     total_rounds: number;
     is_round_robin: boolean;
   }) => Promise<void>;
+  onLifecycleSuccess: () => Promise<void>;
+  onLifecycleError: (message: string) => void;
 }
 
-export function ContestParametersForm({ contest, readonly, onSave }: ContestParametersFormProps) {
-  const { role } = useAuth();
+export function ContestParametersForm({
+  contest,
+  readonly,
+  onSave,
+  onLifecycleSuccess,
+  onLifecycleError,
+}: ContestParametersFormProps) {
   const [totalTeams, setTotalTeams] = useState(contest.total_teams);
   const [matchesPerRound, setMatchesPerRound] = useState(contest.matches_per_round);
   const [totalRounds, setTotalRounds] = useState(contest.total_rounds);
   const [isRoundRobin, setIsRoundRobin] = useState(contest.is_round_robin);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-
-  const rules = contest.rules_json as Record<string, unknown>;
-  const scoring = (rules.scoring as Record<string, unknown>) ?? {};
-  const bonuses = (rules.bonuses as Record<string, unknown>) ?? {};
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -58,97 +61,76 @@ export function ContestParametersForm({ contest, readonly, onSave }: ContestPara
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Команд</label>
-          <input
-            type="number"
-            value={totalTeams}
-            onChange={(e) => setTotalTeams(Number(e.target.value))}
-            disabled={readonly}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
-          />
-          {errors.total_teams && <p className="text-sm text-red-600">{errors.total_teams}</p>}
+    <>
+      <form onSubmit={handleSubmit} className="space-y-6 pb-24">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Команд</label>
+            <input
+              type="number"
+              value={totalTeams}
+              onChange={(e) => setTotalTeams(Number(e.target.value))}
+              disabled={readonly}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
+            />
+            {errors.total_teams && <p className="text-sm text-red-600">{errors.total_teams}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Матчей в туре</label>
+            <input
+              type="number"
+              value={matchesPerRound}
+              onChange={(e) => setMatchesPerRound(Number(e.target.value))}
+              disabled={readonly}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
+            />
+            {errors.matches_per_round && (
+              <p className="text-sm text-red-600">{errors.matches_per_round}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Туров</label>
+            <input
+              type="number"
+              value={totalRounds}
+              onChange={(e) => setTotalRounds(Number(e.target.value))}
+              disabled={readonly}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
+            />
+            {errors.total_rounds && <p className="text-sm text-red-600">{errors.total_rounds}</p>}
+          </div>
+          <div className="flex items-center gap-2 pt-6">
+            <input
+              id="round-robin"
+              type="checkbox"
+              checked={!isRoundRobin}
+              onChange={(e) => setIsRoundRobin(!e.target.checked)}
+              disabled={readonly}
+            />
+            <label htmlFor="round-robin" className="text-sm text-gray-700">
+              Произвольное количество
+            </label>
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Матчей в туре</label>
-          <input
-            type="number"
-            value={matchesPerRound}
-            onChange={(e) => setMatchesPerRound(Number(e.target.value))}
-            disabled={readonly}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
-          />
-          {errors.matches_per_round && (
-            <p className="text-sm text-red-600">{errors.matches_per_round}</p>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Туров</label>
-          <input
-            type="number"
-            value={totalRounds}
-            onChange={(e) => setTotalRounds(Number(e.target.value))}
-            disabled={readonly}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
-          />
-          {errors.total_rounds && <p className="text-sm text-red-600">{errors.total_rounds}</p>}
-        </div>
-        <div className="flex items-center gap-2 pt-6">
-          <input
-            id="round-robin"
-            type="checkbox"
-            checked={!isRoundRobin}
-            onChange={(e) => setIsRoundRobin(!e.target.checked)}
-            disabled={readonly}
-          />
-          <label htmlFor="round-robin" className="text-sm text-gray-700">
-            Произвольное количество
-          </label>
-        </div>
-      </div>
 
-      <section>
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">
-          Правила начисления (только просмотр)
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          {Object.entries(scoring).map(([key, val]) => (
-            <div key={key} className="border border-gray-200 rounded p-2">
-              <span className="text-gray-500 block text-xs">{key}</span>
-              <span className="font-medium">{String(val)}</span>
-            </div>
-          ))}
-          {Object.entries(bonuses).map(([key, val]) => (
-            <div key={key} className="border border-gray-200 rounded p-2">
-              <span className="text-gray-500 block text-xs">{key}</span>
-              <span className="font-medium">{String(val)}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+        <RulesDisplayPanel rulesJson={contest.rules_json as Record<string, unknown>} />
 
-      {!readonly && (
-        <button
-          type="submit"
-          disabled={submitting}
-          className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          Сохранить параметры
-        </button>
-      )}
-
-      {role === "ADMIN" && (
-        <div className="pt-4 border-t border-gray-200">
-          <Link
-            href="/admin/lifecycle"
-            className="text-sm text-red-600 hover:underline font-medium"
+        {!readonly && (
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            Остановить конкурс
-          </Link>
-        </div>
-      )}
-    </form>
+            Сохранить параметры
+          </button>
+        )}
+      </form>
+
+      <ContestLifecycleActions
+        contest={contest}
+        onSuccess={onLifecycleSuccess}
+        onError={onLifecycleError}
+      />
+    </>
   );
 }

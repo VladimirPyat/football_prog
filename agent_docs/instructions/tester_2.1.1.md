@@ -208,10 +208,13 @@ npm run lint && npm run type-check && npm run format:check
 # 3. E2E
 npm run test:e2e
 
-# 4. Build
+# 4. Teardown — free :3000 / :8000 (tester_2.1 §2.5)
+uv run python src/scripts/dev_setup.py --check-ports
+
+# 5. Build
 npm run build
 
-# 5. Doc audit
+# 6. Doc audit
 ```
 
 ---

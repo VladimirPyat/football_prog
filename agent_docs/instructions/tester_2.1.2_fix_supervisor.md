@@ -205,6 +205,7 @@ Run:
 
 ```bash
 cd frontend && npx playwright test supervisor_ui_fix_smoke.spec.ts
+uv run python src/scripts/dev_setup.py --check-ports   # tester_2.1 §2.5 — mandatory after E2E
 ```
 
 ---

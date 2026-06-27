@@ -12,9 +12,16 @@ interface AdminPageShellProps {
   title: string;
   children: ReactNode;
   showSettingsNav?: boolean;
+  /** Show LockBanner — only relevant on /admin/settings/* pages. Default: false. */
+  showSetupLockBanner?: boolean;
 }
 
-export function AdminPageShell({ title, children, showSettingsNav = false }: AdminPageShellProps) {
+export function AdminPageShell({
+  title,
+  children,
+  showSettingsNav = false,
+  showSetupLockBanner = false,
+}: AdminPageShellProps) {
   const { contest, loading } = useContestAdmin();
   const uiMode = deriveAdminUiMode({ contest, round: null });
 
@@ -31,7 +38,7 @@ export function AdminPageShell({ title, children, showSettingsNav = false }: Adm
       )}
       {!contest && <h1 className="text-2xl font-bold text-gray-900 mb-2">{title}</h1>}
 
-      {uiMode.showLockBanner && <LockBanner />}
+      {showSetupLockBanner && uiMode.showSetupLockBanner && <LockBanner />}
       {uiMode.showPausedBanner && <ContestStatusBanner status="PAUSED" />}
       {uiMode.showFinishedBanner && <ContestStatusBanner status="FINISHED" />}
 

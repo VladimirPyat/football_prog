@@ -322,3 +322,4 @@ types/api.ts       // interfaces from §7
 | 2026-06-24 | Stage 2.1.1: §2.4 Post-login routing by role (`resolvePostLoginPath`); `/profile` USER-only; `/admin/*` SUPERVISOR+; demo `user/user` from bootstrap (TEMPORARY until 2.3 invite UI). |
 | 2026-06-24 | Stage 2.3: B5 logo multipart via `apiUpload`; extended `contestAdmin` path builders in `endpoints.ts`; admin hook matrix. |
 | 2026-06-27 | Stage 1.12: §2.1.1 invite/setup flow (`setup-preview`, `complete-setup`, `request-password-reset`, `ParticipantInviteOut.setup_url`); `PASSWORD_SETUP_REQUIRED` login gate; training mode restore `POST /contests/{id}/restore`. |
+| 2026-06-27 | Stage 2.1.2: `resolveAssetUrl()` for team logos; supervisor lifecycle CTAs on parameters page; login «Забыли пароль?» checkbox → `request-password-reset`. |

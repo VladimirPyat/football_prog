@@ -17,12 +17,13 @@ Overview of the database layer: SQLAlchemy models, enums, constraints, and Alemb
 | Component | Path | Role |
 |-----------|------|------|
 | Declarative base | `src/database/base.py` | `Base` metadata for ORM + Alembic |
-| Models | `src/database/models.py` | 10 tables, enums, CHECK/UNIQUE |
+| Models | `src/database/models.py` | 11 tables, enums, CHECK/UNIQUE |
 | Engine | `src/database/engine.py` | Async engine + session factory |
 | Initial migration | `alembic/versions/0992bb744cc8_initial_schema.py` | Creates initial 8 tables |
 | Scores extension | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds `count_*` columns to `scores` |
 | Lifecycle extension | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Lifecycle on `contest_settings`; tie-break on `users` |
 | Multi-contest | `alembic/versions/c4d5e6f7a8b9_multi_contest_and_participants.py` | `contests`, `contest_participants`, scoped FKs [NEW] |
+| Restore snapshots | `alembic/versions/e6f7a8b9c0d1_contest_restore_snapshots.py` | `contest_restore_snapshots` for training-mode undo [NEW] |
 | Alembic runner | `alembic/env.py` | Async migrations; URL from [CONFIG.md](CONFIG.md) |
 
 **Stack:** SQLAlchemy 2.0+ async, `DateTime(timezone=True)` (TIMESTAMPTZ), JSON column for `rules_json`.
@@ -211,6 +212,20 @@ Replaces singleton `contest_settings` (Stage 1.4). Multiple contests may coexist
 
 > `exceptional_tiebreak_points` is per-contest, admin-set (criterion 5). Not part of `rules_json`; updatable when contest is locked.
 
+### `contest_restore_snapshots` [NEW]
+
+Training-mode undo buffer written before contest delete wipe (Stage 1.12).
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `contest_id` | INTEGER | PK, FK → `contests.id` |
+| `snapshot_json` | JSON | NOT NULL — contest fields, teams, rounds, matches, participant user IDs |
+| `deleted_at` | TIMESTAMPTZ | NOT NULL |
+| `expires_at` | TIMESTAMPTZ | NOT NULL — `deleted_at + contest_restore_window_seconds` |
+| `deleted_by_user_id` | INTEGER | FK → `users.id`, NULL |
+
+At most one snapshot row per contest (PK on `contest_id`). Row deleted after successful restore or when expired. See [API_GUIDE — Contest Lifecycle](API_GUIDE.md#contest-lifecycle--immutability).
+
 **Before → After (Stage 1.4):** `contest_settings` (singleton) → `contests` (multi-row). `users.exceptional_tiebreak_points` → `contest_participants.exceptional_tiebreak_points`. `teams` and `rounds` scoped by `contest_id`.
 
 ## Constraints [NEW]
@@ -245,6 +260,8 @@ Replaces singleton `contest_settings` (Stage 1.4). Multiple contests may coexist
 users ← contacts.user_id
 users ← predictions.user_id, scores.user_id
 users ← contest_participants.user_id
+users ← contest_restore_snapshots.deleted_by_user_id
+contests ← contest_restore_snapshots.contest_id
 contests ← contest_participants.contest_id, teams.contest_id, rounds.contest_id
 rounds ← matches.round_id, predictions.round_id, scores.round_id
 teams ← matches.team1_id, matches.team2_id
@@ -278,6 +295,8 @@ uv run alembic downgrade base    # roll back all
 | `a2b3c4d5e6f7` | `alembic/versions/a2b3c4d5e6f7_scores_counts.py` | Adds 4 `count_*` columns to `scores` |
 | `b3c4d5e6f7a8` | `alembic/versions/b3c4d5e6f7a8_contest_lifecycle_and_tiebreak.py` | Lifecycle columns on `contest_settings`; `exceptional_tiebreak_points` on `users` |
 | `c4d5e6f7a8b9` | `alembic/versions/c4d5e6f7a8b9_multi_contest_and_participants.py` | Multi-contest: `contests`, `contest_participants`, `contest_id` on teams/rounds; drops `contest_settings` [NEW] |
+| `d5e6f7a8b9c0` | `alembic/versions/d5e6f7a8b9c0_drop_legacy_global_uniques.py` | Drops legacy global UNIQUE on `rounds.number` and `teams.name` |
+| `e6f7a8b9c0d1` | `alembic/versions/e6f7a8b9c0d1_contest_restore_snapshots.py` | Adds `contest_restore_snapshots` for training-mode restore [NEW] |
 
 Migration `c4d5e6f7a8b9` migrates existing `contest_settings` row → `contests` id=1, copies users into `contest_participants`, sets `contest_id=1` on teams/rounds, then drops `users.exceptional_tiebreak_points`.
 
@@ -296,6 +315,7 @@ erDiagram
     users ||--o{ scores : earns
     users ||--o{ contest_participants : joins
     contests ||--o{ contest_participants : has
+    contests ||--o| contest_restore_snapshots : snapshot
     contests ||--o{ teams : owns
     contests ||--o{ rounds : owns
     rounds ||--o{ matches : contains

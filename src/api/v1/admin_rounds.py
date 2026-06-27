@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, timedelta
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -16,7 +16,12 @@ from services.contest_lifecycle_service import (
     ensure_running_on_first_activation,
     purge_before_first_activation,
 )
-from services.round_service import close_round, set_deadline, transition_round
+from services.round_service import (
+    close_round,
+    set_deadline,
+    transition_round,
+    validate_round_deadline_placement,
+)
 from services.scoring_persistence import calculate_round
 
 router = APIRouter(prefix="/admin/rounds", tags=["legacy (deprecated)", "admin (supervisor)"])
@@ -51,10 +56,14 @@ async def create_round(body: CreateRoundRequest, session: DbSession) -> dict:
     earliest = min(m.date_time for m in body.matches)
     if earliest.tzinfo is None:
         earliest = earliest.replace(tzinfo=UTC)
-    cutoff = earliest - timedelta(hours=deadline_rule)
     dl = body.deadline if body.deadline.tzinfo else body.deadline.replace(tzinfo=UTC)
-    if dl >= cutoff:
-        raise ValidationError("Дедлайн нарушает правило 24 часов до первого матча")
+    now = datetime.now(UTC)
+    for m in body.matches:
+        dt_check = m.date_time if m.date_time.tzinfo else m.date_time.replace(tzinfo=UTC)
+        if dt_check < now:
+            raise ValidationError("Дата матча не может быть в прошлом")
+    _ = deadline_rule  # rule_hours retained for future warnings; placement rule does not use it
+    validate_round_deadline_placement(dl, earliest, now=now)
 
     existing = await session.scalar(
         select(Round).where(Round.contest_id == contest_id, Round.number == body.number)
@@ -96,19 +105,30 @@ async def update_round(round_id: int, body: UpdateRoundRequest, session: DbSessi
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не найден")
-    if round_.status != RoundStatus.ACTIVE:
-        raise ValidationError("Редактировать можно только активный тур")
+    if round_.status not in {RoundStatus.DRAFT, RoundStatus.ACTIVE}:
+        raise ValidationError("Редактировать можно только тур в статусе Черновик или Активен")
+
+    now = datetime.now(UTC)
 
     if body.deadline is not None:
         await set_deadline(session, round_id, body.deadline)
 
     if body.matches:
+        deadline_passed = False
+        if round_.status == RoundStatus.ACTIVE:
+            current_deadline = round_.deadline
+            if current_deadline.tzinfo is None:
+                current_deadline = current_deadline.replace(tzinfo=UTC)
+            deadline_passed = now >= current_deadline
+
         for item in body.matches:
             if item.match_id is None:
                 continue
             match = await session.get(Match, item.match_id)
             if match is None or match.round_id != round_id:
                 raise NotFoundError(f"Матч {item.match_id} не найден")
+            if deadline_passed and (item.team1_id is not None or item.team2_id is not None):
+                raise ValidationError("После дедлайна нельзя менять состав матчей")
             if item.team1_id is not None:
                 match.team1_id = item.team1_id
             if item.team2_id is not None:

@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Response
 
-from api.deps import DbSession, RoleChecker, cache_control_header, resolve_default_contest_id
+from api.deps import (
+    DbSession,
+    RoleChecker,
+    cache_control_header,
+    get_optional_user,
+    resolve_default_contest_id,
+)
 from api.handlers.leaderboard import (
     get_global_leaderboard_response,
     get_round_leaderboard_response,
     get_round_results_response,
 )
-from database.models import UserRole
+from database.models import User, UserRole
 from schemas.leaderboard import LeaderboardOut, RoundResultsOut
 from services.leaderboard_service import compute_etag
 from services.scoring_persistence import recalculate_contest
@@ -18,6 +26,7 @@ from services.scoring_persistence import recalculate_contest
 router = APIRouter(tags=["legacy (deprecated)", "rounds (public)", "admin (system)"])
 
 _admin = Depends(RoleChecker(UserRole.ADMIN))
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 
 @router.get("/leaderboard", response_model=LeaderboardOut, deprecated=True)
@@ -33,10 +42,13 @@ async def global_leaderboard(session: DbSession, response: Response) -> Leaderbo
 
 
 @router.get("/rounds/{round_id}/leaderboard", response_model=LeaderboardOut, deprecated=True)
-async def round_leaderboard(round_id: int, session: DbSession, response: Response) -> LeaderboardOut:
+async def round_leaderboard(
+    round_id: int, session: DbSession, response: Response, viewer: OptionalUser
+) -> LeaderboardOut:
     """Таблица лидеров тура. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
-    out = await get_round_leaderboard_response(session, contest_id, round_id)
+    viewer_role = viewer.role if viewer else None
+    out = await get_round_leaderboard_response(session, contest_id, round_id, viewer_role=viewer_role)
     etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
     for k, v in cache_control_header().items():
         response.headers[k] = v
@@ -45,10 +57,13 @@ async def round_leaderboard(round_id: int, session: DbSession, response: Respons
 
 
 @router.get("/rounds/{round_id}/results", response_model=RoundResultsOut, deprecated=True)
-async def round_results(round_id: int, session: DbSession, response: Response) -> RoundResultsOut:
+async def round_results(
+    round_id: int, session: DbSession, response: Response, viewer: OptionalUser
+) -> RoundResultsOut:
     """Результаты тура. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
-    out = await get_round_results_response(session, contest_id, round_id)
+    viewer_role = viewer.role if viewer else None
+    out = await get_round_results_response(session, contest_id, round_id, viewer_role=viewer_role)
     etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
     for k, v in cache_control_header().items():
         response.headers[k] = v

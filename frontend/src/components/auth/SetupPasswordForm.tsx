@@ -149,7 +149,11 @@ export function SetupPasswordForm() {
         disabled={submitting}
         className="w-full bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
       >
-        {submitting ? "Сохранение…" : preview?.mode === "confirm_only" ? "Подтвердить" : "Сохранить"}
+        {submitting
+          ? "Сохранение…"
+          : preview?.mode === "confirm_only"
+            ? "Подтвердить"
+            : "Сохранить"}
       </button>
     </form>
   );

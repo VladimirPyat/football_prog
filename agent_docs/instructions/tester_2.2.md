@@ -66,6 +66,8 @@ Optional for deadline E2E: `E2E_SUPERVISOR_PASSWORD` in gitignored env if API he
 
 Same as `tester_2.1.md` §2.4 — `:3000` UI + `:8000` API.
 
+**Mandatory after E2E:** `tester_2.1.md` §2.5 — verify ports free (`dev_setup.py --check-ports`); kill orphan `next dev` / headless Chromium if Playwright did not exit cleanly.
+
 ---
 
 ## 3. Scope — files you may create/modify
@@ -293,6 +295,7 @@ Include in `test_2.2.md`:
 cd frontend && npm run test:unit
 npm run lint && npm run type-check && npm run format:check
 npm run test:e2e    # backend running
+uv run python src/scripts/dev_setup.py --check-ports   # §2.5 / tester_2.1 §2.5
 npm run build
 ```
 
@@ -319,6 +322,7 @@ Russian summary. Table:
 | `[E2E-USER-PREDICT-FLOW]` | PASS/FAIL | |
 | `[E2E-VISITOR-PRED-STUB]` | PASS/FAIL | |
 | `[E2E-CONTEST-PRED-TAB]` | PASS/FAIL | |
+| `[E2E-TEARDOWN]` | PASS/FAIL | `--check-ports` exit 0 (tester_2.1 §2.5) |
 | `[LINT-ESLINT]` | PASS/FAIL | |
 | `[LINT-TSC]` | PASS/FAIL | |
 | `[LINT-PRETTIER]` | PASS/FAIL | |

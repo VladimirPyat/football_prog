@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  canChangeDeadline,
+  deadlineChangeClosedMessage,
   deadlineErrorMessage,
   getDeadlineRuleHours,
   isDeadlineValid,
@@ -13,28 +15,73 @@ describe("deadlineRule", () => {
     expect(getDeadlineRuleHours({})).toBe(24);
   });
 
-  it("passes when deadline is exactly rule hours before first match", () => {
-    const deadline = "2026-07-01T06:00:00.000Z"; // 12h before 18:00 with 12h rule
-    expect(isDeadlineValid(deadline, matchTime, 12)).toBe(true);
+  // ── Placement rule: deadline must be strictly before first match ──────────
+
+  it("[UNIT-DEADLINE-PLACEMENT] passes when deadline is 1h before first match", () => {
+    const deadline = "2026-07-01T17:00:00.000Z"; // 1h before 18:00
+    expect(isDeadlineValid(deadline, matchTime)).toBe(true);
   });
 
-  it("fails when deadline is after cutoff", () => {
-    const deadline = "2026-07-01T12:00:00.000Z"; // only 6h before with 12h rule
-    expect(isDeadlineValid(deadline, matchTime, 12)).toBe(false);
+  it("[UNIT-DEADLINE-PLACEMENT] passes when deadline is 23h before first match (no 24h gap)", () => {
+    const deadline = "2026-06-30T19:00:00.000Z"; // 23h before 18:00
+    expect(isDeadlineValid(deadline, matchTime)).toBe(true);
   });
 
-  it("passes at 24h boundary with default rule", () => {
-    const deadline = "2026-06-30T18:00:00.000Z";
-    expect(isDeadlineValid(deadline, matchTime, 24)).toBe(true);
+  it("[UNIT-DEADLINE-PLACEMENT] passes at 24h before first match", () => {
+    const deadline = "2026-06-30T18:00:00.000Z"; // exactly 24h before
+    expect(isDeadlineValid(deadline, matchTime)).toBe(true);
   });
 
-  it("fails one millisecond past boundary", () => {
-    const matchMs = Date.parse(matchTime);
-    const deadline = new Date(matchMs - 24 * 3_600_000 + 1).toISOString();
-    expect(isDeadlineValid(deadline, matchTime, 24)).toBe(false);
+  it("[UNIT-DEADLINE-PLACEMENT] passes even 25h before first match", () => {
+    const deadline = "2026-06-30T17:00:00.000Z"; // 25h before
+    expect(isDeadlineValid(deadline, matchTime)).toBe(true);
   });
 
-  it("formats Russian error message with hours", () => {
-    expect(deadlineErrorMessage(48)).toContain("48");
+  it("[UNIT-DEADLINE-PLACEMENT] fails when deadline equals first match time", () => {
+    expect(isDeadlineValid(matchTime, matchTime)).toBe(false);
+  });
+
+  it("[UNIT-DEADLINE-PLACEMENT] fails when deadline is after first match", () => {
+    const deadline = "2026-07-01T19:00:00.000Z"; // 1h after
+    expect(isDeadlineValid(deadline, matchTime)).toBe(false);
+  });
+
+  it("formats Russian error message (placement)", () => {
+    const msg = deadlineErrorMessage();
+    expect(msg).toContain("раньше");
+    expect(msg).toContain("матча");
+  });
+
+  // ── Lockout rule: now <= currentDeadline - ruleHours ─────────────────────
+
+  it("[UNIT-DEADLINE-LOCKOUT] change allowed when well inside window (48h to current deadline)", () => {
+    const now = new Date("2026-06-29T12:00:00.000Z");
+    const currentDeadline = "2026-07-01T12:00:00.000Z"; // 48h away
+    expect(canChangeDeadline(now, currentDeadline, 24)).toBe(true);
+  });
+
+  it("[UNIT-DEADLINE-LOCKOUT] change allowed at exactly the cutoff boundary", () => {
+    const now = new Date("2026-06-30T12:00:00.000Z");
+    const currentDeadline = "2026-07-01T12:00:00.000Z"; // exactly 24h away → now == cutoff
+    expect(canChangeDeadline(now, currentDeadline, 24)).toBe(true);
+  });
+
+  it("[UNIT-DEADLINE-LOCKOUT] change blocked 1ms past boundary", () => {
+    const cutoffMs = Date.parse("2026-06-30T12:00:00.000Z");
+    const now = new Date(cutoffMs + 1);
+    const currentDeadline = "2026-07-01T12:00:00.000Z";
+    expect(canChangeDeadline(now, currentDeadline, 24)).toBe(false);
+  });
+
+  it("[UNIT-DEADLINE-LOCKOUT] change blocked when current deadline is 10h away (within 24h)", () => {
+    const now = new Date("2026-06-30T12:00:00.000Z");
+    const currentDeadline = "2026-06-30T22:00:00.000Z"; // 10h from now
+    expect(canChangeDeadline(now, currentDeadline, 24)).toBe(false);
+  });
+
+  it("formats lockout message with ruleHours", () => {
+    const msg = deadlineChangeClosedMessage(48);
+    expect(msg).toContain("48");
+    expect(msg).toContain("дедлайна");
   });
 });

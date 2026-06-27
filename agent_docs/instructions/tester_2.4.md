@@ -42,6 +42,8 @@ NEXT_PUBLIC_DEFAULT_CONTEST_ID=1
 
 Playwright: `:3000` + `:8000`. Credentials: `user/user`, `supervisor` + `SEED_SUPERVISOR_PASSWORD`, `admin` + `SEED_ADMIN_PASSWORD`.
 
+**Mandatory after E2E:** `tester_2.1.md` §2.5 — `dev_setup.py --check-ports`; kill orphan `next dev` / headless Chromium before manual `dev_setup --run-only`. Full integration suite (`npm run test:e2e`) is the highest-risk hang scenario.
+
 **Fixture facts for 2.4:**
 
 | Round | Status | Use |
@@ -236,6 +238,7 @@ cd frontend
 npm run test:unit
 npm run lint && npm run type-check && npm run format:check
 npm run test:e2e
+uv run python src/scripts/dev_setup.py --check-ports   # tester_2.1 §2.5 — mandatory
 npm run build
 ```
 
@@ -326,6 +329,7 @@ Include in `test_2.4.md`:
 | `[E2E-PRED-*]` | PASS/FAIL | batch/validation/privacy/deadline |
 | `[E2E-SUPERVISOR-*]` | PASS/FAIL | list specs run |
 | `[E2E-RBAC-ADMIN]` | PASS/FAIL | |
+| `[E2E-TEARDOWN]` | PASS/FAIL | `--check-ports` exit 0 after full suite (tester_2.1 §2.5) |
 | `[LINT-ESLINT]` | PASS/FAIL | |
 | `[LINT-TSC]` | PASS/FAIL | |
 | `[LINT-PRETTIER]` | PASS/FAIL | |

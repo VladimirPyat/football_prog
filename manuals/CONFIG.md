@@ -91,6 +91,19 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 | `default_team_logo_url` | `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback logo URL |
 | `contest_defaults_path` | — | `docs/test_data/config/contest_defaults.json` | Seed JSON path (code only) |
 
+### Recommended local profile (Stage 1.12) [NEW]
+
+For E2E and supervisor training workflows, common `.env` overrides:
+
+```bash
+ENFORCE_PASSWORD_SETUP=false      # legacy change-password path for automated login
+SUPERVISOR_TRAINING_MODE=true     # supervisor finish/delete/restore
+CONTEST_DELETE_GRACE_SECONDS=0    # instant delete after pause
+FRONTEND_BASE_URL=http://127.0.0.1:3000
+```
+
+Production defaults keep `ENFORCE_PASSWORD_SETUP=true` and `SUPERVISOR_TRAINING_MODE=false`. See [DEV_SETUP.md — confirm participants without email](DEV_SETUP.md#new-contest-confirm-participants-without-email-stage-112).
+
 ### Team logo storage
 
 | Path | Git | Purpose |

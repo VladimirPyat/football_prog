@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/useToast";
 import { AppError } from "@/lib/api/client";
 
 export default function AdminSettingsParametersPage() {
-  const { contest, patchContest } = useContestAdmin();
+  const { contest, patchContest, refetch } = useContestAdmin();
   const { showSuccess, showError } = useToast();
 
   if (!contest) return null;
@@ -16,7 +16,7 @@ export default function AdminSettingsParametersPage() {
   const uiMode = deriveAdminUiMode({ contest, round: null });
 
   return (
-    <AdminPageShell title="Настройки" showSettingsNav>
+    <AdminPageShell title="Настройки" showSettingsNav showSetupLockBanner>
       <ContestParametersForm
         contest={contest}
         readonly={uiMode.setupReadonly}
@@ -28,6 +28,11 @@ export default function AdminSettingsParametersPage() {
             showError(err instanceof AppError ? err.detail : "Ошибка сохранения");
           }
         }}
+        onLifecycleSuccess={async () => {
+          await refetch();
+          showSuccess("Статус конкурса обновлён");
+        }}
+        onLifecycleError={showError}
       />
     </AdminPageShell>
   );

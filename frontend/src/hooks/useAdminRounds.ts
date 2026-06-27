@@ -49,7 +49,13 @@ export function useAdminRounds(contestId: number) {
       roundId: number,
       body: {
         deadline?: string;
-        matches?: { match_id: number; date_time?: string; status?: string }[];
+        matches?: {
+          match_id: number;
+          date_time?: string;
+          status?: string;
+          team1_id?: number;
+          team2_id?: number;
+        }[];
       },
     ) => {
       await apiPatch(contestAdmin.rounds.patch(contestId, roundId), body);

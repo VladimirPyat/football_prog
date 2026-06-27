@@ -34,7 +34,7 @@ export async function fillLoginForm(
   password: string,
 ): Promise<void> {
   await page.getByLabel("Логин").fill(login);
-  await page.getByLabel("Пароль").fill(password);
+  await page.locator("#password").fill(password);
 }
 
 export async function submitLogin(page: Page): Promise<void> {

@@ -13,6 +13,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) | Initial ADMIN/SUPERVISOR via `.env` + bootstrap script |
 | [DEV_SETUP.md](DEV_SETUP.md) | **Local dev:** deps, bootstrap script, API + frontend, test logins |
 | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) | **Frontend map:** routes, components, editable UI copy (human quick edits) |
+| [STATUS_REFERENCE.md](STATUS_REFERENCE.md) | **Статусы:** конкурс, тур, матч — смысл, переходы, где в коде; API vs подписи UI |
 | [API_GUIDE.md](API_GUIDE.md) | FastAPI routes, auth, RBAC, contest lifecycle |
 | [ERROR_LOGGING.md](ERROR_LOGGING.md) | Политика ошибок и логирования (RU) |
 | [MANUAL_SCORING_VERIFICATION.md](MANUAL_SCORING_VERIFICATION.md) | Stage 1 sign-off: ручная проверка scoring + CANARY (RU) |
@@ -33,7 +34,10 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | **1.8** — Contest discovery & user contacts | [API_GUIDE.md](API_GUIDE.md#contest-discovery--user-contacts) |
 | **1.7** — Leaderboard counts & invite accept | [API_GUIDE.md](API_GUIDE.md#multi-contest-api) (count_* fields, participant accept) |
 | **1.9** — Team logo upload & static assets | [API_GUIDE.md](API_GUIDE.md#multi-contest-api), [CONFIG.md](CONFIG.md#team-logo-storage) |
+| **1.12** — Invite accept without SMTP | [DEV_SETUP.md](DEV_SETUP.md#new-contest-confirm-participants-without-email-stage-112) |
+| **1.14** — Dev fixture (round statuses for manual QA) | [DEV_SETUP.md](DEV_SETUP.md#dev-fixture--finalize_dev_fixture-stage-114), [STATUS_REFERENCE.md](STATUS_REFERENCE.md) |
 | **2.x** — Frontend local dev | [DEV_SETUP.md](DEV_SETUP.md) |
 | **2.x** — Frontend routes & UI copy | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) |
+| **2.x** — Status glossary (contest / round / match) | [STATUS_REFERENCE.md](STATUS_REFERENCE.md) |
 
-Last synced: DEV_SETUP.md (Stage 2 bootstrap); OpenAPI v1.2.0.
+Last synced: DEV_SETUP.md (Stage 1.14 fixture + invite workflow).
