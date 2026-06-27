@@ -60,4 +60,16 @@ Replace manual `dev_setup.py --run` with compose services for API, UI, and optio
 
 ---
 
-*Last updated: 2026-06-24 — Stage 2.1.1: demo user bootstrap, CONTEST_LOCKED invite note, loader auth marked resolved via bootstrap.*
+## Stage 2 — Supervisor rounds UX
+
+### Backend: block ACTIVE round structure edits — **Open**
+
+**When:** After frontend policy (2026-06-27) forbids team changes on ACTIVE tours in UI.
+
+**Action:** Harden `PATCH …/admin/rounds/{id}` in `contest_ops.py` / `admin_rounds.py` — reject `team1_id` / `team2_id` on `ACTIVE` rounds regardless of prediction deadline (supervisor mistakes → admin rebuilds tour).
+
+**Priority:** Low — frontend-only guard is sufficient for normal supervisor flow.
+
+---
+
+*Last updated: 2026-06-27 — ACTIVE match schedule UX; backend structure lock backlog.*

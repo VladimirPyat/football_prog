@@ -209,64 +209,42 @@ Pass `round.deadline` into mode derivation (already available on `RoundOut`).
 
 ---
 
-## 4. Pre-deadline match editing on ACTIVE (F3, F4)
+## 4. Match editing on ACTIVE (F3, F4) — updated 2026-06-27
 
-### 4.1 Intended UI rules
+### 4.1 Intended UI rules (supervisor)
 
-| Round state | `now` vs deadline | Editable |
-|-------------|-------------------|----------|
-| `DRAFT` | — | Full structure: teams, add/remove matches, dates, deadline, activate |
-| `ACTIVE` | `now < deadline` | **Same as DRAFT** (teams, add/remove, dates, deadline if change window open) |
-| `ACTIVE` | `now >= deadline` | Status + date only; «Закрыть тур» CTA |
-| `CLOSED`+ | — | Read-only on rounds page; results on `/admin/results` |
+| Round state | Editable on frontend |
+|-------------|----------------------|
+| `DRAFT` | Full structure: teams, dates, deadline, activate |
+| `ACTIVE` | **No team changes.** Reschedule kickoff until match start (ignores prediction deadline). Cancel anytime (confirm). Long league postpone → status `POSTPONED` + free tour. Restore `CANCELED`/`POSTPONED` → `SCHEDULED` **ADMIN only**. |
+| `CLOSED`+ | Read-only on rounds page; results on `/admin/results` |
 
-This **supersedes** `coder_2.3.md` §3.2 row «ACTIVE → structure frozen».
+**Rationale:** After activation participants may have predictions; league calendar is not changed via supervisor UI — only schedule exceptions (short reschedule, cancel, free tour).
+
+**Backend:** No change in this pass — PATCH may still accept team swaps before prediction deadline; enforce later (see `agent_docs/reports/todo.md`).
 
 ### 4.2 Frontend
 
 **`deriveAdminUiMode.ts`:**
 
 ```ts
-const beforePredictionDeadline = isActiveRound && !deadlinePassed;
-
-const canEditRoundStructure =
-  !disableAllMutations &&
-  (roundStatus === "DRAFT" || beforePredictionDeadline);
+const canEditRoundStructure = !disableAllMutations && roundStatus === "DRAFT";
 
 const canEditMatchStatusAndDate =
-  !disableAllMutations &&
-  (roundStatus === "DRAFT" || isActiveRound); // includes after deadline
+  !disableAllMutations && (roundStatus === "DRAFT" || isActiveRound);
 ```
 
-**`RoundManagementPanel` / `MatchEditorRow`:** when `canEditRoundStructure` on ACTIVE, show team selects + «+ Добавить матч» (respect `matches_per_round`).
+**`matchScheduleEdit.ts` + `MatchEditorRow`:** kickoff-based reschedule; cancel/postpone with `ConfirmDialog`; admin restore.
 
-**`ConfirmDialog` (activate):** message → «После активации участники смогут делать прогнозы. До дедлайна вы сможете менять состав матчей; после дедлайна — только статус и дату.»
+**Save button:** do **not** disable on 24h deadline lockout when only match fields changed — lockout applies to deadline field only.
 
-**Hints:**
+**`ConfirmDialog` (activate):** «После активации … Состав матчей изменить уже нельзя — только перенос времени до начала, отмена или перенос в свободный тур.»
 
-- Replace «ТУР АКТИВИРОВАН. Менять можно только статус матча и дату.» with phase-aware text:
-  - before deadline: «Тур активен. До дедлайна можно редактировать матчи.»
-  - after deadline: «Дедлайн прошёл. Менять команды нельзя — только статус и дату.»
+**Hint (ACTIVE):** «Тур активен. Состав матчей изменить нельзя. До начала матча можно перенести время; отмена — в любой момент. Перенос на другую неделю — через «Перенести (свободный тур)».»
 
-### 4.3 Backend
+### 4.3 Backend (unchanged)
 
-**`PATCH …/admin/rounds/{round_id}`** (`admin_rounds.py`, `contest_ops.py`):
-
-When `round.status == ACTIVE`:
-
-```python
-deadline_passed = now >= round_.deadline
-if deadline_passed and body.matches:
-    for item in body.matches:
-        if item.team1_id is not None or item.team2_id is not None:
-            raise ValidationError("После дедлайна нельзя менять состав матчей")
-        # date_time + status still allowed
-```
-
-If product needs **add/remove matches** on ACTIVE before deadline, extend PATCH schema + service (currently only updates existing `match_id` rows). Minimum for this fix:
-
-- Allow `team1_id` / `team2_id` swap while `now < deadline`
-- Block team changes when `now >= deadline`
+**`PATCH …/admin/rounds/{round_id}`** — still allows `team1_id`/`team2_id` while `now < deadline` on ACTIVE. Frontend-only restriction until backend hardening.
 
 Add/remove matches on ACTIVE: **optional stretch** — only if `RoundBuilderForm` already POSTs full round; else document as follow-up **F3b** in report.
 

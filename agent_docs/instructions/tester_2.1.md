@@ -94,7 +94,17 @@ Playwright `webServer` starts `npm run dev` on **:3000**. If the run is interrup
 **After every E2E run** (pass or fail), before manual dev stack or next test session:
 
 1. Ensure the `playwright test` / `npm run test:e2e` process has **fully exited** (no hung worker in background).
-2. Verify dev ports are free:
+2. **Stop the backend** if you started it manually (Terminal 1 `uvicorn` or `dev_setup --run-only`):
+   - **Preferred:** `Ctrl+C` in the terminal where API (or `dev_setup --run-only`) is running.
+   - **If that terminal is gone or process orphaned:**
+
+```bash
+pkill -f "uvicorn main:app" 2>/dev/null || true
+fuser -k 8000/tcp 2>/dev/null || true
+```
+
+   Playwright stops **UI** (`next dev` on `:3000`) on clean exit; **API on `:8000` is never stopped by Playwright** — you must stop it explicitly.
+3. Verify dev ports are free:
 
 ```bash
 uv run python src/scripts/dev_setup.py --check-ports
@@ -102,7 +112,7 @@ uv run python src/scripts/dev_setup.py --check-ports
 
 → exit **0** = both `:8000` (API) and `:3000` (UI) free. Required before handing off to `dev_setup.py --run-only`.
 
-3. If a port is still in use, identify and stop orphans:
+4. If a port is still in use, identify and stop orphans:
 
 ```bash
 ss -lntp | grep -E ':3000|:8000'
@@ -116,11 +126,11 @@ fuser -k 8000/tcp 2>/dev/null || true
 
 Re-run `--check-ports` until exit 0.
 
-4. **Do not** run `dev_setup --run-only` while Playwright still owns `:3000` or while a stray `uvicorn` holds `:8000` from an old session.
+5. **Do not** run `dev_setup --run-only` while Playwright still owns `:3000` or while a stray `uvicorn` holds `:8000` from an old session.
 
 | Tag | Pass criteria |
 |-----|---------------|
-| `[E2E-TEARDOWN]` | `--check-ports` exit 0 after E2E; no orphan `next` / headless Chromium on `:3000` |
+| `[E2E-TEARDOWN]` | `--check-ports` exit 0 after E2E; **API stopped** (no `uvicorn` on `:8000`); no orphan `next` / headless Chromium on `:3000` |
 
 **CI:** `CI=1` → `reuseExistingServer: false` in `playwright.config.ts`; Playwright stops `webServer` on clean exit. Local runs still need §2.5 if the process was killed abruptly.
 

@@ -359,12 +359,14 @@ export function ensureLoadedContestDevState(): void {
 }
 
 export function reloadLoadedContestFixture(): void {
+  console.log("[E2E] reloadLoadedContestFixture — load_test_data --reset (may take 60–120s)…");
   execSync(
     "cd /work/football_prog && uv run python src/scripts/load_test_data.py --reset && " +
       "uv run python src/scripts/bootstrap_users.py && " +
       "uv run python src/scripts/dev_setup.py --ensure-running-only",
-    { stdio: "pipe", timeout: 120_000 },
+    { stdio: "inherit", timeout: 180_000 },
   );
+  console.log("[E2E] reloadLoadedContestFixture — done");
 }
 
 const ROUND_STATUS_LABELS: Record<string, string> = {
@@ -457,6 +459,33 @@ export async function selectContestInPicker(page: Page, contestName: string): Pr
     }
   }
   throw new Error(`Contest not found in picker: ${contestName}`);
+}
+
+export async function setMatchResult(
+  token: string,
+  contestId: number,
+  matchId: number,
+  score1: number,
+  score2: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/v1/contests/${contestId}/admin/matches/${matchId}/result`,
+    {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify({ score1, score2 }),
+    },
+  );
+  if (!res.ok) throw new Error(`setMatchResult: ${res.status} ${await res.text()}`);
+}
+
+export function finalizeLoadedContestFixture(): void {
+  console.log("[E2E] finalizeLoadedContestFixture…");
+  execSync(
+    "cd /work/football_prog && uv run python src/scripts/dev_setup.py --finalize-fixture-only",
+    { stdio: "inherit", timeout: 180_000 },
+  );
+  console.log("[E2E] finalizeLoadedContestFixture — done");
 }
 
 export async function moveRoundToPast(

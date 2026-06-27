@@ -14,6 +14,37 @@ import {
 } from "./fixtures/adminApi";
 import { SUPERVISOR_PASSWORD } from "./fixtures/credentials";
 
+test.describe("[E2E-TOUR-DATE-VALIDATION]", () => {
+  test.skip(!SUPERVISOR_PASSWORD, "SEED_SUPERVISOR_PASSWORD not configured");
+
+  test("empty match date shows human seed error", async ({ page }) => {
+    const token = await supervisorToken();
+    const contest = await createDraftContest(token, `E2E DateVal ${Date.now()}`, {
+      total_teams: 4,
+      matches_per_round: 2,
+      total_rounds: 2,
+    });
+    const teams = await addTeams(token, contest.id, 4);
+
+    await clearAuthStorage(page);
+    await seedSupervisorSession(page);
+    await gotoAdminContest(page, contest.id, "/admin/rounds");
+    await waitForAdminShell(page);
+
+    const form = page.locator("form").filter({ hasText: "Создать тур (черновик)" });
+    await form.locator('input[type="datetime-local"]').first().fill("2026-11-01T10:00");
+    await form.locator("select").nth(0).selectOption(String(teams[0]!.id));
+    await form.locator("select").nth(1).selectOption(String(teams[1]!.id));
+    await form.getByRole("button", { name: "Создать черновик тура" }).click();
+
+    await expect(page.getByText("Укажите дату и время для каждого матча")).toBeVisible();
+
+    await form.locator('input[type="datetime-local"]').nth(1).fill("2026-12-02T15:00");
+    await form.getByRole("button", { name: "Создать черновик тура" }).click();
+    await expect(page.getByText("Укажите дату и время для каждого матча")).not.toBeVisible();
+  });
+});
+
 test.describe.serial("[E2E-SUPERVISOR-CREATE-ROUND] + [E2E-ADMIN-LOCK] Path A", () => {
   test.skip(!SUPERVISOR_PASSWORD, "SEED_SUPERVISOR_PASSWORD not configured");
 

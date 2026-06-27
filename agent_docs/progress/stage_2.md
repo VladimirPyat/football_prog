@@ -132,3 +132,24 @@
 - Fixed: `test_lb_public_published_round_allowed`, `admin.ts` lint, E2E spec semantics (24h/active/copy)
 - E2E: BLOCKED — global-setup `PASSWORD_SETUP_REQUIRED` for provision user
 - Report refreshed: `agent_docs/reports/test_2.3.1_fix_rounds.md`
+
+## 2026-06-27 — Coder (2.3.2 backend calculated edit)
+- STATUS: READY_FOR_TEST
+- Files: `src/services/match_service.py` (set_result CLOSED|CALCULATED + auto recalc), `tests/api/test_results_calculated_edit_2_3_2.py`, `manuals/API_GUIDE.md`, `manuals/STATUS_REFERENCE.md`
+- Verified: `pytest tests/api/test_results_calculated_edit_2_3_2.py -q` 4/4; `pytest tests/api/test_calculate_leaderboard_1_4.py -q` 8/8 (+1 skip); `ruff check src/services/match_service.py` OK
+- Tag: [API-RESULT-CALCULATED]
+- Next: @Tester → `agent_docs/instructions/tester_2.3.2_fix_tours.md` or `tester_2.3.2_backend_calculated_edit.md`; frontend B3 unlock (`coder_2.3.2_fix_tours.md` §5)
+
+## 2026-06-27 — Coder (2.3.2 frontend tours/results UX)
+- STATUS: READY_FOR_TEST
+- Scope: T1–T12 + B3 unlock (matchResultsGating, deriveAdminUiMode, RoundPhasePanel, ResultsEntryPanel, MatchResultRow)
+- Key paths: `frontend/src/lib/admin/matchResultsGating.ts`, `deriveAdminUiMode.ts`, `RoundPhasePanel.tsx`, `ResultsEntryPanel.tsx`, E2E specs (tours_phase_panels, results_kickoff, results_preview)
+- Verified: Vitest 82/82; lint/tsc OK; format fixed
+- Next: `agent_docs/instructions/tester_2.3.2_fix_tours.md`
+
+## 2026-06-27 — Tester (2.3.2 fix tours + backend calculated edit)
+- STATUS: TEST_PASS (automated); E2E SKIP (UI :3000 down)
+- Report: `agent_docs/reports/test_2.3.2_fix_tours.md`
+- Unit: 82 passed; backend: calculated edit 4/4, calculate regression 8/8 (+1 skip), LB gate 5/5
+- E2E: specs created, not run — UI connection refused; API :8000 up
+- Next: `dev_setup.py --run-only` + `npm run test:e2e`; manual 1.14 matrix QA

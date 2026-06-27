@@ -27,26 +27,16 @@ export function RoundLeaderboardPreview({ contestId, roundId }: RoundLeaderboard
   useEffect(() => {
     setLoading(true);
     setError(null);
-    apiGet<{ leaderboard: LeaderboardRow[] }>(
-      contestAdmin.rounds.leaderboard(contestId, roundId),
-    )
+    apiGet<{ leaderboard: LeaderboardRow[] }>(contestAdmin.rounds.leaderboard(contestId, roundId))
       .then((data) => setRows(data.leaderboard))
       .catch(() => setError("Не удалось загрузить таблицу"))
       .finally(() => setLoading(false));
   }, [contestId, roundId]);
 
-  if (loading)
-    return (
-      <p className="text-xs text-gray-500 animate-pulse">Загрузка таблицы…</p>
-    );
-  if (error)
-    return <p className="text-xs text-red-600">{error}</p>;
+  if (loading) return <p className="text-xs text-gray-500 animate-pulse">Загрузка таблицы…</p>;
+  if (error) return <p className="text-xs text-red-600">{error}</p>;
   if (!rows.length)
-    return (
-      <p className="text-xs text-gray-500">
-        Очки не рассчитаны или участники отсутствуют.
-      </p>
-    );
+    return <p className="text-xs text-gray-500">Очки не рассчитаны или участники отсутствуют.</p>;
 
   return (
     <div className="space-y-2">

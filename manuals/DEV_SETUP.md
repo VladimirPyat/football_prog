@@ -80,22 +80,32 @@ uv run python src/scripts/dev_setup.py --run-only     # start servers only (skip
 uv run python src/scripts/dev_setup.py --minimal    # empty contest + admin only (no CSV loader)
 uv run python src/scripts/dev_setup.py --no-reset   # full without wiping loader tables first
 uv run python src/scripts/dev_setup.py --check      # prerequisites only, no DB changes
+uv run python src/scripts/dev_setup.py --check-ports  # verify :8000 and :3000 are free [UPDATED]
 uv run python src/scripts/dev_setup.py --ensure-running-only          # manual fixture after loader
 uv run python src/scripts/dev_setup.py --ensure-running-only --e2e    # E2E: round 10 ACTIVE only
 uv run python src/scripts/dev_setup.py --finalize-fixture-only      # repair fixture on existing DB
 uv run python src/scripts/dev_setup.py --help
 ```
 
-### What `--run` / `--run-only` do
+### What `--run` / `--run-only` do [UPDATED]
 
-1. Ensure `frontend/.env.local` exists (copy from `.env.local.example` if missing)
-2. Run `npm install` in `frontend/` when `node_modules/` is absent
-3. Start **API**: `uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000`
-4. Start **UI**: `npm run dev` in `frontend/` → `http://127.0.0.1:3000`
-5. Poll `/health` and UI root until ready (or timeout ~90s)
-6. On **Ctrl+C** or SIGTERM — stop both child processes
+1. **`assert_dev_ports_free`** — abort if API `:8000` or UI `:3000` already in use (see `--check-ports`)
+2. Ensure `frontend/.env.local` exists (copy from `.env.local.example` if missing)
+3. Run `npm install` in `frontend/` when `node_modules/` is absent
+4. Start **API**: `uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000`
+5. Start **UI**: `npm run dev` in `frontend/` → `http://127.0.0.1:3000`
+6. Poll `/health` and UI root until ready (or timeout ~90s)
+7. On **Ctrl+C** or SIGTERM — stop both child processes
 
-`--run` = default full setup, then steps 1–6. `--run-only` = steps 1–6 without touching the DB.
+`--run` = default full setup, then steps 1–7. `--run-only` = steps 1–7 without touching the DB.
+
+**Port check only:**
+
+```bash
+uv run python src/scripts/dev_setup.py --check-ports
+# ✅ API: 127.0.0.1:8000 is free
+# ❌ UI: 127.0.0.1:3000 is in use  → exit 1
+```
 
 ### What `--full` (default) does
 
@@ -167,6 +177,8 @@ ORDER BY r.number;
 Status meanings and UI walkthrough: [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3 (dev fixture table).
 
 **Pytest isolation:** `load_test_data.py` alone keeps rounds 1–9 `CLOSED` and round 10 `ACTIVE` — finalize runs only from `dev_setup`, not from the loader.
+
+**Stage 2.3.2 manual QA:** after supervisor walkthrough on `/admin/rounds` or `/admin/results`, re-run `--finalize-fixture-only` before handoff to restore rounds 9=`PUBLISHED`, 10=`CALCULATED`, 11=`CLOSED` (see [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3).
 
 ---
 
@@ -263,7 +275,7 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 | Admin missing after loader | Run `bootstrap_users.py` **after** `load_test_data --reset` |
 | `user/user` login fails (401) | Re-run `dev_setup.py` — demo USER is created by `bootstrap_users.py` after loader |
 | Playwright E2E cannot find browser | `npx playwright install chromium` in `frontend/` |
-| Port in use | Stop process on :8000/:3000 or change ports in script / `frontend/package.json` |
+| Port in use | `uv run python src/scripts/dev_setup.py --check-ports`; stop process on :8000/:3000 or use another terminal's stack |
 | `--run` exits immediately | Check logs — missing `frontend/`, `node`, or `npm`; run `--check` |
 | UI not ready after `--run` | Wait up to 90s on first `npm install`; re-run `cd frontend && npm run dev` |
 
@@ -410,4 +422,4 @@ You **do not** re-run `bootstrap_users.py` on every API restart — users persis
 
 ---
 
-*Last updated: Stage 1.14 — `finalize_dev_fixture` manual profile; participant confirm without SMTP.*
+*Last updated: Stage 2.3.1 — `--check-ports`; Stage 1.14 fixture + invite workflow.*

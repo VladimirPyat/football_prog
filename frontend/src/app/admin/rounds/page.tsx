@@ -12,16 +12,8 @@ import { AppError } from "@/lib/api/client";
 
 export default function AdminRoundsPage() {
   const { contest, contestId, refetch: refetchContest } = useContestAdmin();
-  const {
-    rounds,
-    loading,
-    createRound,
-    activateRound,
-    updateRound,
-    createFreeTour,
-    closeRound,
-    publishRound,
-  } = useAdminRounds(contestId);
+  const { rounds, loading, createRound, activateRound, updateRound, createFreeTour, closeRound } =
+    useAdminRounds(contestId);
   const { teams } = useTeams(contestId);
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
   const {
@@ -92,15 +84,6 @@ export default function AdminRoundsPage() {
             showSuccess("Тур закрыт");
           } catch (err) {
             showError(err instanceof AppError ? err.detail : "Ошибка закрытия тура");
-          }
-        }}
-        onPublishRound={async (roundId) => {
-          try {
-            await publishRound(roundId);
-            await refetchContest();
-            showSuccess("Тур опубликован");
-          } catch (err) {
-            showError(err instanceof AppError ? err.detail : "Ошибка публикации");
           }
         }}
         onRefetchMatches={refetchMatches}

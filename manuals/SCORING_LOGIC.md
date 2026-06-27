@@ -224,10 +224,12 @@ From `rules_json.constraints` (seeded defaults):
 
 Structural limits from `contest_structure`:
 
-| Key | Default |
-|-----|---------|
-| `deadline_rule_hours` | `24` |
-| `max_score_value` | `20` |
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `deadline_rule_hours` | `24` | **Change lockout only** [UPDATED]: on an `ACTIVE` round, supervisor may PATCH deadline only while `now <= current_deadline - N hours`. Does **not** require deadline to be N hours before first kickoff. |
+| `max_score_value` | `20` | Max match score (also enforced at API/DB) |
+
+**Before → After (2026-06-27):** Deadline **placement** at create/PATCH is independent of `deadline_rule_hours`: must satisfy `now < deadline < earliest_match`. The 24h value gates **editing** an existing deadline on active rounds (`assert_deadline_change_allowed` in `round_service.py`). See [API_GUIDE.md — round_service](API_GUIDE.md#round_servicepy-updated).
 
 Round-robin validation (when `is_round_robin=true`):
 

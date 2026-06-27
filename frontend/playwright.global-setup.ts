@@ -22,6 +22,21 @@ async function apiLogin(login: string, password: string): Promise<string> {
   return ((await res.json()) as { access_token: string }).access_token;
 }
 
+async function completeSetupViaToken(setupUrl: string, newPassword: string): Promise<void> {
+  const token = new URL(setupUrl).searchParams.get("token");
+  if (!token) {
+    throw new Error(`setup_url missing token: ${setupUrl}`);
+  }
+  const res = await fetch(`${API_BASE}/api/v1/auth/complete-setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!res.ok) {
+    throw new Error(`complete-setup failed: ${res.status} ${await res.text()}`);
+  }
+}
+
 async function provisionRegularUser(supervisorPassword: string): Promise<E2EUserCredentials> {
   const supervisorToken = await apiLogin(SUPERVISOR_LOGIN, supervisorPassword);
   const auth = { Authorization: `Bearer ${supervisorToken}` };
@@ -50,10 +65,22 @@ async function provisionRegularUser(supervisorPassword: string): Promise<E2EUser
   if (!inviteRes.ok) {
     throw new Error(`Invite failed: ${inviteRes.status} ${await inviteRes.text()}`);
   }
-  const invite = (await inviteRes.json()) as { login: string; temp_password: string };
+  const invite = (await inviteRes.json()) as {
+    login: string;
+    temp_password: string;
+    setup_url: string;
+  };
 
-  const tempToken = await apiLogin(invite.login, invite.temp_password);
   const newPassword = "E2eUserPass1!";
+
+  // ENFORCE_PASSWORD_SETUP=true (default): temp-password login returns 403 — use setup token.
+  if (invite.setup_url) {
+    await completeSetupViaToken(invite.setup_url, newPassword);
+    return { login: invite.login, password: newPassword, contestId };
+  }
+
+  // Legacy path when enforce_password_setup=false
+  const tempToken = await apiLogin(invite.login, invite.temp_password);
   const changeRes = await fetch(`${API_BASE}/api/v1/auth/change-password`, {
     method: "POST",
     headers: {
@@ -73,6 +100,17 @@ async function provisionRegularUser(supervisorPassword: string): Promise<E2EUser
 }
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
+  console.log("[E2E globalSetup] Checking API at", API_BASE);
+  const health = await fetch(`${API_BASE}/health`).catch(() => null);
+  if (!health?.ok) {
+    throw new Error(
+      `API not reachable at ${API_BASE}/health — start backend first:\n` +
+        "  uv run uvicorn main:app --host 127.0.0.1 --port 8000\n" +
+        "  (Playwright starts UI on :3000 automatically via webServer)",
+    );
+  }
+  console.log("[E2E globalSetup] API OK — provisioning test user…");
+
   const rootEnv = parseRootEnv();
   const supervisorPassword = rootEnv.SEED_SUPERVISOR_PASSWORD ?? "";
   if (!supervisorPassword) {
@@ -83,4 +121,5 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
 
   const credentials = await provisionRegularUser(supervisorPassword);
   fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2), "utf8");
+  console.log("[E2E globalSetup] Done — user", credentials.login, "contest", credentials.contestId);
 }

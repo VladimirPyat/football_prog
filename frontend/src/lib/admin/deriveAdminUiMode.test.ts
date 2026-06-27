@@ -32,7 +32,11 @@ const draftRound: RoundOut = {
 };
 
 const activeRoundFarDeadline: RoundOut = { ...draftRound, status: "ACTIVE", deadline: farDeadline };
-const activeRoundNearDeadline: RoundOut = { ...draftRound, status: "ACTIVE", deadline: nearDeadline };
+const activeRoundNearDeadline: RoundOut = {
+  ...draftRound,
+  status: "ACTIVE",
+  deadline: nearDeadline,
+};
 const publishedRound: RoundOut = { ...draftRound, status: "PUBLISHED" };
 
 describe("deriveAdminUiMode", () => {
@@ -62,17 +66,17 @@ describe("deriveAdminUiMode", () => {
     expect(mode.canEditMatchStatusAndDate).toBe(false);
   });
 
-  it("[UNIT-UI-MODE-PRE-DEADLINE] ACTIVE + !deadlinePassed → canEditRoundStructure true", () => {
+  it("[UNIT-UI-MODE-ACTIVE] ACTIVE → structure frozen, schedule actions allowed", () => {
     const mode = deriveAdminUiMode({
       contest: baseContest,
       round: activeRoundFarDeadline,
       deadlinePassed: false,
     });
-    expect(mode.canEditRoundStructure).toBe(true);
+    expect(mode.canEditRoundStructure).toBe(false);
     expect(mode.canEditMatchStatusAndDate).toBe(true);
   });
 
-  it("[UNIT-UI-MODE-PRE-DEADLINE] ACTIVE + deadlinePassed → canEditRoundStructure false, canEditMatchStatusAndDate true", () => {
+  it("[UNIT-UI-MODE-ACTIVE] ACTIVE + deadlinePassed → structure still frozen", () => {
     const mode = deriveAdminUiMode({
       contest: baseContest,
       round: activeRoundFarDeadline,
@@ -108,18 +112,30 @@ describe("deriveAdminUiMode", () => {
     expect(mode.canEditDeadline).toBe(true);
   });
 
-  it("enables results workflow for CLOSED round", () => {
+  it("[UNIT-UI-MODE-RESULTS-CLOSED] CLOSED → canEnterResults, canCalculate, !canPublish", () => {
     const closed: RoundOut = { ...draftRound, status: "CLOSED" };
     const mode = deriveAdminUiMode({ contest: baseContest, round: closed });
     expect(mode.canEnterResults).toBe(true);
     expect(mode.canCalculate).toBe(true);
     expect(mode.canPublish).toBe(false);
+    expect(mode.resultsReadonly).toBe(false);
   });
 
-  it("shows applied badge for PUBLISHED", () => {
+  it("[API-RESULT-CALCULATED] CALCULATED → canEnterResults true, resultsReadonly false", () => {
+    const calculated: RoundOut = { ...draftRound, status: "CALCULATED" };
+    const mode = deriveAdminUiMode({ contest: baseContest, round: calculated });
+    expect(mode.canEnterResults).toBe(true);
+    expect(mode.resultsReadonly).toBe(false);
+    expect(mode.canPublish).toBe(true);
+    expect(mode.canCalculate).toBe(false);
+  });
+
+  it("[UNIT-UI-MODE-RESULTS-CLOSED] PUBLISHED → resultsReadonly, !canCalculate, !canPublish", () => {
     const mode = deriveAdminUiMode({ contest: baseContest, round: publishedRound });
     expect(mode.showAppliedBadge).toBe(true);
     expect(mode.resultsReadonly).toBe(true);
+    expect(mode.canCalculate).toBe(false);
+    expect(mode.canPublish).toBe(false);
     expect(mode.canVoidMatch).toBe(true);
   });
 
@@ -148,6 +164,19 @@ describe("deriveAdminUiMode", () => {
       hasDraftRound: true,
     });
     expect(mode.canCreateRound).toBe(false);
+  });
+
+  it("[UNIT-UI-MODE-RESULTS-CLOSED] PAUSED contest overrides mutations", () => {
+    const closed: RoundOut = { ...draftRound, status: "CLOSED" };
+    const mode = deriveAdminUiMode({
+      contest: { ...baseContest, status: "PAUSED" },
+      round: closed,
+    });
+    expect(mode.disableAllMutations).toBe(true);
+    expect(mode.canEnterResults).toBe(false);
+    expect(mode.canCalculate).toBe(false);
+    expect(mode.canPublish).toBe(false);
+    expect(mode.canVoidMatch).toBe(false);
   });
 
   it("allows void on PUBLISHED but not when paused", () => {

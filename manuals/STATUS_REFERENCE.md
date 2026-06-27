@@ -71,7 +71,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | `DRAFT` | Черновик | Черновик | Тур собран (матчи, дедлайн), но участники **ещё не** принимают прогнозы. Можно активировать. |
 | `ACTIVE` | Активен | Приём прогнозов *(опционально)* | Участники заполняют прогнозы до поля `deadline`. |
 | `CLOSED` | Закрыт | **Дедлайн** | Дедлайн прогнозов прошёл. Прогнозы закрыты; на вкладке **Результаты** вводятся счёта матчей. |
-| `CALCULATED` | Рассчитан | Рассчитан | Очки посчитаны (`POST …/calculate`). Можно **опубликовать** тур в общую таблицу. |
+| `CALCULATED` | Рассчитан | Рассчитан | Очки посчитаны (`POST …/calculate`). Можно **исправить счёт** на «Результаты» (авто-пересчёт) или **опубликовать** тур в общую таблицу. |
 | `PUBLISHED` | Опубликован | Опубликован | Тур **подтверждён**; публичная таблица и матрица результатов **доступны** участникам и гостям. |
 
 ### 2.3 Видимость таблицы и результатов (политика продукта)
@@ -87,16 +87,27 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 > - **`CALCULATED`** — очки уже в таблице `scores` (после «Рассчитать»), но **не показываются публично** до `PUBLISHED`.
 > - **`PUBLISHED`** — супервайзер нажал «Опубликовать»; тот же `scores`, тур открыт для всех.
 
-**Реализация (целевая, `coder_2.3.1_fix` §9.9):**
+**Реализация (Stage 2.3.1) [UPDATED]:**
 
 | Слой | Файл | Правило |
 |------|------|---------|
-| Backend | `src/services/leaderboard_service.py` | Публичный GET: только `PUBLISHED`; для SUPERVISOR+ допускается `CALCULATED` (preview) |
+| Backend | `src/services/leaderboard_service.py` | `_allowed_round_statuses`: публичный GET — только `PUBLISHED`; для `SUPERVISOR`/`ADMIN` — также `CALCULATED` (preview) |
 | Backend | `get_global_leaderboard` | Агрегировать только туры `PUBLISHED` |
+| Backend | `contest_ops.py`, `admin_misc.py` | Optional Bearer → `viewer_role` на round LB/results |
 | Frontend | `frontend/src/lib/contest/roundPublicVisibility.ts` | `isRoundPubliclyVisible(status) => status === 'PUBLISHED'` |
 | Frontend | Leaderboard / Results (2.4+) | Проверка статуса **до** fetch; иначе stub |
 
-**Текущий код (до фикса):** `leaderboard_service` отдаёт `CALCULATED` и `PUBLISHED` всем — **устарело**, меняется в 2.3.1.
+### 2.4 Правило дедлайна и редактирование тура [UPDATED]
+
+| Правило | Где | Смысл |
+|---------|-----|-------|
+| **Размещение дедлайна** | `validate_round_deadline_placement` | `now < deadline < первый_матч` — при создании тура и смене дедлайна |
+| **24h lockout** | `assert_deadline_change_allowed` | На **ACTIVE** туре: менять дедлайн можно только пока `now <= deadline - deadline_rule_hours` (по умолчанию 24 ч) |
+| **Редактирование тура** | `PATCH …/admin/rounds/{id}` | Допустимо в `DRAFT` или `ACTIVE` |
+| **Состав после дедлайна** | тот же PATCH | На **ACTIVE** после `now >= deadline`: нельзя менять `team1_id` / `team2_id` |
+| **Даты матчей** | `POST …/admin/rounds` | Дата матча не может быть в прошлом |
+
+**Before → After:** `deadline_rule_hours` больше **не** требует ставить дедлайн за N часов до первого матча — только ограничивает **окно изменения** дедлайна на активном туре. См. [API_GUIDE.md](API_GUIDE.md#round_servicepy-updated).
 
 ### Dev fixture (после `dev_setup` + `finalize_dev_fixture`, Stage 1.14)
 
@@ -117,9 +128,9 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Статус | Прогнозы участников | Редактирование тура (админка) | Результаты |
 |--------|---------------------|------------------------------|------------|
 | `DRAFT` | Нет | Полное (матчи, команды, дедлайн) | Нет |
-| `ACTIVE` | Да, пока `now < deadline` | Ограниченное *(см. coder_2.3.1_fix)* | Нет |
+| `ACTIVE` | Да, пока `now < deadline` | Дедлайн и расписание; состав матчей — до дедлайна; после дедлайна состав заморожен [UPDATED] | Нет |
 | `CLOSED` | Нет | Только просмотр на «Туры» | Ввод счёта |
-| `CALCULATED` | Нет | Только просмотр | Только публикация / VOID |
+| `CALCULATED` | Нет | Только просмотр | Правка счёта + авто-пересчёт, публикация / VOID |
 | `PUBLISHED` | Нет | Только просмотр | Только VOID (с пересчётом) |
 
 Подробная матрица операций: [contest_lifecycle_flow.md](../agent_docs/contracts/contest_lifecycle_flow.md).
@@ -177,7 +188,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Слой | Файл | Назначение |
 |------|------|------------|
 | Модель / enum | `src/database/models.py` → `MatchStatus` | Пять значений |
-| Результат + FINISHED | `src/services/match_service.py` → `set_result` | Только при `round.status == CLOSED` и `now >= deadline` |
+| Результат + FINISHED | `src/services/match_service.py` → `set_result` | При `round.status` `CLOSED` или `CALCULATED` и `now >= deadline`; на `CALCULATED` — авто `recalculate_round` |
 | Статус POSTPONED / CANCELED / VOID | `src/services/match_service.py` → `change_status` | PATCH статуса; VOID на `CALCULATED` → `recalculate_round` |
 | API | `src/api/v1/admin_matches.py`, `contest_ops.py` | `PUT …/result`, `PATCH …/status` |
 | Фронт — подписи | `frontend/src/lib/admin/format.ts` → `matchStatusLabel()` | Русские названия |
@@ -228,3 +239,4 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 |------|-----------|
 | 2026-06-27 | Первоначальная версия; рекомендация `CLOSED` → «Дедлайн» в UI |
 | 2026-06-27 | §2.3: публичный LB/results только при `PUBLISHED`; stub «Будет доступно после проверки организатором» |
+| 2026-06-27 | §2.3.1: backend visibility реализован; §2.4: правило дедлайна (placement vs 24h lockout), PATCH тура в DRAFT/ACTIVE |

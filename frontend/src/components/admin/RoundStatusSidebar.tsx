@@ -33,12 +33,10 @@ export function RoundStatusSidebar({
   const badgeClass = STATUS_BADGE[round.status] ?? "bg-gray-100 text-gray-800";
   const hint = roundStatusHint(round.status);
 
-  // Phase-aware hint for ACTIVE rounds
+  // Schedule-only editing on ACTIVE (structure locked after activation)
   const activeHint =
     round.status === "ACTIVE"
-      ? deadlinePassed
-        ? "Дедлайн прошёл. Менять команды нельзя — только статус и дату."
-        : "Тур активен. До дедлайна можно редактировать матчи."
+      ? "Тур активен. Состав фиксирован; до начала матча — перенос времени, отмена или свободный тур."
       : hint;
 
   return (

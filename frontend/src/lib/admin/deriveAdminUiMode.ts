@@ -62,12 +62,10 @@ export function deriveAdminUiMode({
 
   const isActiveRound = roundStatus === "ACTIVE";
 
-  // F3: structure editable in DRAFT, or in ACTIVE before deadline
-  const beforePredictionDeadline = isActiveRound && !deadlinePassed;
-  const canEditRoundStructure =
-    !disableAllMutations && (roundStatus === "DRAFT" || beforePredictionDeadline);
+  // Structure (teams) editable only in DRAFT — after activation, league calendar is fixed.
+  const canEditRoundStructure = !disableAllMutations && roundStatus === "DRAFT";
 
-  // F3: status + date editable in DRAFT or ACTIVE (including after deadline)
+  // Schedule actions on ACTIVE (reschedule / cancel / postpone) — see MatchEditorRow + matchScheduleEdit.
   const canEditMatchStatusAndDate =
     !disableAllMutations && (roundStatus === "DRAFT" || isActiveRound);
 
@@ -92,11 +90,11 @@ export function deriveAdminUiMode({
   const showActiveRoundHint = isActiveRound;
   const showDeadlinePassedHint = isActiveRound && deadlinePassed;
 
-  const canEnterResults = roundStatus === "CLOSED" && !disableAllMutations;
+  const canEnterResults =
+    (roundStatus === "CLOSED" || roundStatus === "CALCULATED") && !disableAllMutations;
   const canCalculate = roundStatus === "CLOSED" && !disableAllMutations;
   const canPublish = roundStatus === "CALCULATED" && !disableAllMutations;
-  const resultsReadonly =
-    roundStatus === "CALCULATED" || roundStatus === "PUBLISHED" || disableAllMutations;
+  const resultsReadonly = roundStatus === "PUBLISHED" || disableAllMutations;
   const canVoidMatch =
     (roundStatus === "CLOSED" || roundStatus === "CALCULATED" || roundStatus === "PUBLISHED") &&
     !disableAllMutations;

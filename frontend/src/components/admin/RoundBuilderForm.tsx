@@ -120,55 +120,79 @@ export function RoundBuilderForm({
       </div>
 
       <div className="space-y-3">
-        {matches.map((m, i) => (
-          <div key={i} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
-            <select
-              value={m.team1_id || ""}
-              onChange={(e) => updateMatch(i, { team1_id: Number(e.target.value) })}
-              disabled={disabled}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              <option value="">Команда 1</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={m.team2_id || ""}
-              onChange={(e) => updateMatch(i, { team2_id: Number(e.target.value) })}
-              disabled={disabled}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              <option value="">Команда 2</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <input
-              type="datetime-local"
-              value={m.date_time ? toDatetimeLocal(m.date_time) : m.date_time}
-              onChange={(e) =>
-                updateMatch(i, { date_time: fromDatetimeLocal(e.target.value) })
-              }
-              disabled={disabled}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            />
-            {matches.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setMatches((prev) => prev.filter((_, j) => j !== i))}
-                className="text-sm text-red-600"
-              >
-                Удалить
-              </button>
-            )}
-          </div>
-        ))}
-        {errors.matches && <p className="text-sm text-red-600">{errors.matches}</p>}
+        {Object.keys(errors).length > 0 && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+            {errors.form ??
+              errors.deadline ??
+              Object.values(errors).find((msg) => msg.includes("дату и время")) ??
+              "Исправьте ошибки в форме перед сохранением"}
+          </p>
+        )}
+        {matches.map((m, i) => {
+          const dateError = errors[`matches.${i}.date_time`];
+          const team2Error = errors[`matches.${i}.team2_id`];
+          return (
+            <div key={i} className="space-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                <select
+                  value={m.team1_id || ""}
+                  onChange={(e) => updateMatch(i, { team1_id: Number(e.target.value) })}
+                  disabled={disabled}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm"
+                >
+                  <option value="">Команда 1</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={m.team2_id || ""}
+                  onChange={(e) => updateMatch(i, { team2_id: Number(e.target.value) })}
+                  disabled={disabled}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm"
+                >
+                  <option value="">Команда 2</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <div>
+                  <input
+                    type="datetime-local"
+                    value={m.date_time ? toDatetimeLocal(m.date_time) : m.date_time}
+                    onChange={(e) =>
+                      updateMatch(i, {
+                        date_time: e.target.value ? fromDatetimeLocal(e.target.value) : "",
+                      })
+                    }
+                    disabled={disabled}
+                    aria-invalid={!!dateError}
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </div>
+                {matches.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setMatches((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-sm text-red-600"
+                  >
+                    Удалить
+                  </button>
+                )}
+              </div>
+              {(dateError || team2Error) && (
+                <p className="text-sm text-red-600">{dateError ?? team2Error}</p>
+              )}
+            </div>
+          );
+        })}
+        {errors.matches && !Object.keys(errors).some((k) => k.startsWith("matches.")) && (
+          <p className="text-sm text-red-600">{errors.matches}</p>
+        )}
         {matches.length < matchesPerRound && (
           <button
             type="button"

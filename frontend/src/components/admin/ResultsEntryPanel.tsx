@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { deriveAdminUiMode } from "@/lib/admin/deriveAdminUiMode";
-import { roundStatusLabel } from "@/lib/admin/format";
+import { roundStatusHint, roundStatusLabel } from "@/lib/admin/format";
 import type { ContestOut, MatchOut, RoundOut } from "@/types/api";
 import { MatchResultRow } from "@/components/admin/MatchResultRow";
+import { RoundLeaderboardPreview } from "@/components/admin/RoundLeaderboardPreview";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
-import { useState } from "react";
 
 interface ResultsEntryPanelProps {
   contest: ContestOut;
@@ -24,6 +24,19 @@ interface ResultsEntryPanelProps {
   onCalculate: (roundId: number) => Promise<void>;
   onPublish: (roundId: number) => Promise<void>;
   onCloseRound?: (roundId: number) => Promise<void>;
+}
+
+function resultsStatusHint(roundStatus: string): string {
+  switch (roundStatus) {
+    case "CLOSED":
+      return "Проверьте счета перед «Рассчитать».";
+    case "CALCULATED":
+      return "Можно исправить счёт — очки пересчитаются автоматически. После «Опубликовать» правка недоступна.";
+    case "PUBLISHED":
+      return "Тур опубликован. Счета и таблица зафиксированы.";
+    default:
+      return "";
+  }
 }
 
 export function ResultsEntryPanel({
@@ -47,6 +60,8 @@ export function ResultsEntryPanel({
   const [voidId, setVoidId] = useState<number | null>(null);
   const [working, setWorking] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [publishedStubOpen, setPublishedStubOpen] = useState(false);
 
   const eligibleRounds = rounds.filter((r) =>
     ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status),
@@ -110,10 +125,17 @@ export function ResultsEntryPanel({
 
       {selectedRound && (
         <>
-          <p className="text-sm text-gray-600">
-            Введите счёт для каждого матча и нажмите «Применить». Когда все матчи завершены —
-            «Рассчитать», затем «Опубликовать».
+          <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+            {roundStatusHint(selectedRound.status)}
           </p>
+
+          <p className="text-sm text-gray-600">{resultsStatusHint(selectedRound.status)}</p>
+
+          {selectedRound.status === "CLOSED" && (
+            <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+              Счёт можно вносить после времени начала каждого матча.
+            </p>
+          )}
 
           <div className="overflow-x-auto border border-gray-200 rounded-lg">
             <table className="min-w-full text-sm">
@@ -131,6 +153,7 @@ export function ResultsEntryPanel({
                   <MatchResultRow
                     key={m.id}
                     match={m}
+                    roundStatus={selectedRound.status}
                     maxScore={maxScore}
                     scoresReadonly={uiMode.resultsReadonly || !uiMode.canEnterResults}
                     canVoid={uiMode.canVoidMatch && m.status !== "VOID"}
@@ -177,24 +200,77 @@ export function ResultsEntryPanel({
                 Опубликовать
               </button>
             )}
-            {selectedRound.status === "PUBLISHED" ? (
-              <Link
-                href={`/contest/${contest.id}`}
+            {selectedRound.status === "CALCULATED" && (
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
                 className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
               >
-                Проверить публичные результаты
-              </Link>
-            ) : (
+                Результаты участников
+              </button>
+            )}
+            {selectedRound.status === "CLOSED" && (
               <span
-                title="Сначала опубликуйте тур"
+                title="Сначала рассчитайте тур"
                 className="px-4 py-2 text-sm border border-gray-200 rounded text-gray-400 cursor-not-allowed"
               >
-                Проверить публичные результаты
+                Результаты участников
               </span>
+            )}
+            {selectedRound.status === "PUBLISHED" && (
+              <button
+                type="button"
+                onClick={() => setPublishedStubOpen(true)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Результаты участников
+              </button>
             )}
           </div>
         </>
       )}
+
+      {previewOpen && selectedRound && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lb-preview-title"
+        >
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full max-h-[80vh] overflow-y-auto p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 id="lb-preview-title" className="text-lg font-semibold">
+                Результаты участников — тур {selectedRound.number}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl leading-none"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <RoundLeaderboardPreview contestId={contest.id} roundId={selectedRound.id} />
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(false)}
+              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={publishedStubOpen}
+        title="Результаты участников"
+        message="Полная матрица прогнозов — в следующих версиях."
+        confirmLabel="Закрыть"
+        onConfirm={() => setPublishedStubOpen(false)}
+        onCancel={() => setPublishedStubOpen(false)}
+      />
 
       <ConfirmDialog
         open={voidId !== null}

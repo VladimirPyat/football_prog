@@ -27,6 +27,57 @@ Verify Stage **2.2** frontend deliverables:
 
 ## 2. Test environment
 
+### 2.0 E2E prerequisites (READ FIRST) [UPDATED]
+
+Playwright **starts UI automatically** (`npm run dev` on `:3000` via `webServer` in `playwright.config.ts`).  
+**API on `:8000` must be running before** `npm run test:e2e` (Playwright does **not** start the backend).
+
+**Minimal E2E run:**
+
+```bash
+# Terminal 1 — API (required before test:e2e)
+cd /work/football_prog
+uv run uvicorn main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2 — tests (Playwright starts UI on :3000)
+cd frontend
+npm run test:e2e -- --reporter=line    # line = clearer progress output
+```
+
+**Or both servers in one command** (then run E2E in another terminal):
+
+```bash
+uv run python src/scripts/dev_setup.py --run-only   # API :8000 + UI :3000
+cd frontend && npm run test:e2e
+```
+
+**Required in root `.env`** (even for user-only specs — `playwright.global-setup.ts` provisions an E2E user):
+
+```bash
+SEED_SUPERVISOR_PASSWORD=…   # globalSetup fails immediately if missing
+SEED_ADMIN_PASSWORD=…        # optional for 2.2; needed if supervisor API helpers used
+```
+
+**Common failures (look like “hang” or silent exit):**
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `API not reachable at …/health` | Backend not started | Terminal 1: `uvicorn` (see above) |
+| `Login failed … PASSWORD_SETUP_REQUIRED` | Outdated `playwright.global-setup.ts` | Use repo version: `complete-setup` via `setup_url` from invite (works with default `ENFORCE_PASSWORD_SETUP=true`) |
+| No output 1–2 min at start | `globalSetup` provisioning user + Next.js first compile | Normal; use `--reporter=line` or `DEBUG=pw:webserver` |
+| Supervisor specs “freeze” ~60–120 s | `beforeAll` → `reloadLoadedContestFixture()` (`load_test_data --reset`) | Normal; console shows `[E2E] reloadLoadedContestFixture…` |
+| `SEED_SUPERVISOR_PASSWORD missing` | Empty `.env` | Copy from `.env.example` and set passwords |
+
+**Debug a single spec:**
+
+```bash
+DEBUG=pw:webserver npx playwright test e2e/prediction_batch.spec.ts --reporter=line
+```
+
+**After tests — stop backend (mandatory):** Playwright does **not** stop API. `Ctrl+C` in the uvicorn terminal, or `pkill -f "uvicorn main:app"`. Then `dev_setup.py --check-ports` → exit 0. Details: `tester_2.1.md` §2.5.
+
+See also: `tester_2.3.2_fix_tours.md` §2.0 (same Playwright stack).
+
 ### 2.1 Backend (Terminal 1)
 
 ```bash
@@ -38,6 +89,8 @@ uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Health: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
+
+> **E2E:** DB bootstrap below is **one-time** (or when resetting fixture). For re-runs, only **API** must stay up — see [§2.0](#20-e2e-prerequisites-read-first-updated).
 
 **Key fixture facts:**
 
@@ -60,13 +113,13 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 NEXT_PUBLIC_DEFAULT_CONTEST_ID=1
 ```
 
-Optional for deadline E2E: `E2E_SUPERVISOR_PASSWORD` in gitignored env if API helper needed to rewind deadline (prefer API `request` fixture over DB).
+Optional for deadline E2E: `E2E_SUPERVISOR_PASSWORD` in gitignored env if API helper needed to rewind deadline (prefer API `request` fixture over DB). Root `SEED_SUPERVISOR_PASSWORD` in `.env` is still required for Playwright `globalSetup`.
 
 ### 2.3 Playwright
 
-Same as `tester_2.1.md` §2.4 — `:3000` UI + `:8000` API.
+See [§2.0 E2E prerequisites](#20-e2e-prerequisites-read-first-updated): **API `:8000` manual**, **UI `:3000` auto** via `webServer`. Do **not** start `npm run dev` separately unless debugging UI outside Playwright.
 
-**Mandatory after E2E:** `tester_2.1.md` §2.5 — verify ports free (`dev_setup.py --check-ports`); kill orphan `next dev` / headless Chromium if Playwright did not exit cleanly.
+**Mandatory after E2E:** `tester_2.1.md` §2.5 — **stop API** (`Ctrl+C` or `pkill -f "uvicorn main:app"`), then `dev_setup.py --check-ports`; kill orphan `next dev` / headless Chromium if Playwright did not exit cleanly.
 
 ---
 
@@ -139,6 +192,8 @@ npm run test:unit
 ---
 
 ## 6. E2E tests (Playwright) — mandatory
+
+**API `:8000` running before `npm run test:e2e`.** UI started by Playwright. See [§2.0](#20-e2e-prerequisites-read-first-updated).
 
 Real API for happy paths. Russian selectors (`getByRole`, visible text).
 
@@ -292,9 +347,14 @@ Include in `test_2.2.md`:
 ## 11. Execution order
 
 ```bash
+# Terminal 1 — keep API running (see §2.0)
+cd /work/football_prog && uv run uvicorn main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2
 cd frontend && npm run test:unit
 npm run lint && npm run type-check && npm run format:check
-npm run test:e2e    # backend running
+npm run test:e2e -- --reporter=line
+# Stop API in Terminal 1 (Ctrl+C), then:
 uv run python src/scripts/dev_setup.py --check-ports   # §2.5 / tester_2.1 §2.5
 npm run build
 ```
@@ -322,7 +382,7 @@ Russian summary. Table:
 | `[E2E-USER-PREDICT-FLOW]` | PASS/FAIL | |
 | `[E2E-VISITOR-PRED-STUB]` | PASS/FAIL | |
 | `[E2E-CONTEST-PRED-TAB]` | PASS/FAIL | |
-| `[E2E-TEARDOWN]` | PASS/FAIL | `--check-ports` exit 0 (tester_2.1 §2.5) |
+| `[E2E-TEARDOWN]` | PASS/FAIL | `--check-ports` exit 0; API stopped (tester_2.1 §2.5) |
 | `[LINT-ESLINT]` | PASS/FAIL | |
 | `[LINT-TSC]` | PASS/FAIL | |
 | `[LINT-PRETTIER]` | PASS/FAIL | |

@@ -64,9 +64,10 @@ async def set_result(
             "Результат можно внести только после дедлайна тура",
             code="DEADLINE_NOT_PASSED",
         )
-    if RoundStatus(round_.status) != RoundStatus.CLOSED:
+    allowed_round = {RoundStatus.CLOSED, RoundStatus.CALCULATED}
+    if RoundStatus(round_.status) not in allowed_round:
         raise ContestRuleError(
-            "Результат можно внести только на закрытом туре",
+            "Результат можно внести только на закрытом или рассчитанном туре",
             code="ROUND_NOT_CLOSED",
         )
 
@@ -81,6 +82,12 @@ async def set_result(
     match.score1 = score1
     match.score2 = score2
     match.status = MatchStatus.FINISHED
+
+    if RoundStatus(round_.status) == RoundStatus.CALCULATED:
+        from services.scoring_persistence import recalculate_round  # noqa: PLC0415
+
+        await recalculate_round(session, round_id=round_.id, contest_id=contest_id)
+
     return match
 
 

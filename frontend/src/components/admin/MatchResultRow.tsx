@@ -1,12 +1,14 @@
 "use client";
 
-import { formatDateTimeRu, matchStatusLabel } from "@/lib/admin/format";
+import { formatDateTimeRu, matchPhaseLabel, matchStatusLabel } from "@/lib/admin/format";
+import { canEnterMatchResult } from "@/lib/admin/matchResultsGating";
 import { matchResultSchema } from "@/lib/validation/admin";
 import type { MatchOut } from "@/types/api";
 import { useState } from "react";
 
 interface MatchResultRowProps {
   match: MatchOut;
+  roundStatus: string;
   maxScore: number;
   scoresReadonly: boolean;
   canVoid: boolean;
@@ -16,6 +18,7 @@ interface MatchResultRowProps {
 
 export function MatchResultRow({
   match,
+  roundStatus,
   maxScore,
   scoresReadonly,
   canVoid,
@@ -27,7 +30,16 @@ export function MatchResultRow({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const finished = match.status === "FINISHED" || match.status === "VOID";
+  const canEnter = canEnterMatchResult(match, { status: roundStatus });
+  const inputsDisabled = scoresReadonly || !canEnter;
+  const isTerminal = match.status === "VOID" || match.status === "CANCELED";
+  const scoresComplete = score1 !== "" && score2 !== "";
+  const showApply = canEnter && !scoresReadonly && !isTerminal;
+
+  const statusLabel =
+    roundStatus === "CLOSED"
+      ? matchPhaseLabel(match.status, match.date_time, roundStatus)
+      : matchStatusLabel(match.status);
 
   const handleFinish = async () => {
     setError(null);
@@ -50,7 +62,7 @@ export function MatchResultRow({
         {match.team1} — {match.team2}
       </td>
       <td className="px-3 py-2 text-sm">{formatDateTimeRu(match.date_time)}</td>
-      <td className="px-3 py-2 text-sm">{matchStatusLabel(match.status)}</td>
+      <td className="px-3 py-2 text-sm">{statusLabel}</td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-2">
           <input
@@ -59,7 +71,7 @@ export function MatchResultRow({
             max={maxScore}
             value={score1}
             onChange={(e) => setScore1(e.target.value === "" ? "" : Number(e.target.value))}
-            disabled={scoresReadonly || finished}
+            disabled={inputsDisabled}
             className="w-14 border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100"
             aria-label="Счёт 1"
           />
@@ -70,20 +82,24 @@ export function MatchResultRow({
             max={maxScore}
             value={score2}
             onChange={(e) => setScore2(e.target.value === "" ? "" : Number(e.target.value))}
-            disabled={scoresReadonly || finished}
+            disabled={inputsDisabled}
             className="w-14 border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100"
             aria-label="Счёт 2"
           />
         </div>
         {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+        {!canEnter && !isTerminal && roundStatus === "CLOSED" && (
+          <p className="text-xs text-gray-500 mt-1">Матч ещё не начался</p>
+        )}
       </td>
       <td className="px-3 py-2 space-x-2">
-        {!scoresReadonly && !finished && (
+        {showApply && (
           <button
             type="button"
             onClick={handleFinish}
-            disabled={saving}
-            className="text-sm text-green-600 hover:underline disabled:opacity-50"
+            disabled={saving || !scoresComplete}
+            className="text-sm text-green-600 hover:underline disabled:opacity-50 disabled:no-underline"
+            title={!scoresComplete ? "Укажите счёт для обеих команд" : undefined}
           >
             Применить
           </button>

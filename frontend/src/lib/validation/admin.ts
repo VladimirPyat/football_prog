@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  deadlineErrorMessage,
-  isDeadlineValid,
-} from "@/lib/admin/deadlineRule";
+import { deadlineErrorMessage, isDeadlineValid } from "@/lib/admin/deadlineRule";
 
 export const createContestSchema = z
   .object({
@@ -75,13 +72,13 @@ export function roundBuilderSchema(matchesPerRound: number, rules: Record<string
   return z
     .object({
       number: z.coerce.number().int().positive(),
-      deadline: z.string().min(1),
+      deadline: z.string().min(1, "Укажите дедлайн прогнозов"),
       matches: z
         .array(
           z.object({
             team1_id: z.coerce.number().int().positive(),
             team2_id: z.coerce.number().int().positive(),
-            date_time: z.string().min(1),
+            date_time: z.string(),
           }),
         )
         .min(1)
@@ -96,6 +93,14 @@ export function roundBuilderSchema(matchesPerRound: number, rules: Record<string
             message: "Команды должны различаться",
           });
         }
+        const parsed = Date.parse(m.date_time);
+        if (!m.date_time || Number.isNaN(parsed)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["matches", i, "date_time"],
+            message: "Укажите дату и время для каждого матча",
+          });
+        }
       });
       const ids = d.matches.flatMap((m) => [m.team1_id, m.team2_id]);
       if (new Set(ids).size !== ids.length) {
@@ -105,7 +110,11 @@ export function roundBuilderSchema(matchesPerRound: number, rules: Record<string
           message: "Команда не может играть дважды в туре",
         });
       }
-      const earliest = Math.min(...d.matches.map((m) => Date.parse(m.date_time)));
+      const validTimestamps = d.matches
+        .map((m) => Date.parse(m.date_time))
+        .filter((t) => !Number.isNaN(t));
+      if (validTimestamps.length === 0) return;
+      const earliest = Math.min(...validTimestamps);
       if (!isDeadlineValid(d.deadline, new Date(earliest).toISOString())) {
         ctx.addIssue({
           code: "custom",
@@ -116,11 +125,47 @@ export function roundBuilderSchema(matchesPerRound: number, rules: Record<string
     });
 }
 
+/** Match result scores: empty input is invalid (not coerced to 0). */
 export function matchResultSchema(maxScore: number) {
-  return z.object({
-    score1: z.coerce.number().int().min(0).max(maxScore),
-    score2: z.coerce.number().int().min(0).max(maxScore),
-  });
+  const scoreField = z.union([z.number(), z.literal("")]);
+
+  return z
+    .object({
+      score1: scoreField,
+      score2: scoreField,
+    })
+    .superRefine((data, ctx) => {
+      for (const field of ["score1", "score2"] as const) {
+        const val = data[field];
+        if (val === "") {
+          ctx.addIssue({
+            code: "custom",
+            path: [field],
+            message: "Укажите счёт",
+          });
+          continue;
+        }
+        if (!Number.isInteger(val)) {
+          ctx.addIssue({
+            code: "custom",
+            path: [field],
+            message: "Счёт должен быть целым числом",
+          });
+          continue;
+        }
+        if (val < 0 || val > maxScore) {
+          ctx.addIssue({
+            code: "custom",
+            path: [field],
+            message: `Допустимый диапазон: 0–${maxScore}`,
+          });
+        }
+      }
+    })
+    .transform((data) => ({
+      score1: data.score1 as number,
+      score2: data.score2 as number,
+    }));
 }
 
 export const freeTourSchema = z.object({

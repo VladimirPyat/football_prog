@@ -18,13 +18,18 @@ import {
 } from "@/lib/admin/format";
 import { RoundBuilderForm } from "@/components/admin/RoundBuilderForm";
 import { RoundPhasePanel } from "@/components/admin/RoundPhasePanel";
-import { MatchEditorRow } from "@/components/admin/MatchEditorRow";
+import {
+  MatchEditorRow,
+  matchActionDialogCopy,
+  type MatchRowAction,
+} from "@/components/admin/MatchEditorRow";
 import { RoundStatusSidebar } from "@/components/admin/RoundStatusSidebar";
 import { FreeTourModal } from "@/components/admin/FreeTourModal";
 import { NewsletterPromptModal } from "@/components/admin/NewsletterPromptModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
-import type { ContestOut, MatchOut, RoundOut, TeamOut } from "@/types/api";
+import { useAuth } from "@/hooks/useAuth";
+import type { ContestOut, MatchOut, MatchStatus, RoundOut, TeamOut } from "@/types/api";
 
 function teamIdByName(teams: TeamOut[], name: string): number | undefined {
   return teams.find((t) => t.name === name || t.short_name === name)?.id;
@@ -63,7 +68,6 @@ interface RoundManagementPanelProps {
     matches: { match_id: number; new_date_time: string }[];
   }) => Promise<void>;
   onCloseRound?: (roundId: number) => Promise<void>;
-  onPublishRound?: (roundId: number) => Promise<void>;
   onRefetchMatches: () => Promise<void>;
   refetchContest: () => Promise<void>;
 }
@@ -82,10 +86,11 @@ export function RoundManagementPanel({
   onUpdateRound,
   onCreateFreeTour,
   onCloseRound,
-  onPublishRound,
   onRefetchMatches,
   refetchContest,
 }: RoundManagementPanelProps) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
   const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
   const hasDraft = rounds.some((r) => r.status === "DRAFT");
   const atRoundCap = rounds.length >= contest.total_rounds;
@@ -106,12 +111,19 @@ export function RoundManagementPanel({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showDraftEdit, setShowDraftEdit] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
+  const [pendingMatchAction, setPendingMatchAction] = useState<{
+    action: MatchRowAction;
+    match: MatchOut;
+  } | null>(null);
+  const [actionSaving, setActionSaving] = useState(false);
 
   useEffect(() => {
     setLocalMatches(matches);
     if (selectedRound) setDeadlineEdit(toDatetimeLocal(selectedRound.deadline));
     setShowDraftEdit(false);
+    setSaveError(null);
   }, [matches, selectedRound]);
 
   const ruleHours = getDeadlineRuleHours(contest.rules_json);
@@ -127,11 +139,38 @@ export function RoundManagementPanel({
       : true; // DRAFT: no lockout
   const deadlineValid = deadlinePlacementValid;
   const deadlineChangeBlocked = selectedRound?.status === "ACTIVE" && !changeWindowOpen;
+  const deadlineDirty =
+    selectedRound != null && deadlineEdit !== toDatetimeLocal(selectedRound.deadline);
+  const saveDisabled =
+    saving ||
+    (deadlineDirty &&
+      (!deadlineValid || deadlineChangeBlocked || !uiMode.canEditDeadline));
 
   const nextRoundNumber = useMemo(() => {
     if (!rounds.length) return 1;
     return Math.max(...rounds.map((r) => r.number)) + 1;
   }, [rounds]);
+
+  const handleMatchActionConfirm = async () => {
+    if (!pendingMatchAction || !selectedRound) return;
+    const { action, match } = pendingMatchAction;
+    const status: MatchStatus =
+      action === "cancel" ? "CANCELED" : action === "postpone" ? "POSTPONED" : "SCHEDULED";
+    setActionSaving(true);
+    try {
+      await onUpdateRound(selectedRound.id, {
+        matches: [{ match_id: match.id, status }],
+      });
+      setLocalMatches((prev) =>
+        prev.map((row) => (row.id === match.id ? { ...row, status } : row)),
+      );
+      await onRefetchMatches();
+      if (action === "postpone") setShowFreeTour(true);
+    } finally {
+      setActionSaving(false);
+      setPendingMatchAction(null);
+    }
+  };
 
   const handleCloseRound = async () => {
     if (!selectedRound || !onCloseRound) return;
@@ -146,6 +185,12 @@ export function RoundManagementPanel({
 
   const handleSaveActive = async () => {
     if (!selectedRound) return;
+    const missingMatchDate = localMatches.some((m) => !m.date_time?.trim());
+    if (missingMatchDate) {
+      setSaveError("Укажите дату и время для каждого матча");
+      return;
+    }
+    setSaveError(null);
     setSaving(true);
     try {
       const body: {
@@ -294,13 +339,7 @@ export function RoundManagementPanel({
                     </span>
                   )}
                 </div>
-                <RoundPhasePanel
-                  contest={contest}
-                  round={selectedRound}
-                  matches={localMatches}
-                  disableAllMutations={uiMode.disableAllMutations}
-                  onPublish={onPublishRound}
-                />
+                <RoundPhasePanel contest={contest} round={selectedRound} matches={localMatches} />
               </section>
             ) : (
               /* DRAFT and ACTIVE panels */
@@ -358,22 +397,16 @@ export function RoundManagementPanel({
 
                 {/* ACTIVE: phase-aware hints */}
                 {selectedRound.status === "ACTIVE" && (
-                  <>
-                    {!deadlinePassed && (
-                      <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 mb-3">
-                        Тур активен. До дедлайна можно редактировать матчи.
-                      </p>
-                    )}
-                    {deadlinePassed && (
-                      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
-                        Дедлайн прошёл. Менять команды нельзя — только статус и дату.
-                      </p>
-                    )}
-                  </>
+                  <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 mb-3">
+                    Тур активен. Состав матчей изменить нельзя. До начала матча можно перенести
+                    время; отмена — в любой момент. Перенос на другую неделю — статус «Перенесён»
+                    и свободный тур.
+                  </p>
                 )}
 
-                {/* Deadline editor */}
-                {(selectedRound.status === "DRAFT" || selectedRound.status === "ACTIVE") && (
+                {/* Deadline editor (hidden in DRAFT inline edit — form has its own field) */}
+                {(selectedRound.status === "DRAFT" || selectedRound.status === "ACTIVE") &&
+                  !(selectedRound.status === "DRAFT" && showDraftEdit) && (
                   <div className="mb-4 max-w-xs">
                     <label className="block text-sm text-gray-700 mb-1">Дедлайн прогнозов</label>
                     <input
@@ -410,14 +443,18 @@ export function RoundManagementPanel({
                           <MatchEditorRow
                             key={m.id}
                             match={m}
+                            roundStatus={selectedRound.status}
+                            isAdmin={isAdmin}
                             teams={teams}
                             canEditStructure={uiMode.canEditRoundStructure}
                             canEditStatusAndDate={uiMode.canEditMatchStatusAndDate}
+                            onRequestAction={(action, match) =>
+                              setPendingMatchAction({ action, match })
+                            }
                             onChange={(patch) => {
+                              setSaveError(null);
                               setLocalMatches((prev) =>
-                                prev.map((row) =>
-                                  row.id === m.id ? { ...row, ...patch } : row,
-                                ),
+                                prev.map((row) => (row.id === m.id ? { ...row, ...patch } : row)),
                               );
                             }}
                           />
@@ -427,28 +464,24 @@ export function RoundManagementPanel({
                   </div>
                 ) : null}
 
+                {saveError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mt-4">
+                    {saveError}
+                  </p>
+                )}
+
                 {(selectedRound.status === "ACTIVE" || selectedRound.status === "DRAFT") &&
                   !uiMode.disableAllMutations &&
                   selectedRound.status !== "DRAFT" && (
                     <button
                       type="button"
                       onClick={handleSaveActive}
-                      disabled={saving || !deadlineValid || deadlineChangeBlocked}
+                      disabled={saveDisabled}
                       className="mt-4 px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
                     >
                       Сохранить изменения
                     </button>
                   )}
-                {selectedRound.status === "ACTIVE" && !uiMode.disableAllMutations && (
-                  <button
-                    type="button"
-                    onClick={handleSaveActive}
-                    disabled={saving || !deadlineValid || deadlineChangeBlocked}
-                    className="mt-4 px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Сохранить изменения
-                  </button>
-                )}
 
                 {selectedRound.deadline && (
                   <p className="text-xs text-gray-500 mt-2">
@@ -475,11 +508,20 @@ export function RoundManagementPanel({
       <ConfirmDialog
         open={showActivate}
         title="Активировать тур?"
-        message="После активации участники смогут делать прогнозы. До дедлайна вы сможете менять состав матчей; после дедлайна — только статус и дату."
+        message="После активации участники смогут делать прогнозы. Состав матчей изменить уже нельзя — только перенос времени до начала, отмена или перенос в свободный тур."
         confirmLabel="Активировать"
         onConfirm={handleActivate}
         onCancel={() => setShowActivate(false)}
       />
+
+      {pendingMatchAction && (
+        <ConfirmDialog
+          open
+          {...matchActionDialogCopy(pendingMatchAction.action, pendingMatchAction.match)}
+          onConfirm={() => void handleMatchActionConfirm()}
+          onCancel={() => !actionSaving && setPendingMatchAction(null)}
+        />
+      )}
 
       <FreeTourModal
         open={showFreeTour}

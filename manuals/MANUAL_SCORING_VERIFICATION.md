@@ -81,7 +81,7 @@ SELECT number, status FROM rounds WHERE number <= 9;
 
 После полного dev bootstrap (`dev_setup.py` + `finalize_dev_fixture`) в `scores` ожидается **100 строк** (90 за туры 1–9 + 10 за тур 10 `CALCULATED`); тур 11 — без очков до ручного calculate.
 
-Проверьте: раунды 1–9 в статусе `CALCULATED` или `PUBLISHED`; в `scores` ~90 строк; **отсутствие прогноза = нет строки** в `predictions`, не `NULL` и не `0:0`-sentinel.
+Проверьте: после `finalize_dev_fixture` раунды 1–9 в статусе **`PUBLISHED`**; в `scores` ~90 строк; **отсутствие прогноза = нет строки** в `predictions`, не `NULL` и не `0:0`-sentinel. Без finalize (только loader) раунды 1–9 остаются `CLOSED`.
 
 ### Фаза 2 — Script 2 (`compare_db_vs_reference.py`)
 

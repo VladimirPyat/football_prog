@@ -17,7 +17,7 @@ Implement **user prediction entry** and **privacy-aware predictions viewing**. A
 | Deliverable | Description |
 |-------------|-------------|
 | `PredictionForm` | Batch-only save; score `0..maxScore`; Edit/Save toggle; readonly after deadline |
-| `ScoreInput` | Integer-only; empty ≠ `0`; rejects non-numeric and out-of-range |
+| `ScoreInput` | Integer-only; **empty ≠ `0`**; rejects non-numeric and out-of-range; **never POST empty as 0** |
 | `PredictionsMatrix` | Прогнозы tab — privacy pre-deadline; full matrix post-deadline (authenticated) |
 | `DeadlineCountdown` + `DeadlineWarningBanner` | Countdown; **warning when &lt;24h** to deadline |
 | Privacy helpers | `shouldShowScore`, `PrivacyMask` — render from API `entries`, never infer hidden scores |
@@ -60,27 +60,53 @@ Implement **user prediction entry** and **privacy-aware predictions viewing**. A
 ### 3.1 Batch-only predictions
 
 - Form state: `Record<matchId, { score1?: number; score2?: number }>` — empty cells are **`undefined`**, not `0`.
-- **`0` is valid** when user explicitly typed `0`.
+- **`0` is valid** only when user **explicitly typed** `0` in both fields for that match.
 - Submit **«Сохранить прогноз»** enabled only when `filledCount === matches.length === matches_per_round`.
 - Partial fill (e.g. 7/8) → button **disabled** + optional hint «Заполните прогнозы на все матчи тура».
 - POST sends exactly `matches_per_round` items; handle API `400` incomplete batch.
 
+**Empty field ≠ zero (LOCKED — same rule as admin results, `coder_2.3` / `MatchResultRow`):**
+
+| Rule | Requirement |
+|------|-------------|
+| UI state | Cleared input → `undefined` or `""` in local state — **not** `0` |
+| Validation | **Do not** use `z.coerce.number()` on score fields — `""` coerces to `0` and sends a fake prediction |
+| POST body | Include a match in `predictions[]` **only** when both `score1` and `score2` are explicit integers |
+| Batch build | Filter/map: skip matches with missing either side; if count &lt; `matches_per_round` → disable submit (do not pad with `0`) |
+| UX | Optional per-cell error on Save attempt: «Укажите счёт»; prefer disabling Save until batch complete |
+
+Reference implementation (admin results, Stage 2.3.2): `lib/validation/admin.ts` → `matchResultSchema` (union `number | ""`, reject empty before transform).
+
 ### 3.2 Score validation (`ScoreInput`)
 
+**Anti-pattern (forbidden):**
+
 ```ts
-// max from useMaxScore() / contest context
-z.number().int().min(0).max(maxScore)
+// WRONG — empty string becomes 0 and is sent to API
+z.coerce.number().int().min(0).max(maxScore)
+```
+
+Use explicit optional/required flow:
+
+```ts
+// max from useMaxScore() / contest context — see §6 for batch schema
 ```
 
 | Input | UI behaviour |
 |-------|--------------|
-| empty | `undefined`; does not count toward batch |
-| `0` | valid; counts as filled |
+| empty | `undefined`; does **not** count toward batch; **must not** appear in POST as `0` |
+| `0` | valid; counts as filled only when user typed it |
 | `abc`, `-`, `1.5` | reject on input or blur; inline error |
 | `maxScore + 1` | disable submit + inline «Максимум {maxScore}» |
 | API `SCORE_OUT_OF_RANGE` 422 | highlight cell + toast |
 
 Label hint per match: «0–{maxScore}» (dynamic).
+
+**`ScoreInput` implementation checklist:**
+
+- `value`: `number | ""` (controlled); `onChange`: empty string stays `""`, not coerced to `0`
+- Parent form aggregates only cells where both scores are defined integers
+- «Сохранить прогноз» disabled until all matches filled — same as partial batch rule
 
 ### 3.3 Deadline UX
 
@@ -245,18 +271,39 @@ Document in `frontend_api_integration.md` — not a blocker; backend returns 401
 
 ## 6. Validation (Zod)
 
-Per `forms_validation.md` — export from `lib/validation/prediction.ts`:
+Per `forms_validation.md` — export from `lib/validation/prediction.ts` and `lib/validation/score.ts`.
+
+**Score field (single cell / blur):** reject empty before treating as number — mirror `matchResultSchema` in `admin.ts`:
+
+```ts
+export function scoreInputSchema(maxScore: number) {
+  const field = z.union([z.number(), z.literal("")]);
+  return field.superRefine((val, ctx) => {
+    if (val === "") {
+      ctx.addIssue({ code: "custom", message: "Укажите счёт" });
+      return;
+    }
+    if (!Number.isInteger(val) || val < 0 || val > maxScore) {
+      ctx.addIssue({ code: "custom", message: `Допустимый диапазон: 0–${maxScore}` });
+    }
+  });
+}
+```
+
+**Batch (POST payload):** build array only from matches with **both** scores as integers; then validate length:
 
 ```ts
 export function predictionBatchSchema(maxScore: number, matchCount: number) {
   const score = z.number().int().min(0).max(maxScore);
   return z.object({
-    predictions: z.array(
-      z.object({ match_id: z.number().int(), score1: score, score2: score })
-    ).length(matchCount),
+    predictions: z
+      .array(z.object({ match_id: z.number().int(), score1: score, score2: score }))
+      .length(matchCount),
   });
 }
 ```
+
+Call `predictionBatchSchema` only after the form layer has confirmed every match has two explicit numbers — never pass coerced values from empty inputs.
 
 Separate `scoreInputSchema(maxScore)` for single-field blur validation in `ScoreInput`.
 
@@ -266,8 +313,8 @@ Separate `scoreInputSchema(maxScore)` for single-field blur validation in `Score
 
 | File | Tests |
 |------|-------|
-| `lib/validation/score.test.ts` | 0 valid; empty rejected; max+1 rejected; non-int rejected |
-| `lib/validation/prediction.test.ts` | 7/8 fails schema; 8/8 passes; uses dynamic maxScore |
+| `lib/validation/score.test.ts` | 0 valid; **empty rejected (not coerced to 0)**; max+1 rejected; non-int rejected |
+| `lib/validation/prediction.test.ts` | 7/8 fails schema; 8/8 passes; **partial object with undefined scores must not serialize as 0**; uses dynamic maxScore |
 | `lib/privacy/shouldShowScore.test.ts` | pre-deadline own vs other; post-deadline all; ADMIN bypass; visitor null |
 | `lib/privacy/deadlineWarning.test.ts` | `shouldShowDeadlineWarning(secondsLeft)` true when ≤24h and >0 |
 
@@ -321,6 +368,7 @@ If integration reveals missing backend behaviour (e.g. anonymous post-deadline G
 Manual + automated (`tester_2.2`):
 
 - [ ] **Batch:** 7/8 filled → **Сохранить** disabled; 8/8 → enabled → save → reload shows data
+- [ ] **Empty ≠ zero:** cleared cell → submit disabled; **no** `{ score1: 0, score2: 0 }` in POST unless user typed 0:0
 - [ ] **Score 0** accepted and stored (not treated as empty)
 - [ ] **Invalid:** non-numeric blocked; `maxScore+1` blocked in UI; API 422 surfaced
 - [ ] **maxScore** from contest rules (label «0–N»), not hardcoded 20
@@ -362,7 +410,7 @@ Append to `agent_docs/progress/stage_2.md`:
 ## YYYY-MM-DD — Coder (2.2 predictions & privacy)
 - STATUS: READY_FOR_TEST
 - Scope: PredictionForm, PredictionsMatrix, deadline UX, privacy helpers
-- UI rules: batch-only, 0..maxScore, NULL≠0, 24h warning, privacy pre/post deadline
+- UI rules: batch-only, 0..maxScore, **empty≠0 (no coerce)**, NULL≠0, 24h warning, privacy pre/post deadline
 - Verified: npm run build, npm run test:unit; manual checklist §9
 - Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.2
 - Next: agent_docs/instructions/tester_2.2.md

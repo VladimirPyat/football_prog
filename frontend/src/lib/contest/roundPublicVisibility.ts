@@ -16,9 +16,7 @@ export function isRoundPubliclyVisible(status: RoundStatus): boolean {
 }
 
 /** Copy shown on public contest pages for non-published rounds. */
-export const ROUND_NOT_PUBLISHED_COPY =
-  "Будет доступно после проверки организатором";
+export const ROUND_NOT_PUBLISHED_COPY = "Будет доступно после проверки организатором";
 
 /** Secondary copy for round selector in public contest pages. */
-export const ROUND_NOT_PUBLISHED_SECONDARY =
-  "Организатор ещё не опубликовал результаты тура";
+export const ROUND_NOT_PUBLISHED_SECONDARY = "Организатор ещё не опубликовал результаты тура";

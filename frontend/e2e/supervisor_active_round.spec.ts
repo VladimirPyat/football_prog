@@ -27,7 +27,9 @@ test.describe("[E2E-SUPERVISOR-ACTIVE-ROUND]", () => {
     await ensureRound10Active();
   });
 
-  test("ACTIVE round before deadline: structure and status/date editable", async ({ page }) => {
+  test("ACTIVE round: no team structure edit; reschedule and postpone actions", async ({
+    page,
+  }) => {
     const token = await supervisorToken();
     const round10 = await ensureRound10Active();
 
@@ -37,12 +39,10 @@ test.describe("[E2E-SUPERVISOR-ACTIVE-ROUND]", () => {
     await waitForAdminShell(page);
     await selectRoundByNumber(page, token, 1, 10);
 
-    await expect(page.getByText(/Тур активен/i).first()).toBeVisible();
-    await expect(page.locator("tbody select").first()).toBeEnabled();
+    await expect(page.getByText(/Состав матчей изменить нельзя/i).first()).toBeVisible();
+    await expect(page.locator("tbody select")).toHaveCount(1);
 
-    const statusSelect = page.locator("tbody select").first();
-    await statusSelect.selectOption({ value: "POSTPONED" });
-    const newDate = addDays(new Date(), 30);
+    const newDate = addDays(new Date(), 2);
     const dateInput = page.locator('tbody input[type="datetime-local"]').first();
     await dateInput.fill(toDatetimeLocal(newDate));
     await dateInput.dispatchEvent("change");
@@ -54,8 +54,18 @@ test.describe("[E2E-SUPERVISOR-ACTIVE-ROUND]", () => {
         res.url().includes("/admin/rounds/") &&
         res.ok(),
     );
-    await saveBtn.click();
+    await page.getByRole("button", { name: "Сохранить изменения" }).click();
     await saveResponse;
+
+    const statusSelect = page.locator("tbody select").first();
+    await statusSelect.selectOption({ value: "POSTPONED" });
+    await page.getByRole("button", { name: "Подтвердить" }).click();
+    await page.waitForResponse(
+      (res) =>
+        res.request().method() === "PATCH" &&
+        res.url().includes("/admin/rounds/") &&
+        res.ok(),
+    );
 
     const matches = await getRoundMatches(token, 1, round10.id);
     expect(matches[0]?.status).toBe("POSTPONED");

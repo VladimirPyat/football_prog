@@ -31,6 +31,8 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 | Scoring persistence (calculate/recalculate) | ✅ Stage 1.2 | `src/services/scoring_persistence.py` |
 | Contest lifecycle (pause/finish/delete guards) | ✅ Stage 1.3 | `src/services/contest_lifecycle_service.py` |
 | Leaderboard aggregation + ETag | ✅ Stage 1.3 | `src/services/leaderboard_service.py` |
+| Published-only public LB/results + staff CALCULATED preview | ✅ Stage 2.3.1 | `leaderboard_service`, `contest_ops.py`, `admin_misc.py` [UPDATED] |
+| Round deadline placement + 24h change lockout | ✅ Stage 2.3.1 | `round_service.py`, `contest_ops.py`, `admin_rounds.py` [UPDATED] |
 | Multi-contest API + setup phase | ✅ Stage 1.4 | `src/api/v1/contests.py`, `contest_ops.py`, … |
 | FastAPI application | ✅ Stage 1.3 | `main.py` |
 | JWT authentication (bcrypt + python-jose) | ✅ Stage 1.3 | `src/core/security.py`, `src/api/v1/auth.py` |
@@ -148,9 +150,9 @@ Dev workflow without SMTP: [DEV_SETUP.md — New contest: confirm participants](
 
 | Role | Capabilities |
 |------|-------------|
-| **Visitor** (no token) | Public GET: rounds list, leaderboard, results (CALCULATED/PUBLISHED rounds only); **`GET /contests/public`** (RUNNING contests) |
-| **USER** | Own predictions read/write; **`GET /me/contests`** (enrolled contests only) |
-| **SUPERVISOR** | Round/match/result/VOID, calculate, publish, read contest settings; **same pre-deadline prediction privacy as USER** (own scores only) |
+| **Visitor** (no token) | Public GET: rounds list; round/global leaderboard and results **only for `PUBLISHED` rounds** [UPDATED]; **`GET /contests/public`** (RUNNING contests) |
+| **USER** | Own predictions read/write; **`GET /me/contests`** (enrolled contests only); round LB/results same visibility as Visitor (`PUBLISHED` only) |
+| **SUPERVISOR** | Round/match/result/VOID, calculate, publish, read contest settings; **same pre-deadline prediction privacy as USER** (own scores only); round LB/results preview for **`CALCULATED`** rounds when authenticated [UPDATED] |
 | **ADMIN** | All SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete, **create organizers** (`POST /admin/users/supervisor`); **only role that may see all predictions before deadline** (support/troubleshooting) |
 
 **Contest status guards:** When `contests.status ∈ {PAUSED, FINISHED}` for the target contest, all mutating round/match/prediction operations return `403`. Public GETs remain allowed.
@@ -216,9 +218,9 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 |--------|------|------|-------------|
 | `GET` | `/contests/{id}/rounds` | Public | List rounds |
 | `GET/POST` | `/contests/{id}/rounds/{rid}/predictions` | USER+ | Predictions view / batch save |
-| `GET` | `/contests/{id}/rounds/{rid}/leaderboard` | Public | Round standings |
-| `GET` | `/contests/{id}/rounds/{rid}/results` | Public | Results + points |
-| `GET` | `/contests/{id}/leaderboard` | Public | Global standings |
+| `GET` | `/contests/{id}/rounds/{rid}/leaderboard` | Public (optional Bearer) | Round standings; visibility by round status + viewer role [UPDATED] |
+| `GET` | `/contests/{id}/rounds/{rid}/results` | Public (optional Bearer) | Results + points; same visibility rules as round leaderboard [UPDATED] |
+| `GET` | `/contests/{id}/leaderboard` | Public | Global standings — aggregates **`PUBLISHED` rounds only** [UPDATED] |
 | `POST/PATCH/…` | `/contests/{id}/admin/rounds`, `/admin/matches/…` | SUPERVISOR+ | Round/match admin (same semantics as legacy) |
 | `POST` | `/contests/{id}/admin/recalculate` | ADMIN | Recalculate all CALCULATED rounds |
 
@@ -232,6 +234,15 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | `count_outcome` | Correct outcome only |
 
 Round leaderboard reads per-round `scores` columns; global leaderboard uses cross-round `StandingRow` sums (same source as rank tie-breakers).
+
+**Round leaderboard/results visibility (Stage 2.3.1) [UPDATED]:** Endpoints accept optional Bearer token (`get_optional_user`). `viewer_role` drives `_allowed_round_statuses` in `leaderboard_service.py`:
+
+| Viewer | Round statuses returned | HTTP when blocked |
+|--------|-------------------------|-------------------|
+| No token / `USER` | `PUBLISHED` only | `403` `RESULTS_NOT_AVAILABLE` |
+| `SUPERVISOR` / `ADMIN` | `CALCULATED`, `PUBLISHED` | `403` `RESULTS_NOT_AVAILABLE` |
+
+Global leaderboard (`GET …/leaderboard`) sums scores from **`PUBLISHED` rounds only** — `CALCULATED` preview rounds are excluded even for staff. Frontend should gate fetch with [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3 before calling public LB/results for non-`PUBLISHED` rounds.
 
 **Team logos (Stage 1.9) [UPDATED]:** `TeamOut.logo_url` is never `null` in JSON — when `teams.logo_url` is unset, the API returns `DEFAULT_TEAM_LOGO_URL` (default `/static/assets/default-team-logo.jpg`). Uploaded files are stored under `uploads/teams/{contest_id}/{team_id}.jpg` and served at `{STATIC_URL_PREFIX}/teams/{contest_id}/{team_id}.jpg`. Images are center-cropped and resized to `TEAM_LOGO_TARGET_PX` (default 64×64). Clear a custom logo with `PATCH .../teams/{id}` and `"logo_url": null`.
 
@@ -343,7 +354,7 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 | `NotFoundError` | 404 | `NOT_FOUND` |
 | `ValidationError` | 400 | `VALIDATION_ERROR` |
 | `ScoreOutOfRangeError` | 422 | `SCORE_OUT_OF_RANGE` |
-| `ContestRuleError` | 403 | `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `PARTICIPANT_NOT_ENROLLED` / `PARTICIPANT_NOT_ACCEPTED` / … |
+| `ContestRuleError` | 403 | `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `DEADLINE_CHANGE_CLOSED` [UPDATED] / `RESULTS_NOT_AVAILABLE` [UPDATED] / `PARTICIPANT_NOT_ENROLLED` / `PARTICIPANT_NOT_ACCEPTED` / … |
 | `ContestLockedError` | 403 | `CONTEST_LOCKED` |
 | `GracePeriodError` | 400 | `GRACE_PERIOD_ACTIVE` |
 | `IllegalTransitionError` | 409 | `ILLEGAL_TRANSITION` |
@@ -366,9 +377,11 @@ Legacy shim: `DELETE /admin/contest` (default contest only, deprecated).
 
 All services are `async` functions using `AsyncSession`. Routers wrap calls in transactions via `get_db`.
 
-### `round_service.py`
+### `round_service.py` [UPDATED]
 
 ```python
+def validate_round_deadline_placement(deadline, earliest_match, *, now=None) -> None
+def assert_deadline_change_allowed(current_deadline, deadline_rule_hours, *, now=None) -> None
 async def transition_round(session, round_id, target_status: RoundStatus) -> Round
 async def set_deadline(session, round_id, new_deadline: datetime) -> Round
 ```
@@ -380,6 +393,18 @@ DRAFT → ACTIVE → CLOSED → CALCULATED → PUBLISHED
 
 **Activation side-effect:** `contests.is_locked = True` when transitioning to `ACTIVE`. API calls `purge_before_first_activation` **before** lock, then `transition_round`, then `ensure_running_on_first_activation` → `status=RUNNING`.
 
+**Deadline policy (2026-06-27) [UPDATED]:**
+
+| Rule | When | Constraint |
+|------|------|------------|
+| **Placement** | Create round, `set_deadline`, PATCH deadline | `now < deadline < earliest_match_kickoff` (`validate_round_deadline_placement`) |
+| **24h change lockout** | `set_deadline` on **ACTIVE** round only | Supervisor may change deadline only while `now <= current_deadline - deadline_rule_hours` (`assert_deadline_change_allowed` → `DEADLINE_CHANGE_CLOSED`) |
+| **Past match dates** | Create round | Each match `date_time >= now`; else `400` `VALIDATION_ERROR` |
+
+**Before → After:** `deadline_rule_hours` (default 24 from `rules_json.contest_structure`) no longer forces deadline to be N hours before first kickoff. It gates **editing** the deadline on an active round. See [SCORING_LOGIC.md — Validation Constraints](SCORING_LOGIC.md#validation-constraints).
+
+**Round PATCH** (`PATCH …/admin/rounds/{id}`): editable in `DRAFT` or `ACTIVE` (not `CLOSED`+). On **ACTIVE** after deadline passed: changing `team1_id` / `team2_id` → `400` «После дедлайна нельзя менять состав матчей»; deadline and match schedule fields may still update subject to placement/24h rules.
+
 ### `match_service.py`
 
 ```python
@@ -387,7 +412,7 @@ async def set_result(session, match_id, score1: int, score2: int) -> Match
 async def change_status(session, match_id, new_status: MatchStatus) -> Match
 ```
 
-- `set_result`: validates `0 ≤ score ≤ max_score_value`; sets `FINISHED`.
+- `set_result`: validates `0 ≤ score ≤ max_score_value`; sets `FINISHED`. Allowed when `round.status` is `CLOSED` or `CALCULATED` and `now >= deadline`. On `CALCULATED`, triggers `recalculate_round` after score update so `scores` and staff LB preview stay in sync.
 - `change_status(VOID)`: if round is `CALCULATED`, triggers `recalculate_round` atomically.
 
 ### `prediction_service.py` [UPDATED]
@@ -459,6 +484,8 @@ Removes all `PENDING` USER participants before first activation (called while co
 ### `leaderboard_service.py` [UPDATED]
 
 Aggregates `Score` rows, reads `contest_participants.exceptional_tiebreak_points`, calls `build_standings(manual_overrides=…)`, serializes `count_exact_high`, `count_exact`, `count_diff`, `count_outcome` on each leaderboard row, and builds ETag hashes for cache headers.
+
+**Visibility (Stage 2.3.1):** `get_round_leaderboard` / `get_round_results` take optional `viewer_role`. `_assert_round_visible` allows `PUBLISHED` for public/USER; adds `CALCULATED` for `SUPERVISOR`/`ADMIN`. `get_global_leaderboard` joins scores only from rounds with `status == PUBLISHED`.
 
 ### `team_logo_service.py` [NEW]
 
@@ -572,6 +599,8 @@ Base path: `/api/v1`. **Preferred:** contest-scoped paths from [Multi-Contest AP
 
 **Rules:** All round matches required (atomic save). Scores `0..20`; `0` is valid. Missing fields → `422`; incomplete batch → `400`; after deadline / not ACTIVE / contest PAUSED|FINISHED → `403`.
 
+**GET response (Stage 2.3.1) [UPDATED]:** Each match in the predictions view includes `team1_id` and `team2_id` (FK to `teams.id`) alongside display names — used by admin UI for team pickers.
+
 **Response:** `{ "success": true, "saved_count": 8 }`
 
 ## HTTP Caching [NEW]
@@ -602,7 +631,7 @@ Domain errors (`AppError` subclasses from `src/core/exceptions.py`) return:
 | `NOT_FOUND` | 404 |
 | `VALIDATION_ERROR` | 400 |
 | `SCORE_OUT_OF_RANGE` | 422 |
-| `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `CONTEST_NOT_RUNNING` | 403 |
+| `CONTEST_RULE_VIOLATION` / `DEADLINE_PASSED` / `DEADLINE_CHANGE_CLOSED` / `RESULTS_NOT_AVAILABLE` / `CONTEST_NOT_RUNNING` | 403 [UPDATED] |
 | `PARTICIPANT_NOT_ENROLLED` / `PARTICIPANT_NOT_ACCEPTED` | 403 |
 | `CONTEST_LOCKED` | 403 |
 | `PASSWORD_SETUP_REQUIRED` | 403 [NEW] |
