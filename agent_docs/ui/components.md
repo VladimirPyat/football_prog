@@ -1,7 +1,7 @@
 # UI Component Catalogue (Stage 2)
 
 > **Living document** — see update log at the bottom.
-> **Refs:** `agent_docs/plans/draft_2.md` (§5, §11), screenshots in `docs/screens/`.
+> **Refs:** `agent_docs/plans/draft_2.md` (§5, §11), screenshots in `docs/screens/`, **`agent_docs/contracts/admin_ui_status_matrix.md`**.
 > **Constraints:** Tailwind only, no external UI libraries, no animations (`docs/02_project_structure.md`). Russian UI copy.
 
 Components grouped by layer. Props are TypeScript-ish sketches; exact types live in `frontend/src/types`.
@@ -15,7 +15,7 @@ Header bar: brand `Sport Prognosis` (left); right side role-aware nav — USER: 
 - props: `{ children }`; reads `useAuth`.
 
 ### `AdminTopNav` (supervisor) — **Implemented (2.3)** → `frontend/src/components/admin/AdminTopNav.tsx`
-Top nav: brand `SportPrognosis` + `Сегодня DD.MM.YYYY`; tabs `Настройки` `Туры` `Рассылки` `Результаты` (active link via pathname); right `ContestPicker adminMode` + `+ Новый конкурс` → `CreateContestForm`.
+Top nav: brand `SportPrognosis` + `Сегодня DD.MM.YYYY`; tabs `Настройки` `Туры` `Рассылки` `Результаты` (active link via pathname); right `ContestPicker adminMode` + `+ Новый конкурс` → `CreateContestForm` (**name + slug only** — 2.3.3 S1.1). Post-create setup hint on Parameters.
 
 ### `ContestPicker` — **Implemented (2.1, 2.3)** → `frontend/src/components/contest/ContestPicker.tsx`
 Dropdown of contests. Supervisor → `GET /contests`; User → `GET /me/contests` (B1); Visitor → `GET /contests/public` (B2). Prop `adminMode` keeps user on admin page when switching contest.
@@ -50,13 +50,15 @@ Global layout guard; redirects authenticated `is_temp_password` users to `/chang
 | `LoadingState` / `ErrorState` / `EmptyState` | Consistent fetch states | `{ message? }` — **LoadingState, ErrorState implemented (2.1)** → `frontend/src/components/ui/` |
 | `RoleBadge` | Show current role | `{ role }` |
 | `ContestStatusBanner` | PAUSED / FINISHED / locked notice | **Implemented (2.3)** → `frontend/src/components/admin/ContestStatusBanner.tsx` |
-| `LockBanner` | «Редактирование параметров недоступно — Конкурс уже запущен» | **Implemented (2.3)** → `frontend/src/components/admin/LockBanner.tsx` |
+| `LockBanner` | «Редактирование параметров недоступно — Конкурс уже запущен» | **Implemented (2.3)** → `frontend/src/components/admin/LockBanner.tsx` — **settings pages only** (2.3.1 F8) |
 
 ### Status color map (Tailwind badge classes)
 
 | Round | Match |
 |-------|-------|
 | DRAFT gray · ACTIVE green · CLOSED orange · CALCULATED blue · PUBLISHED purple | SCHEDULED gray · POSTPONED yellow · CANCELED red · VOID red-outline · FINISHED green |
+
+**Round status labels (2.3.1):** API `CLOSED` → UI **«Дедлайн»** via `roundStatusLabel()`; contextual hints via `roundStatusHint()` in `frontend/src/lib/admin/format.ts`. Supplementary rounds: **«ДопТурN»** via `formatRoundTitle()` / `formatRoundOptionLabel()` in `roundLabel.ts` (2.3.4 F4).
 
 ---
 
@@ -99,8 +101,11 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | `PredictionForm` | `/contest/[id]/predict/[rid]` |
 | `ScoreInput` | inside PredictionForm / ResultsEntryGrid |
 | `ContactsForm` | `/profile` (B3) — **Implemented (2.1)** → `frontend/src/components/profile/ContactsForm.tsx` |
-| `CreateContestForm` | NewContestButton — **Implemented (2.3)** → `frontend/src/components/admin/CreateContestForm.tsx` |
-| `ContestParametersForm` | Настройки → Параметры — **Implemented (2.3)** → `frontend/src/components/admin/ContestParametersForm.tsx` |
+| `CreateContestForm` | NewContestButton — **Implemented (2.3)** → `frontend/src/components/admin/CreateContestForm.tsx` — **name + optional slug only** (2.3.3); structure defaults from backend |
+| `ContestParametersForm` | Настройки → Параметры — **Implemented (2.3)** → `frontend/src/components/admin/ContestParametersForm.tsx` — round-robin sync, rules save (2.3.3–2.3.4) |
+| `RulesEditorPanel` | Parameters — structured bonus/scoring editor — **Implemented (2.3.4)** → `frontend/src/components/admin/RulesEditorPanel.tsx` |
+| `ContestLifecycleActions` | Parameters footer — start / delete / pause CTAs — **Implemented (2.3.3+)** → `frontend/src/components/admin/ContestLifecycleActions.tsx` |
+| `ContestStartReadinessPanel` | Parameters — pre-start checklist — **Implemented (2.3.4)** → `frontend/src/components/admin/ContestStartReadinessPanel.tsx` |
 | `TeamForm` | Настройки → Команды — **Implemented (2.3)** → `frontend/src/components/admin/TeamForm.tsx` |
 | `ParticipantInviteForm` | Настройки → Участники — **Implemented (2.3)** → `frontend/src/components/admin/ParticipantInviteForm.tsx` |
 | `RoundBuilderForm` | Туры — **Implemented (2.3)** → `frontend/src/components/admin/RoundBuilderForm.tsx` |
@@ -121,7 +126,11 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | `ParticipantInviteModal` | `frontend/src/components/admin/ParticipantInviteModal.tsx` |
 | `TeamsGrid` / `TeamLogoUpload` | `frontend/src/components/admin/TeamsGrid.tsx`, `TeamLogoUpload.tsx` |
 | `RoundManagementPanel` | `frontend/src/components/admin/RoundManagementPanel.tsx` |
+| `RoundPhasePanel` | Per-status main panel (DRAFT/ACTIVE/CLOSED/CALCULATED/PUBLISHED) — **2.3.1** → `frontend/src/components/admin/RoundPhasePanel.tsx` |
+| `RoundStatusSidebar` | Status badge + hints + post-deadline copy — **2.3.1/2.3.5** → `frontend/src/components/admin/RoundStatusSidebar.tsx` |
+| `RoundLeaderboardPreview` | CALCULATED preview table + `bonuses_pending` note — **2.3.1/2.3.4** → `frontend/src/components/admin/RoundLeaderboardPreview.tsx` |
 | `ResultsEntryPanel` | `frontend/src/components/admin/ResultsEntryPanel.tsx` |
+| `MatchResultRow` | Per-match result row with gating — **2.3.2** → `frontend/src/components/admin/MatchResultRow.tsx` |
 | `LifecyclePanel` | `frontend/src/components/admin/LifecyclePanel.tsx` |
 | `CreateOrganizerForm` | `frontend/src/components/admin/CreateOrganizerForm.tsx` |
 | `NewsletterPromptModal` | `frontend/src/components/admin/NewsletterPromptModal.tsx` (Stage 3 stub) |
@@ -132,7 +141,25 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 
 `useAuth`, `useContest`, `useRounds`, `useLeaderboard`, `useRoundResults`, `usePredictionsView`, `usePredictionSubmit`, `useDeadline`, `useMaxScore`, `useMyContests`, `usePublicContests`, `useContacts`, `useToast`.
 
-**Implemented (2.3):** `useContestAdmin`, `useTeams`, `useParticipants`, `useAdminRounds`, `useRoundMatches`, `useAdminResults` under `frontend/src/hooks/`. Pure helpers: `deriveAdminUiMode`, `deadlineRule`, `collectPostponedMatches` in `frontend/src/lib/admin/`.
+**Implemented (2.3):** `useContestAdmin`, `useTeams`, `useParticipants`, `useAdminRounds`, `useRoundMatches`, `useAdminResults`, `useContestStartReadiness` under `frontend/src/hooks/`.
+
+**Pure helpers (`frontend/src/lib/admin/`):**
+
+| Module | Purpose |
+|--------|---------|
+| `deriveAdminUiMode.ts` | Contest/round phase → capability flags (uses `effectiveRoundStatus` — 2.3.5) |
+| `deadlineRule.ts` | Deadline placement + 24h **change** lockout (2.3.1 F2) |
+| `roundEffectiveStatus.ts` | ACTIVE + deadline passed → behave as CLOSED (2.3.5) |
+| `roundLabel.ts` | `Тур N` / `ДопТурN` labels (2.3.4 F4) |
+| `roundScoringPending.ts` | Parse `bonuses_pending` from leaderboard (2.3.4 F5) |
+| `contestStartReadiness.ts` | Start gate matrix (2.3.4 F3) |
+| `rulesEditor.ts` | `buildRulesJsonPatch()` for PATCH (2.3.4 F2) |
+| `matchResultsGating.ts` | Results entry by round/match status (2.3.2) |
+| `matchScheduleEdit.ts` | Kickoff reschedule rules on ACTIVE (2.3.1 F3) |
+| `collectPostponedMatches.ts` | Free-tour postponed match grouping |
+| `format.ts` | `roundStatusLabel`, `roundStatusHint`, `matchPhaseLabel` |
+
+**Public visibility (2.3.1 F12):** `frontend/src/lib/contest/roundPublicVisibility.ts` — `isRoundPubliclyVisible(status)`.
 
 **Implemented (2.1):** `useAuth` → `frontend/src/hooks/useAuth.ts`; `useContest` → `frontend/src/hooks/useContest.ts`; `useMyContests` → `frontend/src/hooks/useMyContests.ts`; `usePublicContests` → `frontend/src/hooks/usePublicContests.ts`; `useContacts` → `frontend/src/hooks/useContacts.ts`; `useToast` → `frontend/src/hooks/useToast.ts`.
 
@@ -148,3 +175,6 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | 2026-06-23 | Stage 2.1: marked implemented components with `frontend/src/...` paths; added `TempPasswordGuard`, `ContestList`, `ProfileMenu`. |
 | 2026-06-24 | Stage 2.1.1: `AdminTopNav` stub; `resolvePostLoginPath`; role-aware `AppShell` nav; `ProtectedRoute` staff redirect from `/profile`. |
 | 2026-06-24 | Stage 2.3: full admin component catalogue with `frontend/src/components/admin/*` paths; `deriveAdminUiMode` engine; admin hooks. |
+| 2026-06-28 | Stage 2.3.1: `RoundPhasePanel`, `RoundStatusSidebar`, status hints; LockBanner scope; public visibility helper. |
+| 2026-06-28 | Stage 2.3.3–2.3.4: slim create; `RulesEditorPanel`, `ContestLifecycleActions`, `ContestStartReadinessPanel`; `roundLabel`, `rulesEditor`, `contestStartReadiness`. |
+| 2026-06-28 | Stage 2.3.5: `roundEffectiveStatus`; `MatchResultRow`; removed manual close UX from sidebar. |

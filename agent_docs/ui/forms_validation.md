@@ -14,7 +14,7 @@
 | `NULL ≠ 0` | empty input = `undefined` in state, never `0`; submit only when user typed; `0` is a valid entered value |
 | Batch-only predictions | submit enabled only when **all** `matches_per_round` filled (100%); partial → disabled |
 | Deadline | inputs readonly when `deadline_passed`; never submit after deadline (also enforced by 403) |
-| 24h rule | round deadline must be `≤ first_match_date − 24h` |
+| 24h rule | **Placement:** `now < deadline < earliest_match` on create/set. **Change lockout:** supervisor may move deadline only while `now <= deadline − deadline_rule_hours` (2.3.1 F2 — not «first match must be ≥24h away») |
 | Immutable | disable when `is_locked` (setup) or round status ≥ CLOSED (predictions) |
 | Privacy | render from API `entries`; never infer hidden scores client-side |
 | Errors | map `422` Pydantic field errors + domain `code` to inputs/toasts (`detail` shown verbatim, Russian) |
@@ -69,23 +69,19 @@ z.object({
 z.object({
   name: z.string().min(1),
   slug: z.string().optional(),
-  total_teams: z.number().int().positive(),
-  matches_per_round: z.number().int().positive(),
-  total_rounds: z.number().int().positive(),
-  is_round_robin: z.boolean(),
-}).superRefine((d, ctx) => {
-  if (d.is_round_robin) {
-    if (d.matches_per_round !== d.total_teams/2)
-      ctx.addIssue({ code:'custom', path:['matches_per_round'], message:'Должно быть = команды / 2' });
-    if (d.total_rounds !== (d.total_teams-1)*2)
-      ctx.addIssue({ code:'custom', path:['total_rounds'], message:'Должно быть = (команды − 1) × 2' });
-  }
 })
 ```
-(Round-robin math per `docs/01` §3.2.)
+Structural defaults (`total_teams`, `matches_per_round`, `total_rounds`, `is_round_robin`) come from backend `contest_defaults_path` on create — set on Parameters page (2.3.3 S1.1). Slug help: «Короткое имя для ссылки (латиница, цифры, дефисы)…».
 
 ### ContestParametersForm — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`contestParametersSchema`)
-- Same fields as create; **all readonly when `is_locked`**. Scoring/bonus values shown from `rules_json` (display-only here). PATCH `/contests/{id}`; `CONTEST_LOCKED` (403) → keep readonly + banner.
+```ts
+// fields: total_teams, matches_per_round, total_rounds, is_round_robin (+ rules via rulesEditor)
+```
+- **Round-robin:** when `is_round_robin=true`, `deriveRoundRobinStructure(totalTeams)` auto-fills `matches = teams/2`, `rounds = (teams−1)×2`; fields read-only (2.3.3 S1.2).
+- **«Произвольное количество»** checkbox = `!is_round_robin` — free manual values when checked.
+- **`buildRulesJsonPatch(formState)`** merges scoring/bonus into PATCH payload (2.3.4 F2).
+- **All readonly when `is_locked`**. PATCH `/contests/{id}`; `CONTEST_LOCKED` (403) → keep readonly + banner.
+- Start flow: save (incl. rules) via `onBeforeStart`, then `POST /start` (2.3.3–2.3.4).
 
 ### TeamForm — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`teamFormSchema`)
 ```ts
@@ -123,14 +119,15 @@ z.object({
   const ids = d.matches.flatMap(m => [m.team1_id, m.team2_id]);
   if (new Set(ids).size !== ids.length)
     ctx.addIssue({ code:'custom', path:['matches'], message:'Команда не может играть дважды в туре' });
-  // 24h rule
+  // placement: deadline before first match and in the future
   const firstMatch = Math.min(...d.matches.map(m => Date.parse(m.date_time)));
-  if (Date.parse(d.deadline) > firstMatch - 24*3600*1000)
-    ctx.addIssue({ code:'custom', path:['deadline'], message:'Дедлайн должен быть ≥ 24ч до первого матча' });
+  if (Date.parse(d.deadline) >= firstMatch)
+    ctx.addIssue({ code:'custom', path:['deadline'], message:'Дедлайн должен быть раньше первого матча' });
 })
 ```
 - `team1_id !== team2_id` per match.
-- After activation: only match status + date editable (per `supervisor_tours.jpg`); deadline locked <24h.
+- Match kickoff may be &lt;24h away; 24h rule applies only to **changing** deadline on ACTIVE tour (`deadlineRule.isDeadlineChangeAllowed` — 2.3.1 F2).
+- **ACTIVE:** no team swap in UI; kickoff reschedule until match start; cancel/postpone allowed (2.3.1 F3).
 
 ### MatchResultForm / ResultsEntryGrid — **Implemented (2.3)** → `frontend/src/lib/validation/admin.ts` (`matchResultSchema`)
 ```ts
@@ -183,6 +180,7 @@ Duplicate login → `400 VALIDATION_ERROR`.
 | `SCORE_OUT_OF_RANGE` 422 | score cell |
 | `VALIDATION_ERROR` 400 | form-level (incomplete batch, duplicate) |
 | `DEADLINE_PASSED` 403 | predictions readonly |
+| `DEADLINE_CHANGE_CLOSED` 403 | deadline picker on ACTIVE (within 24h of current deadline) |
 | `CONTEST_LOCKED` 403 | setup readonly |
 | `CONTEST_NOT_RUNNING` 403 | disable mutations + banner |
 | `ILLEGAL_TRANSITION` 409 | toast (round/match step) |
@@ -197,3 +195,6 @@ Duplicate login → `400 VALIDATION_ERROR`.
 | 2026-06-21 | Initial Zod schemas + cross-cutting rules for all Stage-2 forms; mirrors `docs/01` §6 and API error contract. |
 | 2026-06-23 | Stage 2.1: Zod export paths for login, changePassword, contacts under `frontend/src/lib/validation/`. |
 | 2026-06-24 | Stage 2.3: admin Zod schemas in `frontend/src/lib/validation/admin.ts`; client 24h rule in `lib/admin/deadlineRule.ts`. |
+| 2026-06-28 | Stage 2.3.1: 24h placement vs change lockout; RoundBuilder deadline validation updated. |
+| 2026-06-28 | Stage 2.3.3: slim `createContestSchema`; `deriveRoundRobinStructure` on Parameters. |
+| 2026-06-28 | Stage 2.3.4: `buildRulesJsonPatch`; start readiness validation mirrors backend 422. |

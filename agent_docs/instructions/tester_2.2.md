@@ -3,7 +3,7 @@
 > **Status gate:** @Coder `READY_FOR_TEST` for 2.2 in `agent_docs/progress/stage_2.md`.
 > **Prerequisites:** Sub-stages **2.1**, **2.1.1**, and **2.3** at `TEST_PASS`. Backend predictions API Stage 1.3+ (`test_1.3.md` / `test_operational_gaps_1_4.py`).
 > **Dev note:** Test user `user/user` comes from `bootstrap_users.py` (2.1.1) until invite UI removes demo seed — see `agent_docs/reports/todo.md`.
-> **Reference:** `instructions/coder_2.2.md`, `docs/03_user_scenarios.md` §3–§4 (E2E §), `docs/06_front_tests.md`, `agent_docs/contracts/frontend_api_integration.md`.
+> **Reference:** `instructions/coder_2.2.md`, `docs/03_user_scenarios.md` §3–§4 (E2E §), `docs/06_front_tests.md`, `agent_docs/contracts/frontend_api_integration.md`, `agent_docs/contracts/admin_ui_status_matrix.md` (§10–11).
 > **Strategy:** Unit (Vitest) + E2E (Playwright) — **agent runs**; visual/mobile UX — **human** (agent reminds in report).
 
 ---
@@ -84,21 +84,28 @@ See also: `tester_2.3.2_fix_tours.md` §2.0 (same Playwright stack).
 cd /work/football_prog
 uv run alembic upgrade head
 uv run python src/scripts/bootstrap_users.py
-uv run python src/scripts/load_test_data.py    # contest id=1; round 10 ACTIVE; rounds 1–9 past
+uv run python src/scripts/load_test_data.py --reset   # contest id=1; see fixture table below
+# Prediction E2E needs ACTIVE round 10 — full loader leaves round 10 CALCULATED (coder_1.14):
+uv run python src/scripts/dev_setup.py --ensure-running-only --e2e
 uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+See `agent_docs/instructions/backend/coder_1.14_data_fix.md` if round 10 is not ACTIVE after bootstrap.
 
 Health: `curl -s http://127.0.0.1:8000/health` → `{"status":"ok"}`.
 
 > **E2E:** DB bootstrap below is **one-time** (or when resetting fixture). For re-runs, only **API** must stay up — see [§2.0](#20-e2e-prerequisites-read-first-updated).
 
-**Key fixture facts:**
+**Key fixture facts** (after `coder_1.14` full profile + `--e2e` restore):
 
 | Item | Value |
 |------|-------|
 | Contest id | `1` (RUNNING, locked) |
-| Active round | **10** — ACTIVE, deadline in future (open for predictions) |
-| Past round | **9** — CLOSED, deadline passed (privacy / full matrix tests) |
+| Open predictions round | **10** — must be **`ACTIVE`**, deadline in future — use `--ensure-running-only --e2e` (not default after `--reset` alone) |
+| Post-deadline privacy round | **9** — **`PUBLISHED`**, deadline passed (`deadline_passed === true` on GET predictions) |
+| Other history | Rounds **1–8** also `PUBLISHED` (public LB includes them; not used in default 2.2 specs) |
+| Round 10 without `--e2e` | **`CALCULATED`** after full finalize — good for LB stub tests (not published), **bad** for predict POST until restored ACTIVE |
+| Round 11 | **`CLOSED`** — no scores in public LB |
 | `matches_per_round` | 8 (from contest defaults) |
 | `maxScore` | from `rules_json.constraints.score_validation_range[1]` — verify via `GET /contests/1`, do not assume 20 |
 | Test user | `user` / `user` (bootstrap demo user, 2.1.1) |
@@ -164,9 +171,15 @@ export async function getRoundIdByNumber(contestId: number, number: number, toke
 }
 
 // For deadline_block: supervisor PATCH round deadline to past (if UI test needs API setup)
+// Note: backend 1.16 auto-closes round on GET …/predictions when deadline passed.
+// Supervisor 24h rule (2.3.1) limits deadline *changes* — prefer round 9 (already past) for post-deadline matrix tests.
+
+export async function ensureRound10Active(/* … */) {
+  // Optional: call dev_setup --e2e or admin activate path — see coder_1.14_data_fix.md §6
+}
 ```
 
-Use **round 10** for open predictions; **round 9** for post-deadline matrix (deadline already passed in loader).
+Use **round 10** (ACTIVE after `--e2e`) for open predictions; **round 9** (`PUBLISHED`, deadline passed) for post-deadline matrix tests.
 
 ---
 
@@ -285,6 +298,16 @@ Source: `docs/03` partial `user_full_flow` (full flow with logout → 2.4).
 3. Tab **Прогнозы** renders `PredictionsMatrix` (table/grid with match headers).
 4. Tab switch does not crash; refetch on round change.
 
+### 6.10 `[E2E-LB-STUB-NOT-PUBLISHED]` — optional `contest_leaderboard_stub.spec.ts`
+
+**Setup:** round **10** in **`CALCULATED`** state (default after full loader without `--e2e`) OR select any non-`PUBLISHED` round on **Лидерборд** tab.
+
+1. Visit `/contest/1` → tab **Лидерборд** → select round 10 (if listed).
+2. Assert stub **«Будет доступно после проверки организатором»** (or `ROUND_NOT_PUBLISHED_COPY`).
+3. Assert **no** standings table with participant ranks (no successful public LB render for unpublished round).
+
+Maps to: 2.3.1 F12 / `admin_ui_status_matrix.md` §10. **Skip** if Coder deferred all LB tab work to 2.4 — document SKIP in report.
+
 ---
 
 ## 7. TypeScript lint & build (mandatory)
@@ -313,9 +336,9 @@ npm run build
 | ID | Pass criteria |
 |----|---------------|
 | `[DOC-UI-COMPONENTS]` | `components.md` — PredictionForm, PredictionsMatrix, ScoreInput, Deadline* marked **Implemented (2.2)** |
-| `[DOC-UI-PAGES]` | `pages.md` — `/contest/[id]/predict/[rid]`, Прогнозы tab ✅ |
+| `[DOC-UI-PAGES]` | `pages.md` — `/contest/[id]/predict/[rid]`, Прогнозы tab; **PUBLISHED-only** LB/Results stubs (2.3.1) |
 | `[DOC-FORMS]` | `forms_validation.md` — prediction schema paths |
-| `[DOC-INTEGRATION]` | `frontend_api_integration.md` — predictions matrix, visitor 401 note |
+| `[DOC-INTEGRATION]` | `frontend_api_integration.md` — predictions matrix, visitor 401 note; client `PUBLISHED` gate documented or cross-ref `admin_ui_status_matrix.md` §10 |
 | `[DOC-CODER-HANDOFF]` | `stage_2.md` Coder 2.2 `READY_FOR_TEST` |
 
 ---
@@ -326,7 +349,7 @@ After tests:
 
 1. Verify **Stage 2.2 readiness checklist** (§10 below) against results.
 2. No backend blockers expected for 2.2 (predictions API exists since 1.3).
-3. If anonymous post-deadline viewing required by product but API returns 401 → document as **optional B7** in report; do not fail 2.2 if Coder implemented login prompt per `coder_2.2.md` §5.4.
+3. If anonymous post-deadline viewing required by product but API returns 401 → document in report; do **not** fail 2.2 if Coder implemented login prompt per `coder_2.2.md` §5.4 (by design).
 
 ---
 
@@ -382,6 +405,7 @@ Russian summary. Table:
 | `[E2E-USER-PREDICT-FLOW]` | PASS/FAIL | |
 | `[E2E-VISITOR-PRED-STUB]` | PASS/FAIL | |
 | `[E2E-CONTEST-PRED-TAB]` | PASS/FAIL | |
+| `[E2E-LB-STUB-NOT-PUBLISHED]` | PASS/FAIL/SKIP | 2.3.1 F12 |
 | `[E2E-TEARDOWN]` | PASS/FAIL | `--check-ports` exit 0; API stopped (tester_2.1 §2.5) |
 | `[LINT-ESLINT]` | PASS/FAIL | |
 | `[LINT-TSC]` | PASS/FAIL | |
@@ -406,7 +430,8 @@ On **TEST_PASS:** ready for **2.4** (leaderboard & integration). Dependency grap
 | Invalid chars / out of range | `[E2E-PRED-VALIDATION]`, `[UNIT-SCORE-RANGE]` |
 | maxScore from rules | `[E2E-PRED-VALIDATION]` (read from API) |
 | Pre-deadline: others masked | `[E2E-PRED-PRIVACY-PRE]` |
-| Post-deadline: full matrix (auth) | `[E2E-PRED-PRIVACY-POST]` |
+| Post-deadline: full matrix (auth) | `[E2E-PRED-PRIVACY-POST]` (round 9 PUBLISHED) |
+| LB/Results stub non-PUBLISHED | `[E2E-LB-STUB-NOT-PUBLISHED]` (optional) |
 | Visitor pre-deadline stub | `[E2E-VISITOR-PRED-STUB]` |
 | Deadline warning &lt;24h | `[E2E-PRED-DEADLINE-WARN]`, `[UNIT-DEADLINE-WARN]` |
 | After deadline readonly | `[E2E-DEADLINE-BLOCK]` |

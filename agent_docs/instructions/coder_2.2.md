@@ -4,7 +4,7 @@
 > **Prerequisite:** Sub-stages **2.1**, **2.1.1**, and **2.3** at `TEST_PASS` (auth shell, role routing, admin UI). Backend prediction API Stage 1.3+ (`GET/POST …/predictions`, privacy filter). See `agent_docs/reports/BLOCKED.md`.
 > **Dev note:** Until 2.3 invite UI replaces bootstrap seed, use demo `user/user` from `bootstrap_users.py` (2.1.1) for prediction E2E — see `agent_docs/reports/todo.md`.
 > **Plan:** `agent_docs/plans/draft_2.md` § Sub-stage 2.2, §3.6, §7.3.
-> **Specs:** `agent_docs/ui/{components,pages,forms_validation,state_management}.md`, `agent_docs/contracts/frontend_api_integration.md`, `docs/03_user_scenarios.md` §3–§4.
+> **Specs:** `agent_docs/ui/{components,pages,forms_validation,state_management}.md`, `agent_docs/contracts/frontend_api_integration.md`, `agent_docs/contracts/admin_ui_status_matrix.md` (§10–11 — public LB/results vs predictions), `agent_docs/contracts/contest_lifecycle_flow.md` §3.3–3.4, `docs/03_user_scenarios.md` §3–§4.
 > **Screenshots:** `docs/screens/user_predict.jpg` — prediction form + matrix layout reference.
 > **Language policy:** UI copy Russian; code comments English; API `detail` shown as-is.
 
@@ -27,9 +27,20 @@ Implement **user prediction entry** and **privacy-aware predictions viewing**. A
 **Non-goals:**
 
 - Full **Лидерборд** / **Результаты** tab polish (13 columns, points matrix) → **2.4**
-- Supervisor admin UI → **2.3**
+- Supervisor admin UI → **2.3** (shipped — reuse `roundLabel.ts`, `roundPublicVisibility.ts` from admin work)
 - Playwright E2E full suite → **tester_2.2**
 - Mock API data
+
+**Cross-stage rules (2.3.1+ — apply in 2.2 even for stubs):**
+
+| Area | Rule | Source |
+|------|------|--------|
+| Public **Лидерборд** / **Результаты** tabs | Fetch only when `isRoundPubliclyVisible(round.status)` (`PUBLISHED`); else stub + **skip GET** | `lib/contest/roundPublicVisibility.ts`, `admin_ui_status_matrix.md` §10 |
+| Stub copy (LB / Результаты) | **«Будет доступно после проверки организатором»** — not «после подведения итогов» | 2.3.1 F12, `ROUND_NOT_PUBLISHED_COPY` |
+| **Прогнозы** tab | Privacy by **`deadline_passed`**, not by `PUBLISHED` — matrix rules unchanged (§3.4, §5.3) | `contest_lifecycle_flow.md` §3.3, `admin_ui_status_matrix.md` §11 |
+| Round labels in `RoundSelector` | `Тур N` / **`ДопТурN`** via `formatRoundTitle()` | `lib/admin/roundLabel.ts` (2.3.4) |
+| `RoundOut` API | May include `kind`, `supplementary_index`, `source_round_numbers` — use in selector labels | `types/api.ts`, 2.3.4 |
+| User **&lt;24h warning** on predict form | Unchanged — independent of supervisor 24h **deadline change** lockout (2.3.1 F2) | This doc §3.3 |
 
 ---
 
@@ -51,7 +62,7 @@ Implement **user prediction entry** and **privacy-aware predictions viewing**. A
 
 **Score range:** `maxScore = contest.rules_json.constraints.score_validation_range[1]` — **never hardcode 20** in validation or labels.
 
-**Test data:** `load_test_data.py` → contest `id=1`, round **10** ACTIVE; demo `user/user` enrolled via `bootstrap_users.py` (2.1.1).
+**Test data:** `load_test_data.py --reset` → contest `id=1` **RUNNING**; after **`coder_1.14` full profile** rounds **1–9 `PUBLISHED`**, **10 `CALCULATED`**, **11 `CLOSED`** — not ACTIVE round 10 by default. For prediction entry E2E/manual use **`dev_setup.py --ensure-running-only --e2e`** (or API helper) to restore **round 10 ACTIVE** with future deadline. Demo `user/user` enrolled via `bootstrap_users.py` (2.1.1). See `agent_docs/instructions/backend/coder_1.14_data_fix.md` §6.
 
 ---
 
@@ -121,7 +132,7 @@ Implement `useDeadline(round)` per `state_management.md`:
 
 **Server wins:** if `RoundPredictionsView.deadline_passed === true` but client clock disagrees → trust API.
 
-Optional: poll `refetch` predictions every 60s on Прогнозы tab to auto-reveal matrix after deadline (UC-9).
+**Auto-close (backend 1.16):** `GET …/predictions` runs lazy round close when `now >= deadline`; `deadline_passed` in response is authoritative. Optional poll/refetch on Прогнозы tab (60s) reveals full matrix after deadline without reload — same pattern as admin `useRoundMatches.onDeadlinePassed` (2.3.5), but participant UI only needs predictions refetch.
 
 ### 3.4 Privacy matrix (`PredictionsMatrix`)
 
@@ -166,7 +177,7 @@ export function shouldShowScore(
 
 `PARTICIPANT_NOT_ACCEPTED` (403) → banner «Смените временный пароль» + link `/change-password`.
 
-Round not ACTIVE / contest PAUSED → disable form + explain.
+Round not **ACTIVE** (for POST) / contest **PAUSED** / **FINISHED** → disable form + explain. Viewing **Прогнозы** matrix on past rounds (`deadline_passed`) is allowed for **CLOSED / CALCULATED / PUBLISHED** — visibility is deadline-based, not publish-based.
 
 ---
 
@@ -193,6 +204,8 @@ frontend/src/
   lib/
     privacy/shouldShowScore.ts
     privacy/formatPredictionCell.ts
+    contest/roundPublicVisibility.ts     # EXISTS — reuse isRoundPubliclyVisible, ROUND_NOT_PUBLISHED_COPY
+    admin/roundLabel.ts                  # EXISTS — reuse formatRoundTitle in RoundSelector
     validation/prediction.ts              # Zod batch schema
     validation/score.ts                   # reusable score field
   hooks/
@@ -241,11 +254,18 @@ Upgrade from 2.1 placeholder:
 
 | Tab | 2.2 behaviour |
 |-----|---------------|
-| **Лидерборд** | Minimal stub: «Полная таблица лидеров — этап 2.4» OR basic `LeaderboardTable` if trivial — **not blocking** |
-| **Прогнозы** | **`PredictionsMatrix`** for selected round |
-| **Результаты** | Stub «Результаты будут доступны после подведения итогов» (2.4) |
+| **Лидерборд** | Minimal stub or basic `LeaderboardTable` if trivial — **not blocking** for 2.2. **Mandatory gate:** call `GET …/leaderboard` only when selected round is **`PUBLISHED`** (or global LB which excludes non-published server-side). Non-published round → `ROUND_NOT_PUBLISHED_COPY` stub, **no fetch** (2.3.1 F12). Full 13-column polish → **2.4**. |
+| **Прогнозы** | **`PredictionsMatrix`** for selected round — privacy by `deadline_passed` (§5.3). **Not** gated by `PUBLISHED`. |
+| **Результаты** | Stub with **`ROUND_NOT_PUBLISHED_COPY`** until round **`PUBLISHED`**; skip `GET …/results` otherwise. Full matrix → **2.4**. |
 
-`RoundSelector`: default = current ACTIVE round; past rounds selectable (deadline_passed → full matrix for auth users).
+**`RoundSelector`** — behaviour **depends on active tab**:
+
+| Tab | Round list / default |
+|-----|----------------------|
+| **Прогнозы** | Default = current **ACTIVE** round (open predictions) if any; else latest round with `deadline_passed` for matrix view. All rounds selectable; label via `formatRoundTitle(round)`. |
+| **Лидерборд** / **Результаты** | Prefer **`PUBLISHED`** rounds for data fetch; non-published selection → stub (optional: show in dropdown disabled + tooltip `ROUND_NOT_PUBLISHED_SECONDARY`). |
+
+Post-deadline on **Прогнозы**: authenticated users see **full matrix** for rounds where `deadline_passed === true` (including `CLOSED`, `CALCULATED`, `PUBLISHED`).
 
 ### 5.3 Прогнозы tab — authenticated USER+
 
@@ -334,7 +354,7 @@ Update living docs with **Implemented (2.2)** + file paths; append update log ro
 | `agent_docs/ui/pages.md` | `/contest/[id]/predict/*`, Прогнозы tab |
 | `agent_docs/ui/forms_validation.md` | Score/prediction Zod schemas |
 | `agent_docs/ui/state_management.md` | `usePredictionsView`, `usePredictionSubmit`, etc. |
-| `agent_docs/contracts/frontend_api_integration.md` | Predictions GET/POST, privacy matrix |
+| `agent_docs/contracts/frontend_api_integration.md` | Predictions GET/POST, privacy matrix; note public LB/results **client gate** `PUBLISHED` (backend may 403 `RESULTS_NOT_AVAILABLE` — handle gracefully) |
 
 Append update log rows — do not delete prior content.
 
@@ -373,6 +393,8 @@ Manual + automated (`tester_2.2`):
 - [ ] **Invalid:** non-numeric blocked; `maxScore+1` blocked in UI; API 422 surfaced
 - [ ] **maxScore** from contest rules (label «0–N»), not hardcoded 20
 - [ ] **Pre-deadline privacy:** USER sees own scores; others → «Прогноз сделан»; ADMIN sees all
+- [ ] **LB/Results stubs:** non-`PUBLISHED` round → «Будет доступно после проверки организатором»; no spurious leaderboard/results fetch
+- [ ] **Прогнозы not publish-gated:** matrix works on `ACTIVE` / post-deadline `CLOSED`/`CALCULATED`/`PUBLISHED` by `deadline_passed`
 - [ ] **Visitor pre-deadline:** stub «Будет доступно после дедлайна» (no matrix)
 - [ ] **Post-deadline:** authenticated user sees **full matrix**; form readonly
 - [ ] **Deadline warning:** banner when &lt;24h remain

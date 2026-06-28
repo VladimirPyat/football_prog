@@ -185,6 +185,22 @@ ETag: <16-char sha256 of score state>
 - Client: store ETag per resource; send `If-None-Match` on refresh; on `304` reuse cached payload (optionally seed from `localStorage`).
 - **Never cache:** `GET/POST predictions`, all admin routes, contest PATCH.
 
+### 4.1 Public round visibility (frontend gate — 2.3.1)
+
+Endpoints `GET …/leaderboard` and `GET …/results` are **public** (ETag), but backend returns **`403 RESULTS_NOT_AVAILABLE`** for rounds not yet **`PUBLISHED`**. Frontend **must** gate before fetch:
+
+```ts
+// frontend/src/lib/contest/roundPublicVisibility.ts
+isRoundPubliclyVisible(status) === (status === 'PUBLISHED')
+```
+
+| Tab / feature | Gate | Stub copy |
+|---------------|------|-----------|
+| Public **Лидерборд** / **Результаты** | `PUBLISHED` only | `ROUND_NOT_PUBLISHED_COPY` |
+| **Прогнозы** matrix | **`deadline_passed`** privacy — **not** publish-gated | visitor pre-deadline stub |
+
+Global `GET …/leaderboard` aggregates **PUBLISHED** rounds only (server-side). Detail: [admin_ui_status_matrix.md](admin_ui_status_matrix.md) §10–11.
+
 ```ts
 const res = await fetch(url, { headers: etag ? { 'If-None-Match': etag } : {} });
 if (res.status === 304) return cached;
@@ -286,7 +302,9 @@ Helper: `resolveDefaultContestId()` — reads env, validates number, used by Vis
 
 // RoundOut
 { id:number; contest_id:number; number:number; deadline:string;
-  status:'DRAFT'|'ACTIVE'|'CLOSED'|'CALCULATED'|'PUBLISHED'; matches_count:number }
+  status:'DRAFT'|'ACTIVE'|'CLOSED'|'CALCULATED'|'PUBLISHED'; matches_count:number;
+  kind?:'REGULAR'|'SUPPLEMENTARY'; supplementary_index?:number|null;
+  source_round_numbers?:number[] }
 
 // MatchOut
 { id:number; team1:string; team2:string; date_time:string;
@@ -339,3 +357,4 @@ types/api.ts       // interfaces from §7
 | 2026-06-24 | Stage 2.3: B5 logo multipart via `apiUpload`; extended `contestAdmin` path builders in `endpoints.ts`; admin hook matrix. |
 | 2026-06-27 | Stage 1.12: §2.1.1 invite/setup flow (`setup-preview`, `complete-setup`, `request-password-reset`, `ParticipantInviteOut.setup_url`); `PASSWORD_SETUP_REQUIRED` login gate; training mode restore `POST /contests/{id}/restore`. |
 | 2026-06-27 | Stage 2.1.2: `resolveAssetUrl()` for team logos; supervisor lifecycle CTAs on parameters page; login «Забыли пароль?» checkbox → `request-password-reset`. |
+| 2026-06-28 | Stage 2.3.1 / 2.2 prep: §4.1 public LB/results `PUBLISHED` client gate; `RoundOut` supplementary fields; cross-ref `admin_ui_status_matrix.md`. |

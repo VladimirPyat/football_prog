@@ -1,7 +1,7 @@
 # UI Pages Specification (Stage 2)
 
 > **Living document** — see update log at the bottom.
-> **Refs:** `agent_docs/plans/draft_2.md` (§3.2, §4, §11), `docs/03_user_scenarios.md`, `docs/04_supervisor_scenario.md`, screenshots `docs/screens/`.
+> **Refs:** `agent_docs/plans/draft_2.md` (§3.2, §4, §11), `docs/03_user_scenarios.md`, `docs/04_supervisor_scenario.md`, screenshots `docs/screens/`, **`agent_docs/contracts/admin_ui_status_matrix.md`** (status × capability matrix).
 > Routing decision (locked): contest-scoped URLs `/contest/[id]`; public views are **tabs**, not sub-routes.
 
 Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
@@ -24,12 +24,13 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 
 ### `/contest/[contestId]` — public tabbed page  (`user_*.jpg`) — **Placeholder (2.1)** → `frontend/src/app/contest/[contestId]/page.tsx`
 - **Roles:** all (privacy rules per tab).
-- **Header:** title `Конкурс спортивных прогнозов` + subtitle; top-right `RoundSelector` (`Тур N (Текущий)`).
+- **Header:** title `Конкурс спортивных прогнозов` + subtitle; top-right `RoundSelector` (`Тур N (Текущий)` or `ДопТурN` for supplementary rounds — 2.3.4).
 - **Tabs (`PublicTabs`):**
-  - **Лидерборд** (default): `LeaderboardTable` from `GET /contests/{id}/leaderboard` (global) or round leaderboard when a round is selected.
+  - **Лидерборд** (default): `LeaderboardTable` from `GET /contests/{id}/leaderboard` (global) or round leaderboard when a round is selected. **PUBLISHED only** (2.3.1 F12): rounds in `CALCULATED`/`CLOSED`/`ACTIVE`/`DRAFT` → stub «Будет доступно после проверки организатором»; skip leaderboard fetch.
   - **Прогнозы:** `PredictionsMatrix` + `OutcomeStatsFooter` from `GET …/rounds/{rid}/predictions`. Privacy: current round before deadline → others masked / visitor stub («Будет доступно после дедлайна»); past rounds → full.
-  - **Результаты:** `ResultsMatrix` from `GET …/rounds/{rid}/results`. Only CALCULATED/PUBLISHED; else «Результаты будут доступны после подведения итогов».
+  - **Результаты:** `ResultsMatrix` from `GET …/rounds/{rid}/results`. **PUBLISHED only** (2.3.1 F12); else same stub as leaderboard.
 - Deep link: `/contest/[contestId]/round/[roundId]` preserves selected round (+ tab via query).
+- Helper: `isRoundPubliclyVisible()` in `frontend/src/lib/contest/roundPublicVisibility.ts`.
 
 ### `/contest/[contestId]/predict/[roundId]` — prediction entry
 - **Roles:** USER+ (`requireNotTempPassword`).
@@ -68,9 +69,14 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 - `AdminTopNav` + `ProtectedRoute requireRole SUPERVISOR+`.
 
 ### `/admin/settings/parameters` — **Implemented (2.3)** → `frontend/src/app/admin/settings/parameters/page.tsx`
-- `LockBanner` when `is_locked`. Fields readonly when locked: `Количество команд`, `Количество туров`, `Число матчей в туре`, `Произвольное количество`.
-- Scoring cards (`Основные очки`, `Бонусы`) from `rules_json`. `Остановить конкурс` (pause/finish, ADMIN).
-- Source: `GET/PATCH /contests/{id}`.
+- **`LockBanner`** when `is_locked` — **settings pages only** (2.3.1 F8); not shown on Туры/Результаты.
+- **DRAFT + unlocked:** editable structural fields; round-robin auto-sync (`deriveRoundRobinStructure`); help for «Произвольное количество» (2.3.3 S1.2).
+- **`RulesEditorPanel`:** editable bonus/scoring rules on DRAFT; PATCH `rules_json` with parameters save; readonly after start (2.3.4 F2).
+- **`ContestStartReadinessPanel`:** checklist «Команды X из Y», «Принятые участники N»; blocks start when incomplete (2.3.4 F3).
+- **`ContestLifecycleActions`:** primary **«Запустить конкурс»** on DRAFT (`POST /contests/{id}/start` — 2.3.3 S1.12); auto-save parameters + rules via `onBeforeStart` before start; secondary **«Удалить конкурс»** for DRAFT/PAUSED (2.3.3 S0.6).
+- Post-create hint (from `AdminTopNav`): «Задайте число команд… Запуск конкурса — кнопка внизу страницы» (2.3.3 S1.1).
+- After start: structural fields + rules readonly; no «Сохранить параметры»; `LockBanner` visible (S1.4).
+- Pause/finish (ADMIN) via lifecycle panel. Source: `GET/PATCH /contests/{id}`, `POST …/start`, `DELETE …/contests/{id}`.
 
 ### `/admin/settings/participants` — **Implemented (2.3)** → `frontend/src/app/admin/settings/participants/page.tsx`
 - `ParticipantsTable`; `+ Добавить участника` (disabled when locked); invite → `temp_password` shown.
@@ -81,12 +87,26 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 - Source: `GET/POST/PATCH/DELETE …/teams`. Logo: B5 upload, fallback `logo_url`.
 
 ### `/admin/rounds` — **Implemented (2.3)** → `frontend/src/app/admin/rounds/page.tsx`
-- `RoundManagementPanel`: round dropdown, `Дедлайн прогнозов` picker (24h rule), 8-match grid (`Домашняя/Гостевая/Статус/Время`), right `Статус тура` card, `+ Добавить свободный тур`.
-- Warnings when active/deadline passed (only status+date editable).
-- Source: `POST/PATCH …/admin/rounds`, `…/activate|close`, `…/free-tour`, `PATCH …/matches/{id}/status`.
+- **`RoundManagementPanel`** + **`RoundPhasePanel`**: mode switches by **effective** round status (2.3.1 F6, 2.3.5 U2):
+  - **DRAFT:** summary + «Редактировать» → `RoundBuilderForm`; «Активировать» (2.3.1 F10).
+  - **ACTIVE:** match grid; kickoff reschedule / cancel / postpone; deadline picker; 24h lockout on deadline **change only** (2.3.1 F2–F3).
+  - **CLOSED («Дедлайн»):** read-only matches + phase labels («Идёт» when kickoff ≤ now); links/stubs to predictions view and `/admin/results` (2.3.1 F6–F7).
+  - **CALCULATED:** `RoundLeaderboardPreview` + «Опубликовать»; badge «Предпросмотр — тур ещё не опубликован» (2.3.1 F7).
+  - **PUBLISHED:** read-only; «Отменить» stub modal (2.3.1 F11).
+- **`RoundStatusSidebar`:** status badge + `roundStatusHint()`; post-deadline hint without manual «Закрыть тур» (2.3.5 U4 — backend auto-close via 1.16).
+- Round labels: **`formatRoundTitle`** — `Тур N` or **`ДопТурN`** + source round hint for supplementary (2.3.4 F4).
+- **«+ Создать тур»** always beside selector (cap at `total_rounds`); **«+ Добавить свободный тур»** secondary (2.3.1 F9).
+- **`useRoundMatches`** `onDeadlinePassed` → refetch rounds when deadline flips (2.3.5 U1).
+- No `LockBanner` on this page. Source: `POST/PATCH …/admin/rounds`, `…/activate`, `…/free-tour`, `PATCH …/matches/{id}/status`.
 
 ### `/admin/results` — **Implemented (2.3)** → `frontend/src/app/admin/results/page.tsx`
-- `ResultsEntryPanel`: round dropdown, per-match `Завершён`/`Отменить` + score inputs, `Применить результаты` → calculate → publish workflow; `Применено` lock badge.
+- **`ResultsEntryPanel`:** round dropdown with **`formatRoundOptionLabel`** (ДопТур labels — 2.3.4 F4); eligible rounds = `CLOSED`/`CALCULATED`/`PUBLISHED` plus ACTIVE with `effectiveRoundStatus === CLOSED` (2.3.5 U3).
+- Per-status workflow (2.3.1 F6–F8, 2.3.2):
+  - **CLOSED:** score entry + «Рассчитать» (`matchResultsGating`).
+  - **CALCULATED:** read-only scores + «Опубликовать»; edit allowed per backend calculated-edit policy (2.3.2).
+  - **PUBLISHED:** read-only + VOID.
+- **`bonuses_pending`** callout from API when postponed matches defer bonuses (2.3.4 F5).
+- **`useRoundMatches`** refetch on deadline transition (2.3.5 U1). Query `?round=` deep link from Туры.
 - Source: `PUT …/matches/{id}/result`, `PATCH …/matches/{id}/status` (VOID), `POST …/rounds/{id}/calculate|publish`.
 
 ### `/admin/newsletters` — **Implemented (2.3 placeholder)** → `frontend/src/app/admin/newsletters/page.tsx`
@@ -111,7 +131,7 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 | `/admin/rounds`, `/admin/results`, `/admin/newsletters` | ❌ | ❌ | ✅ | ✅ |
 | `/admin/lifecycle`, `/admin/users` | ❌ | ❌ | ❌ | ✅ |
 
-\* Результаты only when round CALCULATED/PUBLISHED.
+\* Результаты / лидерборд only when round **PUBLISHED** (2.3.1 F12); supervisor preview on `/admin/rounds` for CALCULATED.
 
 † `/staff/login` is a login page for unauthenticated visitors; authenticated users use role-based nav.
 
@@ -125,3 +145,7 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 | 2026-06-23 | Stage 2.1: marked `/`, `/contests`, `/profile`, `/change-password` ✅; `/contest/[id]` placeholder. |
 | 2026-06-24 | Stage 2.1.1: `/profile` USER-only (staff redirect `/admin`); `/admin` stubs; `/staff/login` optional; `resolvePostLoginPath` post-login routing. |
 | 2026-06-24 | Stage 2.3: full `/admin/*` routes implemented with page file paths. |
+| 2026-06-28 | Stage 2.3.1: per-status round panels; CLOSED→«Дедлайн»; 24h lockout on deadline change only; LockBanner settings-only; public LB/results PUBLISHED-only. |
+| 2026-06-28 | Stage 2.3.3: slim create modal; Parameters start/delete lifecycle; round-robin auto-sync; «Запустить конкурс» on Parameters. |
+| 2026-06-28 | Stage 2.3.4: RulesEditorPanel; start readiness panel; ДопТур labels; bonuses_pending notes; ContestProvider refetch. |
+| 2026-06-28 | Stage 2.3.5: effective round status; deadline refetch; removed manual «Закрыть тур»; Results eligible rounds sync. |

@@ -1,7 +1,7 @@
 # UI State Management (Stage 2)
 
 > **Living document** — see update log at the bottom.
-> **Refs:** `agent_docs/plans/draft_2.md` (§3.4–§3.6), `agent_docs/contracts/frontend_api_integration.md`.
+> **Refs:** `agent_docs/plans/draft_2.md` (§3.4–§3.6), `agent_docs/contracts/frontend_api_integration.md`, **`agent_docs/contracts/admin_ui_status_matrix.md`**.
 > **Stack:** React Context + hooks (no Redux/Zustand). `localStorage` for JWT + caches. No external state libs.
 
 ---
@@ -44,11 +44,12 @@
 | `status` | contest status | DRAFT/RUNNING/PAUSED/FINISHED |
 | `maxScore` | `number` | `rules_json.constraints.score_validation_range[1]` |
 | `rules` | object | `rules_json` (scoring/bonus values for settings display) |
-| `setContest(id)` | fn | switch active contest, refetch |
+| `setContest(id)` | fn | switch active contest, **invalidate + refetch** (2.3.4 F1 — fixes stale DRAFT vs RUNNING fixture) |
 
 - Public pages set `contestId` from the route param.
 - User «Конкурсы» list from `GET /me/contests` (B1); Visitor list from `GET /contests/public` (B2); Supervisor picker from `GET /contests`.
 - **Fallback:** B1/B2 empty or error → `resolveDefaultContestId()` from `NEXT_PUBLIC_DEFAULT_CONTEST_ID`.
+- **`setupReadonly`:** derived from fresh `contest.status` + `is_locked` after refetch — not cached stale state.
 
 ---
 
@@ -85,32 +86,48 @@ Each hook returns `{ data, error, loading, refetch }`. Errors are typed `AppErro
 
 ## 5. Deadline & phase-aware UI
 
+**Effective round status (2.3.5):** `effectiveRoundStatus(round, deadlinePassed)` in `roundEffectiveStatus.ts` — when API still returns `ACTIVE` but deadline has passed, UI routes as **CLOSED («Дедлайн»)** until refetch completes. Use for phase panels, badges, and results eligibility; keep API mutations on real `round.id`.
+
 `useDeadline(round)` → `{ deadlinePassed, secondsLeft, formatted }`:
 - compares `now` vs `round.deadline` (UTC) every 1s via `setInterval`.
 - `deadlinePassed` switches prediction form to readonly and shows «Дедлайн прошёл».
 - Server is source of truth: `RoundPredictionsView.deadline_passed` overrides client clock if they disagree.
 
-Phase derivation (mirrors plan §3.6) lives in **`deriveAdminUiMode(contest, round)`** — **Implemented (2.3)** → `frontend/src/lib/admin/deriveAdminUiMode.ts`. Client 24h pre-check: `frontend/src/lib/admin/deadlineRule.ts`.
+**Deadline transition refetch (2.3.5 U1):** `useRoundMatches(contestId, roundId, { onDeadlinePassed })` fires once when `view.deadline_passed` flips `false → true`; pages wire `onDeadlinePassed: () => refetchRounds()` on `/admin/rounds` and `/admin/results`. Backend 1.16 auto-closes round on predictions GET.
+
+Phase derivation lives in **`deriveAdminUiMode(contest, round, { deadlinePassed })`** — **Implemented (2.3)** → `frontend/src/lib/admin/deriveAdminUiMode.ts`. Client deadline checks: `frontend/src/lib/admin/deadlineRule.ts` (placement vs 24h **change** lockout — 2.3.1 F2).
 
 | Hook | Endpoint | Cache |
 |------|----------|-------|
 | `useContestAdmin()` | `GET/PATCH /contests/{id}` | refetch on mutations — **2.3** |
-| `useTeams(contestId)` | `GET/POST/PATCH/DELETE …/teams`, logo upload | refetch — **2.3** |
-| `useParticipants(contestId)` | `GET/POST/DELETE …/participants`, tiebreak | refetch — **2.3** |
-| `useAdminRounds(contestId)` | admin round CRUD + activate/calculate/publish | refetch — **2.3** |
-| `useRoundMatches(contestId, roundId)` | `GET …/predictions` | never cached — **2.3** |
+| `useTeams(contestId)` | `GET/POST/PATCH/DELETE …/teams`, logo upload | refetch; emits `contest-setup-changed` — **2.3.4 F6** |
+| `useParticipants(contestId)` | `GET/POST/DELETE …/participants`, tiebreak | refetch; emits `contest-setup-changed` — **2.3.4 F6** |
+| `useAdminRounds(contestId)` | admin round CRUD + activate/calculate/publish | refetch on mutations + deadline transition — **2.3.5** |
+| `useRoundMatches(contestId, roundId, opts?)` | `GET …/predictions` | never cached; optional `onDeadlinePassed` — **2.3.5** |
 | `useAdminResults(contestId)` | `PUT …/result`, `PATCH …/status` | no cache — **2.3** |
+| `useContestStartReadiness(contestId)` | teams + participants counts | refetch on `contest-setup-changed` — **2.3.4 F3** |
 
 ---
 
 ## 6. Optimistic updates
 
 - Prediction save: optional optimistic render of submitted scores; on error roll back and show `detail`. Keep simple — re-fetch after save is acceptable for MVP.
-- Admin mutations (activate/close/calculate/publish, VOID): no optimism; await response, then `refetch` affected lists. Show `ConfirmDialog` before destructive actions.
+- Admin mutations (activate/calculate/publish, VOID): no optimism; await response, then `refetch` affected lists. Show `ConfirmDialog` before destructive actions.
+- Contest start (2.3.3–2.3.4): `onBeforeStart` saves parameters + rules, then `POST /start`; refetch contest on success.
+- Round close: **no manual UI** — backend auto-close on deadline (1.16); UI refetches rounds via `onDeadlinePassed` (2.3.5).
 
 ---
 
-## 7. Provider tree
+## 7. Custom events (2.3.3–2.3.4)
+
+| Event | Emitters | Listeners |
+|-------|----------|-----------|
+| `contest-setup-changed` | `useTeams`, `useParticipants` | `useContestStartReadiness` |
+| `contest-list-changed` | delete contest success | `ContestPicker` refresh |
+
+---
+
+## 8. Provider tree
 
 ```
 <AuthProvider>           // frontend/src/providers/AuthProvider.tsx
@@ -133,3 +150,6 @@ Phase derivation (mirrors plan §3.6) lives in **`deriveAdminUiMode(contest, rou
 | 2026-06-23 | Stage 2.1: provider/hook file paths; `fp:unauthorized` event name; `TempPasswordGuard` in tree. |
 | 2026-06-24 | Stage 2.1.1: post-login routing via `resolvePostLoginPath` in `AuthProvider.login` / `changePassword`. |
 | 2026-06-24 | Stage 2.3: `deriveAdminUiMode`, admin hooks (`useContestAdmin`, `useTeams`, …), `deadlineRule` client check. |
+| 2026-06-28 | Stage 2.3.1: 24h policy (placement vs change lockout); `roundStatusHint`. |
+| 2026-06-28 | Stage 2.3.4: ContestProvider refetch on id change; `useContestStartReadiness`; `contest-setup-changed` events. |
+| 2026-06-28 | Stage 2.3.5: `effectiveRoundStatus`; `useRoundMatches.onDeadlinePassed`; rounds refetch on deadline transition. |
