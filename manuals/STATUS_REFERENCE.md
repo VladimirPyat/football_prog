@@ -109,6 +109,18 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 
 **Before → After:** `deadline_rule_hours` больше **не** требует ставить дедлайн за N часов до первого матча — только ограничивает **окно изменения** дедлайна на активном туре. См. [API_GUIDE.md](API_GUIDE.md#round_servicepy-updated).
 
+### 2.5 Расписание матчей на ACTIVE туре (frontend, Stage 2.3.2) [NEW]
+
+| Действие | Условие | UI |
+|----------|---------|-----|
+| Смена команд | Запрещено после активации тура | Селекты команд только в `DRAFT` |
+| Перенос времени (несколько часов) | До `date_time` матча | `datetime-local` + «Сохранить»; предупреждение при сдвиге ≥ 7 суток |
+| Отмена (`CANCELED`) | Пока матч не `CANCELED`/`FINISHED`/`VOID` | Статус в `<select>` → подтверждение → PATCH |
+| Перенос (`POSTPONED`) | Из `SCHEDULED` | Статус в `<select>` → подтверждение → PATCH → модалка свободного тура |
+| Восстановление (`SCHEDULED`) | Только `ADMIN` из `CANCELED`/`POSTPONED` | Статус в `<select>` → подтверждение |
+
+Правила: `frontend/src/lib/admin/matchScheduleEdit.ts`. Ввод счёта на «Результаты»: пустые поля ≠ 0 (`matchResultSchema` без `z.coerce` на пустую строку).
+
 ### Dev fixture (после `dev_setup` + `finalize_dev_fixture`, Stage 1.14)
 
 Справочная дата для дедлайнов: **2026-06-27** UTC.
@@ -128,7 +140,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Статус | Прогнозы участников | Редактирование тура (админка) | Результаты |
 |--------|---------------------|------------------------------|------------|
 | `DRAFT` | Нет | Полное (матчи, команды, дедлайн) | Нет |
-| `ACTIVE` | Да, пока `now < deadline` | Дедлайн и расписание; состав матчей — до дедлайна; после дедлайна состав заморожен [UPDATED] | Нет |
+| `ACTIVE` | Да, пока `now < deadline` | **Frontend [UPDATED]:** состав матчей (команды) **не редактируется** — только расписание: перенос времени до начала матча (независимо от дедлайна прогнозов), отмена (с подтверждением), статус «Перенесён» + свободный тур; восстановление `CANCELED`/`POSTPONED` → `SCHEDULED` — только **ADMIN**. Кнопка «Сохранить» не блокируется 24h lockout дедлайна, если меняли только матчи. **Backend:** PATCH по-прежнему может принять смену команд до дедлайна прогнозов (см. todo). | Нет |
 | `CLOSED` | Нет | Только просмотр на «Туры» | Ввод счёта |
 | `CALCULATED` | Нет | Только просмотр | Правка счёта + авто-пересчёт, публикация / VOID |
 | `PUBLISHED` | Нет | Только просмотр | Только VOID (с пересчётом) |
@@ -148,7 +160,9 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Прогнозы | `src/services/prediction_service.py` | Требует `round.status == ACTIVE` и `now < deadline` |
 | Фронт — подписи | `frontend/src/lib/admin/format.ts` → `roundStatusLabel()` | **Единая точка** для русских названий тура |
 | Фронт — E2E дубль | `frontend/e2e/fixtures/adminApi.ts` → `ROUND_STATUS_LABELS` | Должен совпадать с `format.ts` после смены подписей |
-| Фронт — режим UI | `frontend/src/lib/admin/deriveAdminUiMode.ts` | `canEditRoundStructure`, `canEnterResults`, `canPublish`, … |
+| Фронт — режим UI | `frontend/src/lib/admin/deriveAdminUiMode.ts` | `canEditRoundStructure` (DRAFT only), `canEditMatchStatusAndDate`, … |
+| Фронт — расписание ACTIVE | `frontend/src/lib/admin/matchScheduleEdit.ts` | Kickoff reschedule, cancel/postpone rules [NEW] |
+| Фронт — строка матча | `frontend/src/components/admin/MatchEditorRow.tsx` | Status `<select>`, confirm on CANCELED/POSTPONED/restore [UPDATED] |
 | Фронт — страница | `frontend/src/components/admin/RoundManagementPanel.tsx` | Список туров, редактор, активация |
 | Фронт — карточка | `frontend/src/components/admin/RoundStatusSidebar.tsx` | Бейдж статуса, «Закрыть тур», список матчей |
 | Фронт — результаты | `frontend/src/components/admin/ResultsEntryPanel.tsx` | Выпадающий список туров `CLOSED` / `CALCULATED` / `PUBLISHED` |
@@ -240,3 +254,4 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | 2026-06-27 | Первоначальная версия; рекомендация `CLOSED` → «Дедлайн» в UI |
 | 2026-06-27 | §2.3: публичный LB/results только при `PUBLISHED`; stub «Будет доступно после проверки организатором» |
 | 2026-06-27 | §2.3.1: backend visibility реализован; §2.4: правило дедлайна (placement vs 24h lockout), PATCH тура в DRAFT/ACTIVE |
+| 2026-06-27 | §2.5 + ACTIVE matrix: frontend schedule-only on ACTIVE; `set_result` on CALCULATED + auto-recalc (backend) |

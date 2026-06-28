@@ -127,7 +127,7 @@ supervisor_training_mode: bool = False       # SUPERVISOR_TRAINING_MODE
 contest_restore_window_seconds: int = 86400  # CONTEST_RESTORE_WINDOW_SECONDS (24h)
 ```
 
-When `supervisor_training_mode=true` (document in `.env.example` for local dev):
+When `supervisor_training_mode=true` (override via deployment env or `settings.py` — **not** root `.env`):
 
 - Supervisor may finish and delete without asking ADMIN.
 - **`contest_allow_instant_delete`** effectively `true` for supervisor delete path (skip grace wait), **or** set `contest_delete_grace_seconds=0` only when training mode — pick one, document in CONFIG.
@@ -255,7 +255,7 @@ Document workflow in `manuals/DEV_SETUP.md`.
 | 2 | Login: «Восстановить пароль» |
 | 3 | `PASSWORD_SETUP_REQUIRED` handling |
 | 4 | Invite modal: login + temp_password + setup_url |
-| 5 | Lifecycle panel: finish/delete for supervisor when training mode (read flag from API or env `NEXT_PUBLIC_SUPERVISOR_TRAINING_MODE`) |
+| 5 | Lifecycle panel: finish for supervisor when `supervisor_training_mode`; delete on Parameters for SUPERVISOR+ (post 1.15 — no frontend training env) |
 
 Supervisor UI fixes (parameters, teams, rounds, results): `coder_2.1.2_fix_supervisor.md`.
 
@@ -263,15 +263,15 @@ Supervisor UI fixes (parameters, teams, rounds, results): `coder_2.1.2_fix_super
 
 ## 7. E2E note (LOCKED)
 
-Recommend for local / CI `.env`:
+Pytest / Playwright tuning — **shell prefix or monkeypatch**, not root `.env`:
 
 ```bash
-ENFORCE_PASSWORD_SETUP=false
-SUPERVISOR_TRAINING_MODE=true
-CONTEST_DELETE_GRACE_SECONDS=0
+ENFORCE_PASSWORD_SETUP=false SUPERVISOR_TRAINING_MODE=true \
+  CONTEST_DELETE_GRACE_SECONDS=0 \
+  uv run pytest tests/api/test_participant_accept.py -v
 ```
 
-Migrate Playwright from `change-password` to `complete-setup` when stable.
+Migrate Playwright from `change-password` to `complete-setup` when stable. See `manuals/CONFIG.md`.
 
 ---
 
@@ -325,7 +325,7 @@ Not blocking 1.12 backend work.
 | NEW | `src/scripts/dev_invite_setup.py` |
 | NEW | `alembic/versions/*_contest_restore_snapshots.py` |
 | EDIT | `src/api/v1/auth.py`, `contests.py`, `contest_setup_service.py`, `contest_lifecycle_service.py` |
-| EDIT | `config/settings.py`, `.env.example`, `.gitignore` |
+| EDIT | `config/settings.py`, `.gitignore` |
 | EDIT | `frontend` auth + invite + lifecycle (§6) |
 | EDIT | `manuals/CONFIG.md`, `manuals/DEV_SETUP.md` |
 | DEFER | Full admin→supervisor rename — `coder_1.13_supervisor_rename.md` (§9) |

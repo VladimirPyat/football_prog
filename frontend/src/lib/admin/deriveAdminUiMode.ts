@@ -56,7 +56,8 @@ export function deriveAdminUiMode({
   const showPausedBanner = isPaused;
   const showFinishedBanner = isFinished;
   const disableAllMutations = isPaused || isFinished;
-  const setupReadonly = isLocked || disableAllMutations;
+  const setupReadonly =
+    isLocked || status !== "DRAFT" || disableAllMutations;
 
   const canCreateRound = !disableAllMutations && !hasDraftRound;
 

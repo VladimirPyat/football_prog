@@ -234,7 +234,9 @@ def run_dev_servers() -> None:
         print("\n✅ Dev stack running")
         print(f"   UI:  http://{UI_HOST}:{UI_PORT}/")
         print(f"   API: http://{API_HOST}:{API_PORT}/health")
-        print("   Press Ctrl+C to stop both servers\n")
+        print("   Press Ctrl+C to stop both servers")
+        _print_manual_qa_cheatsheet()
+        print()
     elif not api_ok or not ui_ok:
         print("\n⚠ One or more servers did not become ready — check logs above", file=sys.stderr)
 
@@ -338,12 +340,34 @@ def run_minimal_setup() -> None:
     _run(["uv", "run", "python", "src/scripts/bootstrap_users.py"])
 
 
+def _print_manual_qa_cheatsheet() -> None:
+    """Commands for manual supervisor QA (also printed after dev stack starts)."""
+    print("\n--- Manual QA helpers ---")
+    print("Reset DB to demo fixture (contest id=1, wipes loader data):")
+    print("  uv run python src/scripts/dev_setup.py")
+    print("  # or loader only: uv run python src/scripts/load_test_data.py --reset")
+    print("     && uv run python src/scripts/bootstrap_users.py")
+    print("     && uv run python src/scripts/dev_setup.py --ensure-running-only")
+    print("")
+    print("Accept all pending invites for a contest (no SMTP):")
+    print("  uv run python src/scripts/dev_invite_setup.py list-pending")
+    print("  uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id <ID>")
+    print("  # password: SEED_SUPERVISOR_PASSWORD from .env (or --password)")
+    print("")
+    print("Remove soft-deleted contests from DB (hard purge):")
+    print("  uv run python src/scripts/purge_deleted_contests.py --all-deleted --dry-run")
+    print("  uv run python src/scripts/purge_deleted_contests.py --all-deleted")
+    print("  # UI: supervisor «Удалить конкурс» hides draft; ADMIN restores at /admin/lifecycle")
+    print("")
+    print("Full reference: manuals/DEV_SETUP.md#manual-qa-cheatsheet")
+
+
 def _print_manual_start_hint() -> None:
     print("✅ Dev setup complete")
     print("   API:  uv run uvicorn main:app --reload --reload-dir src --reload-dir main.py --host 127.0.0.1 --port 8000")
     print("   UI:   cd frontend && npm install && npm run dev")
     print("   Or:   uv run python src/scripts/dev_setup.py --run-only")
-    print("   Docs: manuals/DEV_SETUP.md")
+    _print_manual_qa_cheatsheet()
 
 
 def main() -> None:

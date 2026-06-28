@@ -48,6 +48,8 @@ export function ContestPicker({ adminMode = false }: ContestPickerProps) {
       }
     };
     void load();
+    window.addEventListener("contest-list-changed", load);
+    return () => window.removeEventListener("contest-list-changed", load);
   }, [role]);
 
   const items = isSupervisorOrAbove(role) ? supervisorContests : myContests;
@@ -74,7 +76,7 @@ export function ContestPicker({ adminMode = false }: ContestPickerProps) {
     >
       {items.map((c) => (
         <option key={c.id} value={c.id}>
-          {c.name}
+          {c.name} ({c.status})
         </option>
       ))}
     </select>

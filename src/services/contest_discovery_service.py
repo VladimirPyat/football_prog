@@ -20,6 +20,7 @@ async def list_user_contests(
         select(Contest, ContestParticipant.status)
         .join(ContestParticipant, ContestParticipant.contest_id == Contest.id)
         .where(ContestParticipant.user_id == user_id)
+        .where(Contest.deleted_at.is_(None))
         .order_by(Contest.name)
     )
     return [
@@ -40,6 +41,7 @@ async def list_public_contests(session: AsyncSession) -> list[PublicContestOut]:
     contests = await session.scalars(
         select(Contest)
         .where(Contest.status == ContestLifecycleStatus.RUNNING)
+        .where(Contest.deleted_at.is_(None))
         .order_by(Contest.name)
     )
     return [PublicContestOut.model_validate(c) for c in contests]

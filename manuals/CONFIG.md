@@ -71,11 +71,12 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 | `frontend_base_url` | `FRONTEND_BASE_URL` | `http://127.0.0.1:3000` | Base URL for `/auth/setup?token=…` links |
 | `setup_token_expire_hours` | `SETUP_TOKEN_EXPIRE_HOURS` | `72` | Invite/reset setup token TTL |
 | `enforce_password_setup` | `ENFORCE_PASSWORD_SETUP` | `true` | Block temp-password login until `complete-setup` |
-| `supervisor_training_mode` | `SUPERVISOR_TRAINING_MODE` | `false` | Supervisor may finish/delete/restore (training) |
+| `supervisor_training_mode` | `SUPERVISOR_TRAINING_MODE` | `false` | SUPERVISOR may **finish** contest when true (delete/restore: see API_GUIDE) |
 | `contest_restore_window_seconds` | `CONTEST_RESTORE_WINDOW_SECONDS` | `86400` | Undo window after training-mode delete |
 | `contest_delete_grace_seconds` | `CONTEST_DELETE_GRACE_SECONDS` | `10` | Grace before safe delete after pause |
 | `contest_delete_enabled` | `CONTEST_DELETE_ENABLED` | `true` | Enable contest delete endpoint |
 | `contest_allow_instant_delete` | `CONTEST_ALLOW_INSTANT_DELETE` | `false` | Skip grace (test/dev only) |
+| `contest_purge_retention_seconds` | `CONTEST_PURGE_RETENTION_SECONDS` | `2592000` | Hard-delete soft-deleted contests after N seconds (default 30 days) |
 | `cache_max_age_seconds` | `CACHE_MAX_AGE_SECONDS` | `300` | Public cache TTL |
 | `cache_stale_while_revalidate_seconds` | `CACHE_STALE_WHILE_REVALIDATE_SECONDS` | `60` | Stale-while-revalidate window |
 | `log_level` | `LOG_LEVEL` | `INFO` | Root log level |
@@ -91,18 +92,26 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 | `default_team_logo_url` | `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback logo URL |
 | `contest_defaults_path` | — | `docs/test_data/config/contest_defaults.json` | Seed JSON path (code only) |
 
-### Recommended local profile (Stage 1.12) [NEW]
+### Local / CI tuning (not in `.env`)
 
-For E2E and supervisor training workflows, common `.env` overrides:
+Do **not** add non-secret flags to root `.env`. Use one of:
+
+| Need | Approach |
+|------|----------|
+| Change default for all devs | Edit `config/settings.py` |
+| One pytest run | `monkeypatch` in fixtures (`tests/api/stage_112_helpers.py`) |
+| Ad-hoc command | Shell prefix, e.g. `ENFORCE_PASSWORD_SETUP=false uv run pytest tests/api/…` |
+| Production | Deployment env vars (K8s manifest), not committed `.env` |
+
+Example shell prefix for Stage 1.12 regression (see [DEV_SETUP.md](DEV_SETUP.md)):
 
 ```bash
-ENFORCE_PASSWORD_SETUP=false      # legacy change-password path for automated login
-SUPERVISOR_TRAINING_MODE=true     # supervisor finish/delete/restore
-CONTEST_DELETE_GRACE_SECONDS=0    # instant delete after pause
-FRONTEND_BASE_URL=http://127.0.0.1:3000
+ENFORCE_PASSWORD_SETUP=true SUPERVISOR_TRAINING_MODE=true \
+  CONTEST_DELETE_GRACE_SECONDS=0 CONTEST_RESTORE_WINDOW_SECONDS=3600 \
+  uv run pytest tests/api/test_contest_restore.py -v
 ```
 
-Production defaults keep `ENFORCE_PASSWORD_SETUP=true` and `SUPERVISOR_TRAINING_MODE=false`. See [DEV_SETUP.md — confirm participants without email](DEV_SETUP.md#new-contest-confirm-participants-without-email-stage-112).
+Production keeps `enforce_password_setup=true` and `supervisor_training_mode=false` via `settings.py` defaults unless deployment overrides.
 
 ### Team logo storage
 

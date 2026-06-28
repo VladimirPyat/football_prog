@@ -40,6 +40,19 @@ def _run_dev_script(db_url: str, *args: str) -> subprocess.CompletedProcess[str]
 
 
 @pytest.mark.asyncio
+async def test_dev_list_pending(stage_112_api):
+    """[DEV-LIST-PENDING] list-pending shows contest id and pending count."""
+    client, _, db_url = stage_112_api
+    cid, h = await create_draft_contest(client)
+    await invite_participant(client, cid, h, email="list1@example.com", login="list1_user")
+    await invite_participant(client, cid, h, email="list2@example.com", login="list2_user")
+
+    proc = _run_dev_script(db_url, "list-pending")
+    assert proc.returncode == 0, proc.stderr
+    assert f"{cid}\t2\t" in proc.stdout
+
+
+@pytest.mark.asyncio
 async def test_dev_get_unconfirmed(stage_112_api, tmp_path):
     """[DEV-GET-UNCONFIRMED] TSV export with header and PENDING rows."""
     client, _, db_url = stage_112_api
@@ -128,3 +141,22 @@ async def test_dev_confirm_all(stage_112_api):
 
     parts = await client.get(f"{API_PREFIX}/contests/{cid}/participants", headers=h)
     assert all(p["status"] == "ACCEPTED" for p in parts.json())
+
+
+@pytest.mark.asyncio
+async def test_dev_confirm_all_seed_password(stage_112_api, monkeypatch):
+    """[DEV-CONFIRM-ALL-ENV] confirm-all uses SEED_SUPERVISOR_PASSWORD when --password omitted."""
+    monkeypatch.setenv("SEED_SUPERVISOR_PASSWORD", NEW_SECURE_PASSWORD)
+    from config.settings import get_settings
+
+    get_settings.cache_clear()
+
+    client, _, db_url = stage_112_api
+    cid, h = await create_draft_contest(client)
+    await invite_participant(client, cid, h, email="env1@example.com", login="env1_user")
+
+    proc = _run_dev_script(db_url, "confirm-all", "--contest-id", str(cid))
+    assert proc.returncode == 0, proc.stderr
+
+    parts = await client.get(f"{API_PREFIX}/contests/{cid}/participants", headers=h)
+    assert parts.json()[0]["status"] == "ACCEPTED"

@@ -72,9 +72,25 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | `ParticipantInviteModal` | `frontend/src/components/admin/ParticipantInviteModal.tsx` | «Участник приглашён», login/temp_password labels |
 | `NewsletterPromptModal` | `frontend/src/components/admin/NewsletterPromptModal.tsx` | «Отправить напоминание участникам?» (Stage 3 stub) |
 | `FreeTourModal` | `frontend/src/components/admin/FreeTourModal.tsx` | «Свободный тур», «Создать свободный тур» |
-| `RoundManagementPanel` | `frontend/src/components/admin/RoundManagementPanel.tsx` | «Активировать», «ТУР АКТИВИРОВАН…», 24h deadline errors |
+| `RoundManagementPanel` | `frontend/src/components/admin/RoundManagementPanel.tsx` | «Активировать», ACTIVE hint (schedule-only), 24h deadline lockout, match action confirms [UPDATED] |
+| `MatchEditorRow` | `frontend/src/components/admin/MatchEditorRow.tsx` | Match status `<select>` (DRAFT + ACTIVE); ACTIVE: confirm on CANCELED/POSTPONED/restore [NEW] |
+| `RoundBuilderForm` | `frontend/src/components/admin/RoundBuilderForm.tsx` | «Создать черновик тура»; validation errors for empty match dates [UPDATED] |
+| `MatchResultRow` | `frontend/src/components/admin/MatchResultRow.tsx` | Score inputs; «Применить» disabled until both scores filled (empty ≠ 0) [NEW] |
 | `ResultsEntryPanel` | `frontend/src/components/admin/ResultsEntryPanel.tsx` | «Рассчитать», «Опубликовать», badge «Применено» |
 | `LifecyclePanel` | `frontend/src/components/admin/LifecyclePanel.tsx` | Пауза, Возобновить, Завершить, Пересчитать, Удалить |
+
+#### Stage 2.3.2 — ACTIVE round schedule & results UX [NEW]
+
+| Module | Source file | Behavior |
+|--------|-------------|----------|
+| UI mode | `frontend/src/lib/admin/deriveAdminUiMode.ts` | `canEditRoundStructure` → `DRAFT` only; schedule edits on `ACTIVE` |
+| Schedule rules | `frontend/src/lib/admin/matchScheduleEdit.ts` | Reschedule until kickoff; cancel anytime; ADMIN restore; 7-day postpone hint |
+| Score validation | `frontend/src/lib/validation/admin.ts` | `matchResultSchema`: empty string invalid (not coerced to `0`) |
+| Phase panels | `frontend/src/components/admin/RoundPhasePanel.tsx` | CLOSED / CALCULATED / PUBLISHED read-only panels on `/admin/rounds` |
+| Leaderboard preview | `frontend/src/components/admin/RoundLeaderboardPreview.tsx` | Staff preview for `CALCULATED` rounds |
+| Public visibility | `frontend/src/lib/contest/roundPublicVisibility.ts` | Fetch LB/results only when `round.status === 'PUBLISHED'` |
+
+**Before → After:** ACTIVE tours no longer show team `<select>`s after activation. Status changes use the same dropdown pattern as tour selection, with `ConfirmDialog` for destructive transitions.
 
 
 ### Stage 2.4 — Leaderboard & results
@@ -89,3 +105,4 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 |------|-------|---------|
 | 2026-06-24 | 2.1 / 2.1.1 | Baseline shell, auth routes, admin stubs |
 | 2026-06-24 | 2.3 | Full supervisor admin UI: settings, rounds, results, lifecycle, B5 logo |
+| 2026-06-27 | 2.3.2 | ACTIVE schedule-only editing, match status confirms, empty score guard on results |

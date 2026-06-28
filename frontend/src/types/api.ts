@@ -64,6 +64,13 @@ export interface ContestOut {
   rules_json: Record<string, unknown>;
 }
 
+export interface DeletedContestOut {
+  id: number;
+  name: string;
+  deleted_at: string;
+  restore_available: boolean;
+}
+
 export interface ChangePasswordRequest {
   old_password: string;
   new_password: string;
@@ -158,6 +165,7 @@ export interface ContestPatchRequest {
   matches_per_round?: number;
   total_rounds?: number;
   is_round_robin?: boolean;
+  rules_json?: Record<string, unknown>;
 }
 
 export interface CreateContestRequest {

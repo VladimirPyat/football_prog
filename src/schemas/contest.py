@@ -64,7 +64,14 @@ class ContestDeleteConfirmRequest(BaseModel):
 
 class ContestDeleteResponse(BaseModel):
     deleted: bool = True
-    status: str = "DRAFT"
+    status: str = "DELETED"
+
+
+class DeletedContestOut(BaseModel):
+    id: int
+    name: str
+    deleted_at: datetime
+    restore_available: bool
 
 
 class ExceptionalTiebreakRequest(BaseModel):

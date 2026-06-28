@@ -27,10 +27,12 @@ export function useContestAdmin() {
   }, [effectiveId, setContestId]);
 
   useEffect(() => {
-    if (!contest) {
+    if (contest && contest.id !== effectiveId) {
+      void refetch();
+    } else if (!contest) {
       void refetch();
     }
-  }, [contest, refetch]);
+  }, [contest, effectiveId, refetch]);
 
   const patchContest = useCallback(
     async (body: ContestPatchRequest): Promise<ContestOut> => {

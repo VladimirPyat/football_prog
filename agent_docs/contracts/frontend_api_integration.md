@@ -68,7 +68,7 @@ POST /api/v1/contests/{id}/participants (SUPERVISOR+)
 
 UI `/auth/setup`: `password_form` → form + `new_password`; `confirm_only` → confirm button only. Success → redirect to login (no auto-JWT).
 
-Config: `ENFORCE_PASSWORD_SETUP`, `FRONTEND_BASE_URL`, `SUPERVISOR_TRAINING_MODE`, `CONTEST_RESTORE_WINDOW_SECONDS` — see `manuals/CONFIG.md`.
+Config field names (`enforce_password_setup`, `frontend_base_url`, `supervisor_training_mode`, …) — defaults in `config/settings.py`; override via deployment env or shell prefix for tests. **Root `.env` = secrets only.** See `manuals/CONFIG.md`.
 
 ### 2.2 Rules
 

@@ -76,7 +76,7 @@ SEED_ADMIN_PASSWORD=…        # нужен adminApi ensureContestRunning
 | Симптом | Причина | Решение |
 |---------|---------|---------|
 | `API not reachable at …/health` | Бэк не запущен | Terminal 1: uvicorn |
-| `Login failed … PASSWORD_SETUP_REQUIRED` | Старый globalSetup + `ENFORCE_PASSWORD_SETUP=true` | Обновить `playwright.global-setup.ts` (complete-setup) или `ENFORCE_PASSWORD_SETUP=false` на API |
+| `Login failed … PASSWORD_SETUP_REQUIRED` | Старый globalSetup + default `enforce_password_setup=true` | Обновить `playwright.global-setup.ts` (complete-setup); или shell: `ENFORCE_PASSWORD_SETUP=false uv run uvicorn …` |
 | «Висит» 1–2 мин без вывода | `beforeAll` → `reloadLoadedContestFixture()` (полный `--reset` loader) | Нормально; теперь пишет `[E2E] reloadLoadedContestFixture…` в консоль |
 | `SEED_SUPERVISOR_PASSWORD missing` | Пустой `.env` | Заполнить пароли из `.env.example` |
 

@@ -309,6 +309,7 @@ async def activate_round(
     round_ = await session.get(Round, round_id)
     if round_ is None or round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не найден")
+    # No-op when contest already RUNNING (purge runs on POST /start or legacy first activate).
     await purge_before_first_activation(session, contest_id)
     round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
     await ensure_running_on_first_activation(session, contest_id)

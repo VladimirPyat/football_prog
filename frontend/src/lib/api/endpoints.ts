@@ -18,10 +18,12 @@ export const contests = {
   byId: (id: number) => `/api/v1/contests/${id}`,
   create: () => "/api/v1/contests",
   patch: (id: number) => `/api/v1/contests/${id}`,
+  start: (id: number) => `/api/v1/contests/${id}/start`,
   pause: (id: number) => `/api/v1/contests/${id}/pause`,
   resume: (id: number) => `/api/v1/contests/${id}/resume`,
   finish: (id: number) => `/api/v1/contests/${id}/finish`,
   delete: (id: number) => `/api/v1/contests/${id}`,
+  deleted: () => `/api/v1/contests/deleted`,
   restore: (id: number) => `/api/v1/contests/${id}/restore`,
 };
 

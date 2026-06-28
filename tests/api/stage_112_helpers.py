@@ -44,16 +44,48 @@ def apply_env(monkeypatch: pytest.MonkeyPatch, overrides: dict[str, str] | None 
     get_settings.cache_clear()
 
 
-async def create_draft_contest(client: httpx.AsyncClient, *, name: str = "Stage 1.12") -> tuple[int, dict[str, str]]:
+async def create_draft_contest(
+    client: httpx.AsyncClient,
+    *,
+    name: str = "Stage 1.12",
+    total_teams: int = 16,
+) -> tuple[int, dict[str, str]]:
     sup = await api_login(client, "supervisor_api")
     h = auth_header(sup)
     created = await client.post(
         f"{API_PREFIX}/contests",
         headers=h,
-        json={"name": name, "total_teams": 16},
+        json={"name": name, "total_teams": total_teams},
     )
     assert created.status_code == 200, created.text
     return created.json()["id"], h
+
+
+async def fulfill_start_prerequisites(
+    client: httpx.AsyncClient,
+    contest_id: int,
+    sup_h: dict[str, str],
+    *,
+    team_count: int | None = None,
+    accepted_participants: int = 2,
+    skip_teams: bool = False,
+) -> None:
+    """Add all teams and accepted participants required for POST /start."""
+    if not skip_teams:
+        if team_count is None:
+            contest = await client.get(f"{API_PREFIX}/contests/{contest_id}", headers=sup_h)
+            assert contest.status_code == 200, contest.text
+            team_count = contest.json()["total_teams"]
+        await add_teams(client, contest_id, sup_h, count=team_count)
+    for i in range(accepted_participants):
+        invited = await invite_participant(
+            client,
+            contest_id,
+            sup_h,
+            email=f"start_ready_{contest_id}_{i}@example.com",
+            login=f"start_ready_{contest_id}_{i}",
+        )
+        await complete_setup(client, invited["setup_url"])
 
 
 async def invite_participant(

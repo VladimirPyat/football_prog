@@ -6,7 +6,7 @@ from config.settings import get_settings
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from api.deps import CurrentUser, DbSession, RoleChecker, cache_control_header
-from database.models import User, UserRole
+from database.models import ContestLifecycleStatus, User, UserRole
 from schemas.contest import (
     ContestDeleteConfirmRequest,
     ContestDeleteResponse,
@@ -15,6 +15,7 @@ from schemas.contest import (
     ContestPatchRequest,
     ContestRestoreResponse,
     CreateContestRequest,
+    DeletedContestOut,
     PublicContestOut,
 )
 from services.contest_discovery_service import list_public_contests
@@ -27,6 +28,7 @@ from services.contest_lifecycle_service import (
     pause_contest,
     resume_contest,
     seconds_until_deletable,
+    start_contest,
 )
 from services.contest_restore_service import restore_contest_from_snapshot
 from services.contest_setup_service import create_contest, update_contest
@@ -37,28 +39,32 @@ _supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
 _admin = Depends(RoleChecker(UserRole.ADMIN))
 
 
-async def require_finish_delete_role(user: CurrentUser) -> User:
-    """ADMIN always; SUPERVISOR when supervisor_training_mode is enabled."""
-    settings = get_settings()
-    allowed = {UserRole.ADMIN.value}
-    if settings.supervisor_training_mode:
-        allowed.add(UserRole.SUPERVISOR.value)
-    if user.role not in allowed:
+async def require_delete_role(user: CurrentUser) -> User:
+    """SUPERVISOR and ADMIN may delete contests (subject to lifecycle rules)."""
+    if user.role not in {UserRole.ADMIN.value, UserRole.SUPERVISOR.value}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     return user
+
+
+async def require_finish_role(user: CurrentUser) -> User:
+    """ADMIN may finish; SUPERVISOR only in training mode."""
+    if user.role == UserRole.ADMIN.value:
+        return user
+    settings = get_settings()
+    if user.role == UserRole.SUPERVISOR.value and settings.supervisor_training_mode:
+        return user
+    raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
 
 
 async def require_restore_role(user: CurrentUser) -> User:
-    """Restore is available only in supervisor training mode."""
-    settings = get_settings()
-    if not settings.supervisor_training_mode:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Восстановление отключено")
-    if user.role not in {UserRole.SUPERVISOR.value, UserRole.ADMIN.value}:
+    """Only ADMIN may restore soft-deleted contests."""
+    if user.role != UserRole.ADMIN.value:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     return user
 
 
-_finish_delete = Depends(require_finish_delete_role)
+_finish = Depends(require_finish_role)
+_delete = Depends(require_delete_role)
 _restore = Depends(require_restore_role)
 
 
@@ -79,8 +85,39 @@ async def list_contests(session: DbSession) -> list[ContestOut]:
 
     from database.models import Contest  # noqa: PLC0415
 
-    contests = (await session.scalars(select(Contest).order_by(Contest.id))).all()
+    contests = (
+        await session.scalars(
+            select(Contest).where(Contest.deleted_at.is_(None)).order_by(Contest.id)
+        )
+    ).all()
     return [ContestOut.model_validate(c) for c in contests]
+
+
+@router.get("/deleted", response_model=list[DeletedContestOut], dependencies=[_admin])
+async def list_deleted(session: DbSession) -> list[DeletedContestOut]:
+    """Soft-deleted contests (ADMIN) — for restore within snapshot window."""
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from database.models import Contest  # noqa: PLC0415
+    from services.contest_restore_service import has_restore_snapshot  # noqa: PLC0415
+
+    rows = (
+        await session.scalars(
+            select(Contest).where(Contest.deleted_at.is_not(None)).order_by(Contest.deleted_at.desc())
+        )
+    ).all()
+    result: list[DeletedContestOut] = []
+    for c in rows:
+        restore_available = await has_restore_snapshot(session, c.id)
+        result.append(
+            DeletedContestOut(
+                id=c.id,
+                name=c.name,
+                deleted_at=c.deleted_at,
+                restore_available=restore_available,
+            )
+        )
+    return result
 
 
 @router.get("/public", response_model=list[PublicContestOut])
@@ -134,6 +171,14 @@ async def patch_one(
     return ContestOut.model_validate(contest)
 
 
+@router.post("/{contest_id}/start", response_model=ContestLifecycleOut, dependencies=[_supervisor])
+async def start(contest_id: int, session: DbSession) -> ContestLifecycleOut:
+    """Запустить конкурс (DRAFT → RUNNING, блокировка структуры)."""
+    contest = await start_contest(session, contest_id)
+    await session.commit()
+    return _lifecycle_out(contest)
+
+
 @router.post("/{contest_id}/pause", response_model=ContestLifecycleOut, dependencies=[_supervisor])
 async def pause(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     """Приостановить конкурс (RUNNING → PAUSED)."""
@@ -153,7 +198,7 @@ async def resume(contest_id: int, session: DbSession) -> ContestLifecycleOut:
 @router.post(
     "/{contest_id}/finish",
     response_model=ContestLifecycleOut,
-    dependencies=[_finish_delete],
+    dependencies=[_finish],
 )
 async def finish(contest_id: int, session: DbSession) -> ContestLifecycleOut:
     """Досрочно завершить конкурс (RUNNING|PAUSED → FINISHED)."""
@@ -165,7 +210,7 @@ async def finish(contest_id: int, session: DbSession) -> ContestLifecycleOut:
 @router.delete(
     "/{contest_id}",
     response_model=ContestDeleteResponse,
-    dependencies=[_finish_delete],
+    dependencies=[_delete],
 )
 async def delete_one(
     contest_id: int,
@@ -173,15 +218,18 @@ async def delete_one(
     session: DbSession,
     user: CurrentUser,
 ) -> ContestDeleteResponse:
-    """Безопасно удалить данные конкурса (PAUSED + grace + confirm DELETE).
-
-    Args:
-        contest_id: идентификатор конкурса
-        body: подтверждение удаления
-    """
+    """Soft-delete contest (DRAFT instant; PAUSED after grace). Hidden from lists; ADMIN may restore."""
     settings = get_settings()
-    instant = settings.contest_allow_instant_delete or settings.supervisor_training_mode
-    await assert_deletable(session, contest_id, instant=instant)
+    contest = await get_contest(session, contest_id)
+    instant = (
+        settings.contest_allow_instant_delete
+        or settings.supervisor_training_mode
+        or contest.status == ContestLifecycleStatus.DRAFT
+    )
+    allow_draft = True
+    await assert_deletable(
+        session, contest_id, instant=instant, allow_draft=allow_draft
+    )
     await delete_contest_data(session, contest_id, deleted_by_user_id=user.id)
     await session.commit()
     return ContestDeleteResponse()

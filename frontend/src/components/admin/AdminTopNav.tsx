@@ -9,6 +9,7 @@ import { apiPost } from "@/lib/api/client";
 import { contests } from "@/lib/api/endpoints";
 import { useContest } from "@/hooks/useContest";
 import { useToast } from "@/hooks/useToast";
+import type { ContestOut } from "@/types/api";
 import { AppError } from "@/lib/api/client";
 import { formatDateRu } from "@/lib/admin/format";
 
@@ -36,17 +37,16 @@ export function AdminTopNav() {
   const { setContestId } = useContest();
   const { showSuccess, showError } = useToast();
 
-  const handleCreateContest = async (data: {
-    name: string;
-    slug?: string;
-    total_teams: number;
-    matches_per_round: number;
-    total_rounds: number;
-    is_round_robin: boolean;
-  }) => {
+  const handleCreateContest = async (data: { name: string; slug?: string }) => {
     try {
-      const created = await apiPost<{ id: number }>(contests.create(), data);
+      const created = await apiPost<ContestOut>(contests.create(), {
+        name: data.name,
+        slug: data.slug || undefined,
+      });
+      sessionStorage.setItem(`contest_setup_hint_${created.id}`, "1");
       await setContestId(created.id, true);
+      window.dispatchEvent(new Event("contest-list-changed"));
+      setShowCreate(false);
       showSuccess("Конкурс создан");
     } catch (err) {
       showError(err instanceof AppError ? err.detail : "Ошибка создания");

@@ -147,6 +147,7 @@ async def activate_round(round_id: int, session: DbSession) -> dict:
     """Активировать тур. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
     await assert_contest_running(session, contest_id)
+    # No-op when contest already RUNNING (purge runs on POST /start or legacy first activate).
     await purge_before_first_activation(session, contest_id)
     round_ = await transition_round(session, round_id, RoundStatus.ACTIVE)
     await ensure_running_on_first_activation(session, contest_id)

@@ -217,7 +217,7 @@ Copy to `.env.local` for local dev. **`NEXT_PUBLIC_DEFAULT_CONTEST_ID`** is the 
 
 ### 4.3 CORS
 
-Backend `cors_origins` defaults to `["*"]` — direct browser calls from `:3000` to `:8000` should work. If CORS errors appear, verify backend `.env` does not restrict origins without including `http://localhost:3000`. **Do not** add a Next.js rewrite proxy unless CORS cannot be fixed on backend (document in handoff if you do).
+Backend `cors_origins` defaults to `["*"]` in `config/settings.py` — direct browser calls from `:3000` to `:8000` should work. If CORS errors appear, check deployment env / `settings.py`; do not add non-secret vars to root `.env`. **Do not** add a Next.js rewrite proxy unless CORS cannot be fixed on backend (document in handoff if you do).
 
 ---
 

@@ -6,23 +6,12 @@ import { createContestSchema } from "@/lib/validation/admin";
 interface CreateContestFormProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: {
-    name: string;
-    slug?: string;
-    total_teams: number;
-    matches_per_round: number;
-    total_rounds: number;
-    is_round_robin: boolean;
-  }) => Promise<void>;
+  onSubmit: (data: { name: string; slug?: string }) => Promise<void>;
 }
 
 export function CreateContestForm({ open, onClose, onSubmit }: CreateContestFormProps) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [totalTeams, setTotalTeams] = useState(8);
-  const [matchesPerRound, setMatchesPerRound] = useState(4);
-  const [totalRounds, setTotalRounds] = useState(14);
-  const [isRoundRobin, setIsRoundRobin] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,10 +23,6 @@ export function CreateContestForm({ open, onClose, onSubmit }: CreateContestForm
     const parsed = createContestSchema.safeParse({
       name,
       slug: slug || undefined,
-      total_teams: totalTeams,
-      matches_per_round: matchesPerRound,
-      total_rounds: totalRounds,
-      is_round_robin: isRoundRobin,
     });
     if (!parsed.success) {
       const next: Record<string, string> = {};
@@ -50,6 +35,8 @@ export function CreateContestForm({ open, onClose, onSubmit }: CreateContestForm
     setSubmitting(true);
     try {
       await onSubmit(parsed.data);
+      setName("");
+      setSlug("");
       onClose();
     } finally {
       setSubmitting(false);
@@ -58,12 +45,25 @@ export function CreateContestForm({ open, onClose, onSubmit }: CreateContestForm
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Новый конкурс</h3>
+      <div
+        className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-contest-title"
+      >
+        <h3 id="create-contest-title" className="text-lg font-semibold text-gray-900 mb-4">
+          Новый конкурс
+        </h3>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Название</label>
+            <label
+              htmlFor="create-contest-name"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Название
+            </label>
             <input
+              id="create-contest-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
@@ -71,52 +71,24 @@ export function CreateContestForm({ open, onClose, onSubmit }: CreateContestForm
             {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Slug (необязательно)
+            <label
+              htmlFor="create-contest-slug"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Короткое имя (slug)
             </label>
             <input
+              id="create-contest-slug"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Короткое имя для ссылки (латиница, цифры, дефисы). Необязательно — если пусто, в
+              адресе будет только номер конкурса.
+            </p>
+            {errors.slug && <p className="text-sm text-red-600">{errors.slug}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Команд</label>
-              <input
-                type="number"
-                value={totalTeams}
-                onChange={(e) => setTotalTeams(Number(e.target.value))}
-                className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Матчей/тур</label>
-              <input
-                type="number"
-                value={matchesPerRound}
-                onChange={(e) => setMatchesPerRound(Number(e.target.value))}
-                className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Туров</label>
-              <input
-                type="number"
-                value={totalRounds}
-                onChange={(e) => setTotalRounds(Number(e.target.value))}
-                className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-              />
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isRoundRobin}
-              onChange={(e) => setIsRoundRobin(e.target.checked)}
-            />
-            Круговая система
-          </label>
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"

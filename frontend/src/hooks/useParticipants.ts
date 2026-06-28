@@ -35,6 +35,7 @@ export function useParticipants(contestId: number) {
         body,
       );
       await refetch();
+      window.dispatchEvent(new Event("contest-setup-changed"));
       return res;
     },
     [contestId, refetch],
@@ -44,6 +45,7 @@ export function useParticipants(contestId: number) {
     async (userId: number) => {
       await apiDelete(contestAdmin.participants.delete(contestId, userId));
       await refetch();
+      window.dispatchEvent(new Event("contest-setup-changed"));
     },
     [contestId, refetch],
   );

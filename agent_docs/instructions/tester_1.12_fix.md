@@ -41,20 +41,21 @@ uv run uvicorn main:app --host 127.0.0.1 --port 8000
 
 For lifecycle/purge tests use **fresh DRAFT contest** via API (`empty_api` / supervisor token) — not locked contest `id=1` unless test says so.
 
-### 2.2 Recommended `.env` for this test run
+### 2.2 Configuration (not in root `.env`)
 
-Create isolated test profile (document in report which flags were used):
+**Root `.env` — secrets only:** `SEED_ADMIN_PASSWORD`, `SEED_SUPERVISOR_PASSWORD` (see `.env.example`).
+
+Tuning flags (`ENFORCE_PASSWORD_SETUP`, `SUPERVISOR_TRAINING_MODE`, `FRONTEND_BASE_URL`, …) use **`config/settings.py` defaults** locally. Pytest injects env via `monkeypatch` (`tests/api/stage_112_helpers.py`).
+
+For ad-hoc API runs, prefix the command (do **not** add to `.env`):
 
 ```bash
-# Strict password gate (prod-like)
-ENFORCE_PASSWORD_SETUP=true
-SUPERVISOR_TRAINING_MODE=true
-CONTEST_DELETE_GRACE_SECONDS=0
-CONTEST_RESTORE_WINDOW_SECONDS=3600
-FRONTEND_BASE_URL=http://127.0.0.1:3000
+ENFORCE_PASSWORD_SETUP=true SUPERVISOR_TRAINING_MODE=true \
+  CONTEST_DELETE_GRACE_SECONDS=0 CONTEST_RESTORE_WINDOW_SECONDS=3600 \
+  uv run pytest tests/api/test_contest_restore.py -v
 ```
 
-Re-run subset with `ENFORCE_PASSWORD_SETUP=false` for legacy/E2E compatibility checks (§5.6).
+Re-run subset with `ENFORCE_PASSWORD_SETUP=false` via shell prefix for legacy/E2E compatibility checks (§5.6).
 
 ### 2.3 Frontend (minimal §6)
 

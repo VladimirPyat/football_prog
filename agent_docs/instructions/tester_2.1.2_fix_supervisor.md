@@ -54,7 +54,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-For lifecycle buttons (pause/resume): `SUPERVISOR_TRAINING_MODE=true` in backend `.env` if testing finish/delete UI from 1.12.
+For lifecycle buttons (pause/resume): available to SUPERVISOR by default. Finish/delete on lifecycle page: ADMIN-only page; supervisor delete on **Parameters** (post 1.15). No backend `.env` flags required.
 
 For login reset checkbox: `request-password-reset` API must exist (1.12).
 

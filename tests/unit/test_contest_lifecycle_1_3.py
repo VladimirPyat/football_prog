@@ -241,3 +241,4 @@ async def test_delete_contest_data_resets_to_draft(session: AsyncSession) -> Non
 
     assert new_contest.status == ContestLifecycleStatus.DRAFT
     assert new_contest.is_locked is False
+    assert new_contest.deleted_at is not None

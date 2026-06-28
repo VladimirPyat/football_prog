@@ -281,3 +281,10 @@
 - Fixture: rounds 1–9 PUBLISHED (90 scores), 10 CALCULATED (10), 11 CLOSED (0)
 - Regression: test_calculate_persistence_1_2.py OK; tests/scripts/test_finalize_dev_fixture_1_14.py (5 passed)
 - Next: tester_2.3.1_fix_rounds.md (after coder_2.3.1 READY_FOR_TEST)
+
+## 2026-06-28 — Coder (1.15 fix setup — start & DRAFT delete)
+- STATUS: READY_FOR_TEST
+- Files: src/services/contest_lifecycle_service.py (start_contest, assert_deletable allow_draft), src/api/v1/contests.py (POST /start, delete allow_draft), src/api/v1/contest_ops.py, src/api/v1/admin_rounds.py (purge idempotency comments), tests/api/test_contest_start_1_15.py
+- Verified: `uv run ruff check` on modified src files OK; `uv run pytest tests/api/test_contest_start_1_15.py -v` 9 passed; `tests/api/test_contest_restore.py` 7 passed
+- Note: full `uv run ruff check src/` and `uv run mypy src/` have pre-existing project-wide issues unrelated to this change
+- Next: agent_docs/instructions/tester_2.3.3_fix_setup.md

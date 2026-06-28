@@ -63,7 +63,7 @@ SEED_ADMIN_PASSWORD=…        # optional for 2.2; needed if supervisor API help
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `API not reachable at …/health` | Backend not started | Terminal 1: `uvicorn` (see above) |
-| `Login failed … PASSWORD_SETUP_REQUIRED` | Outdated `playwright.global-setup.ts` | Use repo version: `complete-setup` via `setup_url` from invite (works with default `ENFORCE_PASSWORD_SETUP=true`) |
+| `Login failed … PASSWORD_SETUP_REQUIRED` | Outdated `playwright.global-setup.ts` | Use repo version: `complete-setup` via `setup_url` from invite (works with default `enforce_password_setup=true` from `settings.py`) |
 | No output 1–2 min at start | `globalSetup` provisioning user + Next.js first compile | Normal; use `--reporter=line` or `DEBUG=pw:webserver` |
 | Supervisor specs “freeze” ~60–120 s | `beforeAll` → `reloadLoadedContestFixture()` (`load_test_data --reset`) | Normal; console shows `[E2E] reloadLoadedContestFixture…` |
 | `SEED_SUPERVISOR_PASSWORD missing` | Empty `.env` | Copy from `.env.example` and set passwords |

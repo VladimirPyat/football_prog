@@ -135,6 +135,8 @@ Uses `create_engine` + `Base.metadata.create_all` (same pattern as `seed.py`).
 
 ## 8. `.env.example`
 
+Secrets and deployment only — see current [`.env.example`](../../.env.example) and `manuals/CONFIG.md`. **Do not** list `FRONTEND_BASE_URL`, training flags, or upload paths here.
+
 Include at minimum:
 
 - `SEED_ADMIN_LOGIN`, `SEED_ADMIN_PASSWORD`

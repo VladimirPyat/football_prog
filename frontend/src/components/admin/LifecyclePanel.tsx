@@ -50,6 +50,9 @@ export function LifecyclePanel({
     }
   };
 
+  const deleteMessage =
+    "Конкурс будет скрыт из списка. Администратор может восстановить данные в течение ограниченного времени.";
+
   const messages = {
     pause: {
       title: "Поставить конкурс на паузу?",
@@ -65,8 +68,7 @@ export function LifecyclePanel({
     },
     delete: {
       title: "Удалить конкурс?",
-      message:
-        "Конкурс будет удалён безвозвратно. Действие возможно только после паузы и истечения grace-периода.",
+      message: deleteMessage,
     },
     recalculate: {
       title: "Пересчитать конкурс?",

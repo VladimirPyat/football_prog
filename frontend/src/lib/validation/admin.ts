@@ -1,33 +1,21 @@
 import { z } from "zod";
 import { deadlineErrorMessage, isDeadlineValid } from "@/lib/admin/deadlineRule";
 
-export const createContestSchema = z
-  .object({
-    name: z.string().min(1, "Укажите название"),
-    slug: z.string().optional(),
-    total_teams: z.coerce.number().int().positive(),
-    matches_per_round: z.coerce.number().int().positive(),
-    total_rounds: z.coerce.number().int().positive(),
-    is_round_robin: z.boolean(),
-  })
-  .superRefine((d, ctx) => {
-    if (d.is_round_robin) {
-      if (d.matches_per_round !== d.total_teams / 2) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["matches_per_round"],
-          message: "Должно быть = команды / 2",
-        });
-      }
-      if (d.total_rounds !== (d.total_teams - 1) * 2) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["total_rounds"],
-          message: "Должно быть = (команды − 1) × 2",
-        });
-      }
-    }
-  });
+export const createContestSchema = z.object({
+  name: z.string().min(1, "Укажите название"),
+  slug: z.string().optional(),
+});
+
+/** Round-robin home/away: matches per round and total rounds from team count. */
+export function deriveRoundRobinStructure(totalTeams: number): {
+  matches_per_round: number;
+  total_rounds: number;
+} {
+  return {
+    matches_per_round: totalTeams / 2,
+    total_rounds: (totalTeams - 1) * 2,
+  };
+}
 
 export const contestParametersSchema = z
   .object({

@@ -287,14 +287,14 @@ SMTP is **not** wired in dev. Invited players start as `PENDING` in `contest_par
 
 > **Critical:** on **first round activation**, the API **purges** all `PENDING` USER participants. Confirm everyone **before** activating tour 1. See [API_GUIDE.md](API_GUIDE.md#password-setup--invite-links-stage-112).
 
-### Recommended `.env` for local invite testing
+### Local invite testing (defaults)
 
-```bash
-ENFORCE_PASSWORD_SETUP=true   # default — invite link required (production-like)
-SUPERVISOR_TRAINING_MODE=true # optional — supervisor can delete/restore test contests
-```
+No extra root `.env` flags needed. Defaults in `config/settings.py`:
 
-Legacy automated login only: `ENFORCE_PASSWORD_SETUP=false` — see [CONFIG.md](CONFIG.md).
+- `enforce_password_setup=true` — production-like invite flow
+- `frontend_base_url=http://127.0.0.1:3000` — correct `setup_url` host
+
+Legacy automated login in tests only: `ENFORCE_PASSWORD_SETUP=false` via **shell prefix** or pytest `monkeypatch` — see [CONFIG.md — Local / CI tuning](CONFIG.md#local--ci-tuning-not-in-env).
 
 ### Workflow A — UI invite + setup link (one participant)
 
@@ -375,6 +375,7 @@ When SMTP is not configured, use the dev script to export PENDING invitees and c
 
 ```bash
 # Export unconfirmed participants (optional: regenerate setup links)
+uv run python src/scripts/dev_invite_setup.py list-pending
 uv run python src/scripts/dev_invite_setup.py get-unconfirmed --contest-id 2 \
   --out src/scripts/dev_unconfirmed.tsv \
   --links-out src/scripts/.tokens
@@ -384,12 +385,12 @@ uv run python src/scripts/dev_invite_setup.py confirm-list \
   --file src/scripts/dev_unconfirmed.tsv \
   --password 'DevPass123!'
 
-# Export + confirm all in one step
+# Export + confirm all in one step (password from SEED_SUPERVISOR_PASSWORD in .env)
 uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id 2
 ```
 
 `src/scripts/.tokens` is gitignored (one JSON object per line with `setup_url`).  
-Recommended local flags: `ENFORCE_PASSWORD_SETUP=false`, `SUPERVISOR_TRAINING_MODE=true`, `CONTEST_DELETE_GRACE_SECONDS=0` — see [CONFIG.md](CONFIG.md).
+For E2E/training toggles use shell env or pytest `monkeypatch` — see [CONFIG.md — Local / CI tuning](CONFIG.md#local--ci-tuning-not-in-env).
 
 ---
 
@@ -423,3 +424,81 @@ You **do not** re-run `bootstrap_users.py` on every API restart — users persis
 ---
 
 *Last updated: Stage 2.3.1 — `--check-ports`; Stage 1.14 fixture + invite workflow.*
+
+---
+
+## Manual QA cheatsheet
+
+Quick commands for supervisor manual testing (also printed at the end of `dev_setup.py` when the stack starts).
+
+### Reset database to demo fixture
+
+Returns contest **id=1** (RUNNING, locked), 16 teams, demo users. Wipes loader tables.
+
+```bash
+# Full reset (recommended)
+uv run python src/scripts/dev_setup.py
+
+# Same, plus start API + UI
+uv run python src/scripts/dev_setup.py --run
+
+# Loader step only (then restore staff + fixture state)
+uv run python src/scripts/load_test_data.py --reset
+uv run python src/scripts/bootstrap_users.py
+uv run python src/scripts/dev_setup.py --ensure-running-only
+```
+
+### Accept all pending invites (no SMTP)
+
+List contests that still have **«Ожидает»** invitees:
+
+```bash
+uv run python src/scripts/dev_invite_setup.py list-pending
+```
+
+Example output:
+
+```text
+contest_id	pending	name
+10	2	E2E Setup 1719580000
+```
+
+Confirms every `PENDING` temp-password participant for the given contest via `complete-setup`:
+
+```bash
+uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id <ID>
+```
+
+**Password:** not the supervisor login — this is the **new password** assigned to each invited user.
+By default the script reads `SEED_SUPERVISOR_PASSWORD` from `.env` (same value you use for `supervisor` login in dev).
+Override with `--password '…'` if needed.
+
+```bash
+uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id <ID> --password 'OtherPass1!'
+```
+
+Optional: export list + setup links first:
+
+```bash
+uv run python src/scripts/dev_invite_setup.py get-unconfirmed --contest-id <ID> \
+  --out src/scripts/dev_unconfirmed.tsv --links-out src/scripts/.tokens
+```
+
+### Remove extra / deleted contests
+
+| Goal | Action |
+|------|--------|
+| Hide a draft from lists (soft delete) | UI: «Удалить конкурс» on parameters (DRAFT/PAUSED) |
+| Restore within window | ADMIN: `/admin/lifecycle` → «Восстановить» |
+| **Hard-delete** soft-deleted rows from DB | `uv run python src/scripts/purge_deleted_contests.py --all-deleted --dry-run` then without `--dry-run` |
+| Purge by retention TTL only | `uv run python src/scripts/purge_deleted_contests.py` (see `contest_purge_retention_seconds` in [CONFIG.md](CONFIG.md)) |
+
+There is no bulk script for deleting **active** DRAFT contests — use the UI per contest or reset the whole DB above.
+
+### Typical new-contest flow (S1.x)
+
+1. «+ Новый конкурс» → set parameters → add all teams → invite participants.
+2. `confirm-all --contest-id <ID>` (or manual `setup_url` per invite).
+3. Parameters page: readiness panel green → «Запустить конкурс».
+
+See [SUPERVISOR_TESTING_SCENARIOS.md](SUPERVISOR_TESTING_SCENARIOS.md) for full checklist.

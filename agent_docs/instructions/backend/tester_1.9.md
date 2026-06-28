@@ -99,7 +99,7 @@ After upload, `PATCH` team `{ "logo_url": null }` → GET returns **default** UR
 | ID | Check |
 |----|-------|
 | `[DOC-CONTRACT]` | `api_v1.yaml` version **1.2.0**; POST logo path documented |
-| `[DOC-CONFIG]` | `CONFIG.md` + `.env.example` list upload settings + default URL |
+| `[DOC-CONFIG]` | `CONFIG.md` lists upload settings + default URL; `.env.example` secrets only |
 | `[DOC-API-GUIDE]` | Logo upload + default behaviour documented |
 | `[DOC-FRONTEND-HINT]` | Handoff mentions `frontend/public/assets/default-team-logo.jpg` |
 

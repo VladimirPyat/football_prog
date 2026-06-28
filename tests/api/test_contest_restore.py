@@ -106,8 +106,8 @@ async def test_life_finish_supervisor_training(training_loaded_api):
 
 
 @pytest.mark.asyncio
-async def test_life_delete_supervisor_denied(no_training_loaded_api):
-    """[LIFE-DELETE-TRAIN] supervisor delete forbidden when training mode off."""
+async def test_life_delete_supervisor_allowed(no_training_loaded_api):
+    """[LIFE-DELETE] supervisor can delete PAUSED contest (instant delete in test env)."""
     client, sf, _ = no_training_loaded_api
     await ensure_contest_running(sf, client, DEFAULT_CONTEST_ID)
     sup_h = auth_header(await api_login(client, "supervisor_api"))
@@ -118,7 +118,8 @@ async def test_life_delete_supervisor_denied(no_training_loaded_api):
         headers=sup_h,
         json={"confirm": "DELETE"},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "DELETED"
 
 
 @pytest.mark.asyncio
@@ -135,7 +136,7 @@ async def test_life_delete_supervisor_training(training_loaded_api):
         json={"confirm": "DELETE"},
     )
     assert resp.status_code == 200
-    assert resp.json()["status"] == "DRAFT"
+    assert resp.json()["status"] == "DELETED"
 
 
 @pytest.mark.asyncio
@@ -167,7 +168,10 @@ async def test_restore_window(training_loaded_api):
         teams_after = (await session.scalars(select(Team).where(Team.contest_id == cid))).all()
         assert len(teams_after) == 0
 
-    restore = await client.post(contest_url(cid, "/restore"), headers=sup_h)
+    restore = await client.post(
+        contest_url(cid, "/restore"),
+        headers=auth_header(await api_login(client, "admin_api")),
+    )
     assert restore.status_code == 200
     assert restore.json()["restored"] is True
 
@@ -177,7 +181,10 @@ async def test_restore_window(training_loaded_api):
         assert len(teams_restored) == team_count
         assert len(rounds_restored) == round_count
 
-    again = await client.post(contest_url(cid, "/restore"), headers=sup_h)
+    again = await client.post(
+        contest_url(cid, "/restore"),
+        headers=auth_header(await api_login(client, "admin_api")),
+    )
     assert again.status_code in (404, 410)
 
     await client.post(contest_url(cid, "/pause"), headers=sup_h)
@@ -194,5 +201,8 @@ async def test_restore_window(training_loaded_api):
         snap.expires_at = datetime.now(UTC) - timedelta(seconds=1)
         await session.commit()
 
-    expired = await client.post(contest_url(cid, "/restore"), headers=sup_h)
+    expired = await client.post(
+        contest_url(cid, "/restore"),
+        headers=auth_header(await api_login(client, "admin_api")),
+    )
     assert expired.status_code == 410

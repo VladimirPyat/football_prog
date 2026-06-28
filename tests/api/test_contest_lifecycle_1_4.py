@@ -75,7 +75,7 @@ async def test_contest_pause_blocks_predictions(loaded_contest_api):
 
 @pytest.mark.asyncio
 async def test_contest_delete_rbac(delete_contest_api):
-    """[API-CONTEST-DELETE-RBAC] DELETE as SUPERVISOR → 403."""
+    """[API-CONTEST-DELETE-RBAC] DELETE as SUPERVISOR on PAUSED contest → 200 (soft delete)."""
     client, sf, _ = delete_contest_api
     await ensure_contest_running(sf, client, DEFAULT_CONTEST_ID)
     admin = await api_login(client, "admin_api")
@@ -90,7 +90,8 @@ async def test_contest_delete_rbac(delete_contest_api):
         headers=auth_header(sup),
         json={"confirm": "DELETE"},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "DELETED"
 
 
 @pytest.mark.asyncio
@@ -148,9 +149,10 @@ async def test_contest_delete_ok(delete_contest_api):
         json={"confirm": "DELETE"},
     )
     assert resp.status_code == 200
-    assert resp.json()["status"] == "DRAFT"
+    assert resp.json()["status"] == "DELETED"
 
     async with sf() as session:
         contest = await session.get(Contest, DEFAULT_CONTEST_ID)
         assert contest is not None
         assert contest.status == ContestLifecycleStatus.DRAFT.value
+        assert contest.deleted_at is not None

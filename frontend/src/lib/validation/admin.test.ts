@@ -1,5 +1,89 @@
 import { describe, it, expect } from "vitest";
-import { matchResultSchema, roundBuilderSchema } from "@/lib/validation/admin";
+import {
+  contestParametersSchema,
+  createContestSchema,
+  deriveRoundRobinStructure,
+  matchResultSchema,
+  roundBuilderSchema,
+} from "@/lib/validation/admin";
+
+describe("[UNIT-CREATE-SCHEMA] createContestSchema", () => {
+  it("accepts name only", () => {
+    expect(createContestSchema.safeParse({ name: "Test" }).success).toBe(true);
+  });
+
+  it("rejects empty name", () => {
+    expect(createContestSchema.safeParse({ name: "", slug: "x" }).success).toBe(false);
+  });
+
+  it("strips unknown structural fields", () => {
+    const result = createContestSchema.safeParse({ name: "X", total_teams: 8 });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({ name: "X" });
+    }
+  });
+});
+
+describe("[UNIT-PARAMS-SCHEMA] contestParametersSchema", () => {
+  it("accepts valid round-robin values", () => {
+    expect(
+      contestParametersSchema.safeParse({
+        total_teams: 8,
+        matches_per_round: 4,
+        total_rounds: 14,
+        is_round_robin: true,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects round-robin with wrong matches_per_round", () => {
+    const result = contestParametersSchema.safeParse({
+      total_teams: 8,
+      matches_per_round: 3,
+      total_rounds: 14,
+      is_round_robin: true,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message === "Должно быть = команды / 2")).toBe(true);
+    }
+  });
+
+  it("accepts arbitrary mode with non-formula values", () => {
+    expect(
+      contestParametersSchema.safeParse({
+        total_teams: 8,
+        matches_per_round: 3,
+        total_rounds: 5,
+        is_round_robin: false,
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("[UNIT-ROUND-ROBIN-DERIVE] deriveRoundRobinStructure", () => {
+  it("computes matches and rounds for 8 teams", () => {
+    expect(deriveRoundRobinStructure(8)).toEqual({
+      matches_per_round: 4,
+      total_rounds: 14,
+    });
+  });
+
+  it("recomputes when teams change 8→10", () => {
+    expect(deriveRoundRobinStructure(10)).toEqual({
+      matches_per_round: 5,
+      total_rounds: 18,
+    });
+  });
+
+  it("computes matches and rounds for 16 teams", () => {
+    expect(deriveRoundRobinStructure(16)).toEqual({
+      matches_per_round: 8,
+      total_rounds: 30,
+    });
+  });
+});
 
 describe("matchResultSchema", () => {
   const schema = matchResultSchema(20);

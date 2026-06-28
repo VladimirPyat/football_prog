@@ -14,6 +14,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | [DEV_SETUP.md](DEV_SETUP.md) | **Local dev:** deps, bootstrap script, API + frontend, test logins |
 | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) | **Frontend map:** routes, components, editable UI copy (human quick edits) |
 | [STATUS_REFERENCE.md](STATUS_REFERENCE.md) | **Статусы:** конкурс, тур, матч — смысл, переходы, где в коде; API vs подписи UI |
+| [SUPERVISOR_TESTING_SCENARIOS.md](SUPERVISOR_TESTING_SCENARIOS.md) | **Ручное QA организатора:** чек-лист по маршрутам, фикстура, известные пробелы |
 | [API_GUIDE.md](API_GUIDE.md) | FastAPI routes, auth, RBAC, contest lifecycle |
 | [ERROR_LOGGING.md](ERROR_LOGGING.md) | Политика ошибок и логирования (RU) |
 | [MANUAL_SCORING_VERIFICATION.md](MANUAL_SCORING_VERIFICATION.md) | Stage 1 sign-off: ручная проверка scoring + CANARY (RU) |
@@ -37,8 +38,9 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | **1.12** — Invite accept without SMTP | [DEV_SETUP.md](DEV_SETUP.md#new-contest-confirm-participants-without-email-stage-112) |
 | **1.14** — Dev fixture (round statuses for manual QA) | [DEV_SETUP.md](DEV_SETUP.md#dev-fixture--finalize_dev_fixture-stage-114), [STATUS_REFERENCE.md](STATUS_REFERENCE.md) |
 | **2.3.1** — Round LB visibility + deadline rules | [API_GUIDE.md](API_GUIDE.md#round_servicepy-updated), [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3–2.4 |
+| **2.3.2** — CALCULATED result edit + ACTIVE schedule UX | [API_GUIDE.md](API_GUIDE.md#match_servicepy), [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.5, [SUPERVISOR_TESTING_SCENARIOS.md](SUPERVISOR_TESTING_SCENARIOS.md) |
 | **2.x** — Frontend local dev | [DEV_SETUP.md](DEV_SETUP.md) |
 | **2.x** — Frontend routes & UI copy | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) |
 | **2.x** — Status glossary (contest / round / match) | [STATUS_REFERENCE.md](STATUS_REFERENCE.md) |
 
-Last synced: Stage 2.3.1 — leaderboard visibility, deadline placement vs 24h lockout, dev_setup `--check-ports`.
+Last synced: Stage 2.3.2 — `set_result` on CALCULATED + auto-recalc; ACTIVE schedule-only UI; results empty-score validation.

@@ -2,6 +2,10 @@
 .idea/
 .gigaide/
 
+# linter
+.mypy_cache/
+.pytest_cache
+.ruff_cache/
 
 # Gradle
 .gradle/

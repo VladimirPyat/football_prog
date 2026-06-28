@@ -6,7 +6,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from config.settings import get_settings
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import (
@@ -22,13 +22,48 @@ from core.exceptions import (
 from database.models import (
     Contest,
     ContestLifecycleStatus,
+    ContestParticipant,
+    ParticipantStatus,
     Round,
     RoundStatus,
+    Team,
 )
 from services.contest_restore_service import save_restore_snapshot
 from services.contest_teardown import reset_contest_to_draft
 
 logger = logging.getLogger(__name__)
+
+MIN_ACCEPTED_PARTICIPANTS_FOR_START = 2
+
+
+async def validate_contest_start_readiness(
+    session: AsyncSession, contest: Contest
+) -> None:
+    """Ensure teams and participants satisfy prerequisites before start."""
+    team_count = await session.scalar(
+        select(func.count()).select_from(Team).where(Team.contest_id == contest.id)
+    )
+    team_count = team_count or 0
+    if team_count != contest.total_teams:
+        raise ValidationError(
+            f"Для запуска нужно добавить все команды: создано {team_count} "
+            f"из {contest.total_teams}"
+        )
+
+    accepted_count = await session.scalar(
+        select(func.count())
+        .select_from(ContestParticipant)
+        .where(
+            ContestParticipant.contest_id == contest.id,
+            ContestParticipant.status == ParticipantStatus.ACCEPTED,
+        )
+    )
+    accepted_count = accepted_count or 0
+    if accepted_count < MIN_ACCEPTED_PARTICIPANTS_FOR_START:
+        raise ValidationError(
+            f"Для запуска нужно минимум {MIN_ACCEPTED_PARTICIPANTS_FOR_START} "
+            f"участника со статусом «Принято» (сейчас: {accepted_count})"
+        )
 
 
 def _ensure_utc_aware(dt: datetime | None) -> datetime | None:
@@ -40,9 +75,13 @@ def _ensure_utc_aware(dt: datetime | None) -> datetime | None:
     return dt
 
 
-async def get_contest(session: AsyncSession, contest_id: int) -> Contest:
+async def get_contest(
+    session: AsyncSession, contest_id: int, *, include_deleted: bool = False
+) -> Contest:
     contest = await session.get(Contest, contest_id)
     if contest is None:
+        raise NotFoundError(f"Конкурс {contest_id} не найден")
+    if contest.deleted_at is not None and not include_deleted:
         raise NotFoundError(f"Конкурс {contest_id} не найден")
     return contest
 
@@ -97,6 +136,33 @@ async def ensure_running_on_first_activation(
     if contest.status == ContestLifecycleStatus.DRAFT:
         contest.status = ContestLifecycleStatus.RUNNING
         logger.info("contest running on first activation contest_id=%s", contest_id)
+    return contest
+
+
+async def start_contest(session: AsyncSession, contest_id: int) -> Contest:
+    """DRAFT → RUNNING + lock; purge unconfirmed participants."""
+    contest = await get_contest(session, contest_id)
+    if contest.status == ContestLifecycleStatus.RUNNING and contest.is_locked:
+        return contest
+    if contest.status == ContestLifecycleStatus.DRAFT and contest.is_locked:
+        logger.warning(
+            "contest inconsistent state DRAFT+locked; fixing forward to RUNNING contest_id=%s",
+            contest_id,
+        )
+        await validate_contest_start_readiness(session, contest)
+        await purge_before_first_activation(session, contest_id)
+        contest.status = ContestLifecycleStatus.RUNNING
+        logger.info("contest started (fix-forward) contest_id=%s", contest_id)
+        return contest
+    if contest.status != ContestLifecycleStatus.DRAFT:
+        raise IllegalTransitionError(
+            f"Недопустимый переход статуса: {contest.status} → RUNNING (требуется DRAFT)"
+        )
+    await validate_contest_start_readiness(session, contest)
+    await purge_before_first_activation(session, contest_id)
+    contest.is_locked = True
+    contest.status = ContestLifecycleStatus.RUNNING
+    logger.info("contest started contest_id=%s", contest_id)
     return contest
 
 
@@ -169,13 +235,23 @@ def seconds_until_deletable(paused_at: datetime | None) -> int | None:
 
 
 async def assert_deletable(
-    session: AsyncSession, contest_id: int, *, instant: bool = False
+    session: AsyncSession,
+    contest_id: int,
+    *,
+    instant: bool = False,
+    allow_draft: bool = False,
 ) -> Contest:
     app_settings = get_settings()
     if not app_settings.contest_delete_enabled:
         raise ContestDeleteDisabledError("Удаление конкурса отключено в настройках")
 
     contest = await get_contest(session, contest_id)
+    if contest.status == ContestLifecycleStatus.DRAFT:
+        if allow_draft:
+            return contest
+        raise ContestNotPausedError(
+            f"Для удаления конкурс должен быть на паузе (текущий статус: {contest.status})"
+        )
     if contest.status != ContestLifecycleStatus.PAUSED:
         raise ContestNotPausedError(
             f"Для удаления конкурс должен быть на паузе (текущий статус: {contest.status})"
@@ -206,10 +282,17 @@ async def delete_contest_data(
     keep_admin_users: bool = True,
     deleted_by_user_id: int | None = None,
 ) -> Contest:
-    """FK-safe wipe and reset contest to DRAFT; optional restore snapshot."""
+    """Soft-delete: snapshot, wipe operational data, set deleted_at (hidden from lists)."""
     del keep_admin_users
+    contest = await get_contest(session, contest_id, include_deleted=True)
+    if contest.deleted_at is not None:
+        raise ValidationError("Конкурс уже удалён")
+
     await save_restore_snapshot(session, contest_id, deleted_by_user_id=deleted_by_user_id)
-    return await reset_contest_to_draft(session, contest_id)
+    contest = await reset_contest_to_draft(session, contest_id)
+    contest.deleted_at = datetime.now(UTC)
+    logger.info("contest soft-deleted contest_id=%s", contest_id)
+    return contest
 
 
 async def update_exceptional_tiebreak(

@@ -27,6 +27,7 @@ export function useTeams(contestId: number) {
     async (body: { name: string; short_name: string }) => {
       await apiPost<TeamOut>(contestAdmin.teams.create(contestId), body);
       await refetch();
+      window.dispatchEvent(new Event("contest-setup-changed"));
     },
     [contestId, refetch],
   );
@@ -43,6 +44,7 @@ export function useTeams(contestId: number) {
     async (teamId: number) => {
       await apiDelete(contestAdmin.teams.delete(contestId, teamId));
       await refetch();
+      window.dispatchEvent(new Event("contest-setup-changed"));
     },
     [contestId, refetch],
   );

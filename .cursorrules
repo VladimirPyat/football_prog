@@ -13,11 +13,18 @@ description:
 alwaysApply: true
 ---
 
+---
+description: 
+alwaysApply: true
+---
+
 # UNIVERSAL AGENT RULES (ALWAYS ACTIVE)
 
 ## 1. Isolation 
 - **Read-Only**: The `docs/`  directory are STRICTLY READ-ONLY.
 - **Write Access**: Allowed in `agent_docs/`, `src/`, `tests/`, `alembic/`, `manual/` , `config/` and `README.md`
+.env - NO ACCESS FOR AGENT. contains secrets, tokens, etc. only human can read and write. agent has access to .env.example
+all project variables must be in config
 
 ## 2. Honesty
 - **Blockers**: If a task is blocked, requirements are contradictory, or data is missing, IMMEDIATELY create `agent_docs/reports/BLOCKED.md` with the issue and proposed solutions. Silently simplifying logic, skipping complex parts, or hallucinating contracts is STRICTLY FORBIDDEN.

@@ -198,14 +198,7 @@ uploads/
 
 ## 10. `.env.example`
 
-```bash
-# ─── Team logos (Stage 1.9) ─────────────────────────────────────────────────
-# UPLOAD_DIR=./uploads
-# STATIC_URL_PREFIX=/static
-# MAX_LOGO_BYTES=2097152
-# TEAM_LOGO_TARGET_PX=64
-# DEFAULT_TEAM_LOGO_URL=/static/assets/default-team-logo.jpg
-```
+**Do not** add upload/logo tuning to `.env.example` — defaults live in `config/settings.py`. Document in `manuals/CONFIG.md` only.
 
 ## 11. Tests — `test_team_logo_upload.py`
 
@@ -241,7 +234,7 @@ Use `empty_api`; create minimal PNG/JPEG bytes in test (Pillow or tiny fixture f
 ## 14. Implementation order
 
 1. User approval → `uv add pillow`
-2. Settings + `.gitignore` + `.env.example`
+2. Settings + `.gitignore` (no non-secret block in `.env.example`)
 3. `team_logo_service.py` + logo URL resolver
 4. `main.py` static mounts
 5. `contest_teams.py` POST logo + TeamOut resolution

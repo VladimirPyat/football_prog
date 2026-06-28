@@ -60,7 +60,7 @@ SEED_ADMIN_PASSWORD=…        # supervisor specs + adminApi helpers
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `API not reachable at …/health` | Backend not started | Start uvicorn (§2.0) |
-| `Login failed … PASSWORD_SETUP_REQUIRED` | Old globalSetup | Use current `playwright.global-setup.ts` (`complete-setup` path) |
+| `Login failed … PASSWORD_SETUP_REQUIRED` | Old globalSetup vs default `enforce_password_setup=true` | Use current `playwright.global-setup.ts`; or shell prefix `ENFORCE_PASSWORD_SETUP=false` when starting API |
 | Silent 1–2 min at suite start | globalSetup + Next.js compile | Use `--reporter=line`; watch for `[E2E globalSetup]` logs |
 | Long pause on supervisor specs | `reloadLoadedContestFixture()` in `beforeAll` | Expected ~60–120 s; logs `[E2E] reloadLoadedContestFixture…` |
 | Full suite “hangs” 10+ min | Many specs × DB reloads | Run subset: `npx playwright test e2e/leaderboard_visitor.spec.ts`; or `--grep` |

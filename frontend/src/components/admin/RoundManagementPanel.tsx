@@ -143,8 +143,7 @@ export function RoundManagementPanel({
     selectedRound != null && deadlineEdit !== toDatetimeLocal(selectedRound.deadline);
   const saveDisabled =
     saving ||
-    (deadlineDirty &&
-      (!deadlineValid || deadlineChangeBlocked || !uiMode.canEditDeadline));
+    (deadlineDirty && (!deadlineValid || deadlineChangeBlocked || !uiMode.canEditDeadline));
 
   const nextRoundNumber = useMemo(() => {
     if (!rounds.length) return 1;
@@ -399,33 +398,33 @@ export function RoundManagementPanel({
                 {selectedRound.status === "ACTIVE" && (
                   <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 mb-3">
                     Тур активен. Состав матчей изменить нельзя. До начала матча можно перенести
-                    время; отмена — в любой момент. Перенос на другую неделю — статус «Перенесён»
-                    и свободный тур.
+                    время; отмена — в любой момент. Перенос на другую неделю — статус «Перенесён» и
+                    свободный тур.
                   </p>
                 )}
 
                 {/* Deadline editor (hidden in DRAFT inline edit — form has its own field) */}
                 {(selectedRound.status === "DRAFT" || selectedRound.status === "ACTIVE") &&
                   !(selectedRound.status === "DRAFT" && showDraftEdit) && (
-                  <div className="mb-4 max-w-xs">
-                    <label className="block text-sm text-gray-700 mb-1">Дедлайн прогнозов</label>
-                    <input
-                      type="datetime-local"
-                      value={deadlineEdit}
-                      onChange={(e) => setDeadlineEdit(e.target.value)}
-                      disabled={!uiMode.canEditDeadline || uiMode.roundEditorReadonly}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
-                    />
-                    {!deadlinePlacementValid && (
-                      <p className="text-sm text-red-600 mt-1">{deadlineErrorMessage()}</p>
-                    )}
-                    {deadlineChangeBlocked && (
-                      <p className="text-sm text-amber-600 mt-1">
-                        {deadlineChangeClosedMessage(ruleHours)}
-                      </p>
-                    )}
-                  </div>
-                )}
+                    <div className="mb-4 max-w-xs">
+                      <label className="block text-sm text-gray-700 mb-1">Дедлайн прогнозов</label>
+                      <input
+                        type="datetime-local"
+                        value={deadlineEdit}
+                        onChange={(e) => setDeadlineEdit(e.target.value)}
+                        disabled={!uiMode.canEditDeadline || uiMode.roundEditorReadonly}
+                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
+                      />
+                      {!deadlinePlacementValid && (
+                        <p className="text-sm text-red-600 mt-1">{deadlineErrorMessage()}</p>
+                      )}
+                      {deadlineChangeBlocked && (
+                        <p className="text-sm text-amber-600 mt-1">
+                          {deadlineChangeClosedMessage(ruleHours)}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                 {/* Match table (DRAFT full or ACTIVE depending on phase) */}
                 {selectedRound.status !== "DRAFT" || !showDraftEdit ? (
@@ -508,7 +507,11 @@ export function RoundManagementPanel({
       <ConfirmDialog
         open={showActivate}
         title="Активировать тур?"
-        message="После активации участники смогут делать прогнозы. Состав матчей изменить уже нельзя — только перенос времени до начала, отмена или перенос в свободный тур."
+        message={
+          contest.is_locked
+            ? "После активации участники смогут делать прогнозы. Состав матчей изменить уже нельзя — только перенос времени до начала, отмена или перенос в свободный тур."
+            : "После активации конкурс будет заблокирован: нельзя менять число команд, туров и состав участников. Участники смогут делать прогнозы после активации тура."
+        }
         confirmLabel="Активировать"
         onConfirm={handleActivate}
         onCancel={() => setShowActivate(false)}

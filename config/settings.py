@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     contest_allow_instant_delete: bool = False
     supervisor_training_mode: bool = False
     contest_restore_window_seconds: int = 86400
+    # Hard-delete soft-deleted contests after this many seconds (default 30 days).
+    contest_purge_retention_seconds: int = 2_592_000
 
     # ── HTTP caching (public leaderboard/results) ────────────────────────────
     cache_max_age_seconds: int = 300

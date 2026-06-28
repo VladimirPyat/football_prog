@@ -66,6 +66,13 @@ export interface LeaderboardRow {
   total_with_bonus3: number;
 }
 
+export interface ParticipantInviteOut {
+  user_id: number;
+  login: string;
+  temp_password: string;
+  setup_url: string;
+}
+
 export async function apiLogin(login: string, password: string): Promise<string> {
   const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
     method: "POST",
@@ -93,20 +100,31 @@ export async function createDraftContest(
     total_rounds?: number;
     matches_per_round?: number;
     is_round_robin?: boolean;
+    slug?: string;
   } = {},
 ): Promise<ContestOut> {
+  const body: Record<string, unknown> = { name };
+  if (opts.slug) body.slug = opts.slug;
+  if (opts.total_teams !== undefined) body.total_teams = opts.total_teams;
+  if (opts.total_rounds !== undefined) body.total_rounds = opts.total_rounds;
+  if (opts.matches_per_round !== undefined) body.matches_per_round = opts.matches_per_round;
+  if (opts.is_round_robin !== undefined) body.is_round_robin = opts.is_round_robin;
   const res = await fetch(`${API_BASE}/api/v1/contests`, {
     method: "POST",
     headers: authHeaders(token),
-    body: JSON.stringify({
-      name,
-      total_teams: opts.total_teams ?? 4,
-      total_rounds: opts.total_rounds ?? 2,
-      matches_per_round: opts.matches_per_round ?? 2,
-      is_round_robin: opts.is_round_robin ?? false,
-    }),
+    body: JSON.stringify(body),
   });
   return apiJson<ContestOut>(res, "createDraftContest");
+}
+
+export async function startContest(token: string, contestId: number): Promise<ContestOut> {
+  const res = await fetch(`${API_BASE}/api/v1/contests/${contestId}/start`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: "{}",
+  });
+  await apiJson<{ status: string }>(res, "startContest");
+  return getContest(token, contestId);
 }
 
 export async function getContest(token: string, contestId: number): Promise<ContestOut> {
@@ -148,6 +166,64 @@ export async function addTeams(
     );
   }
   return teams;
+}
+
+export async function inviteParticipant(
+  token: string,
+  contestId: number,
+  email: string,
+  login: string,
+  firstName: string,
+  lastName: string,
+): Promise<ParticipantInviteOut> {
+  const res = await fetch(`${API_BASE}/api/v1/contests/${contestId}/participants`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      login,
+    }),
+  });
+  return apiJson<ParticipantInviteOut>(res, "inviteParticipant");
+}
+
+export async function completeParticipantSetup(
+  setupUrl: string,
+  newPassword = "NewSecure1!",
+): Promise<void> {
+  const token = new URL(setupUrl).searchParams.get("token");
+  if (!token) throw new Error(`setup token missing in ${setupUrl}`);
+  const res = await fetch(`${API_BASE}/api/v1/auth/complete-setup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!res.ok) throw new Error(`completeParticipantSetup: ${res.status} ${await res.text()}`);
+}
+
+export async function fulfillStartPrerequisites(
+  token: string,
+  contestId: number,
+  opts: { skipTeams?: boolean } = {},
+): Promise<void> {
+  const contest = await getContest(token, contestId);
+  if (!opts.skipTeams) {
+    await addTeams(token, contestId, contest.total_teams);
+  }
+  const tag = `${contestId}_${Date.now()}`;
+  for (let i = 0; i < 2; i += 1) {
+    const invited = await inviteParticipant(
+      token,
+      contestId,
+      `e2e_start_${tag}_${i}@example.com`,
+      `e2e_start_${tag}_${i}`,
+      "E2E",
+      `Player${i + 1}`,
+    );
+    await completeParticipantSetup(invited.setup_url);
+  }
 }
 
 export async function createDraftRound(

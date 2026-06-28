@@ -120,9 +120,9 @@ async def save_restore_snapshot(
     *,
     deleted_by_user_id: int | None,
 ) -> None:
-    """Persist restorable contest payload before wipe (training mode only)."""
+    """Persist restorable contest payload before wipe."""
     settings = get_settings()
-    if not settings.supervisor_training_mode:
+    if not settings.contest_delete_enabled:
         return
 
     existing = await session.get(ContestRestoreSnapshot, contest_id)
@@ -146,10 +146,6 @@ async def save_restore_snapshot(
 
 async def restore_contest_from_snapshot(session: AsyncSession, contest_id: int) -> None:
     """Replay snapshot into contest and remove snapshot row."""
-    settings = get_settings()
-    if not settings.supervisor_training_mode:
-        raise SnapshotNotFoundError("Восстановление доступно только в режиме обучения")
-
     row = await session.get(ContestRestoreSnapshot, contest_id)
     if row is None:
         raise SnapshotNotFoundError("Снимок для восстановления не найден")
@@ -178,6 +174,7 @@ async def restore_contest_from_snapshot(session: AsyncSession, contest_id: int) 
     contest.total_rounds = c["total_rounds"]
     contest.is_round_robin = c["is_round_robin"]
     contest.rules_json = c["rules_json"]
+    contest.deleted_at = None
 
     team_id_map: dict[int, int] = {}
     for team in data.get("teams", []):

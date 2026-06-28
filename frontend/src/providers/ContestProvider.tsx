@@ -40,13 +40,14 @@ export function ContestProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = getActiveContestId();
-    if (stored) setContestIdState(stored);
+    setContestIdState(stored ?? resolveDefaultContestId());
   }, []);
 
   const setContestId = useCallback(async (id: number, fetchDetails = false) => {
     setContestIdState(id);
     setActiveContestId(id);
     if (fetchDetails) {
+      setContest(null);
       try {
         const details = await apiGet<ContestOut>(contestEndpoints.byId(id));
         setContest(details);
@@ -55,6 +56,13 @@ export function ContestProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (contestId == null) return;
+    if (contest == null || contest.id !== contestId) {
+      void setContestId(contestId, true);
+    }
+  }, [contestId, contest, setContestId]);
 
   const value = useMemo<ContestContextValue>(() => {
     const rules = (contest?.rules_json ?? {}) as Record<string, unknown>;

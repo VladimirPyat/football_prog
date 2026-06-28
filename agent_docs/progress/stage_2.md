@@ -153,3 +153,29 @@
 - Unit: 82 passed; backend: calculated edit 4/4, calculate regression 8/8 (+1 skip), LB gate 5/5
 - E2E: specs created, not run — UI connection refused; API :8000 up
 - Next: `dev_setup.py --run-only` + `npm run test:e2e`; manual 1.14 matrix QA
+
+## 2026-06-28 — Coder (1.15 fix setup — backend)
+- STATUS: READY_FOR_TEST
+- Files: `contest_lifecycle_service.py` (start_contest, assert_deletable allow_draft), `contests.py` (POST /start), tests/api/test_contest_start_1_15.py
+- Verified: pytest 9/9 start+delete; restore regression 7/7
+
+## 2026-06-28 — Coder (2.3.3 fix setup — frontend)
+- STATUS: READY_FOR_TEST
+- Files: CreateContestForm, ContestParametersForm, ContestLifecycleActions, admin_setup.spec.ts, SUPERVISOR_TESTING_SCENARIOS.md
+- Verified: lint/tsc OK; Vitest 94/94
+
+## 2026-06-28 — Tester (2.3.3 fix setup)
+- STATUS: TEST_PASS (automated)
+- Report: `agent_docs/reports/test_2.3.3_fix_setup.md`
+- API: 16/16; Unit: 94/94; E2E: 9/9 (admin_setup + admin_setup_locked)
+- Skip: E2E delete/restore UI, manual S1.11, E2E activate copy
+- Fix during test: `adminApi.startContest` → GET contest after POST /start
+
+## 2026-06-28 — Tester (2.3.3 fix setup — re-verify)
+- STATUS: TEST_PASS
+- Report: `agent_docs/reports/test_2.3.3_fix_setup.md` (updated)
+- Unit: 101 passed (+7 schema tests in `admin.test.ts`); API: 16/16; E2E: 9/9
+- Contest start from Parameters + lock verified (S1.12, S1.4 via E2E)
+- Delete/restore: API OK; UI E2E skipped (training mode frontend env)
+- Skip: manual S1.11, `[E2E-ACTIVATE-COPY]`, `[LINT-FORMAT]` (7 Coder files)
+- Next: @Coder — document `POST /start` in API_GUIDE; optional activate-copy + delete/restore E2E

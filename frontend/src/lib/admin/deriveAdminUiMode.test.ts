@@ -40,11 +40,18 @@ const activeRoundNearDeadline: RoundOut = {
 const publishedRound: RoundOut = { ...draftRound, status: "PUBLISHED" };
 
 describe("deriveAdminUiMode", () => {
-  it("allows setup when contest is unlocked", () => {
+  it("locks setup when RUNNING even if unlocked", () => {
     const mode = deriveAdminUiMode({ contest: baseContest, round: null });
-    expect(mode.setupReadonly).toBe(false);
+    expect(mode.setupReadonly).toBe(true);
     expect(mode.showSetupLockBanner).toBe(false);
-    expect(mode.showLockBanner).toBe(false); // backward compat
+  });
+
+  it("allows setup when contest is DRAFT and unlocked", () => {
+    const mode = deriveAdminUiMode({
+      contest: { ...baseContest, status: "DRAFT", is_locked: false },
+      round: null,
+    });
+    expect(mode.setupReadonly).toBe(false);
   });
 
   it("locks setup when is_locked", () => {
