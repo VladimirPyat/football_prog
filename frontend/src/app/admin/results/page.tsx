@@ -35,8 +35,7 @@ export default function AdminResultsPage() {
   const { showSuccess, showError } = useToast();
 
   const effectiveActiveDeadlinePassed =
-    activeDeadlinePassed ||
-    (activeRound != null && isDeadlinePassedNow(activeRound.deadline));
+    activeDeadlinePassed || (activeRound != null && isDeadlinePassedNow(activeRound.deadline));
 
   useEffect(() => {
     if (effectiveActiveDeadlinePassed && activeRound?.status === "ACTIVE") {

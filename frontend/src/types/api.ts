@@ -141,11 +141,33 @@ export interface MatchOut {
   status: MatchStatus;
 }
 
+export interface MatchPredictionOut {
+  match_id: number;
+  score1: number | null;
+  score2: number | null;
+}
+
+export interface PredictionEntryOut {
+  user_id: number;
+  user_name: string | null;
+  submitted: boolean;
+  predictions: MatchPredictionOut[] | null;
+}
+
 export interface RoundPredictionsView {
   round_id: number;
   deadline_passed: boolean;
   matches: MatchOut[];
-  entries: unknown[];
+  entries: PredictionEntryOut[];
+}
+
+export interface PredictionBatchRequest {
+  predictions: { match_id: number; score1: number; score2: number }[];
+}
+
+export interface PredictionBatchResponse {
+  success: boolean;
+  saved_count: number;
 }
 
 export interface CreateRoundResponse {

@@ -112,10 +112,7 @@ export function buildRulesJsonPatch(
   structure: ContestStructurePatch,
 ): Record<string, unknown> {
   const next = formStateToRulesJson(rulesJson, form);
-  const cs = ((next.contest_structure as Record<string, unknown>) ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const cs = ((next.contest_structure as Record<string, unknown>) ?? {}) as Record<string, unknown>;
   cs.total_teams = structure.total_teams;
   cs.matches_per_round = structure.matches_per_round;
   cs.total_rounds = structure.total_rounds;

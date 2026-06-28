@@ -16,11 +16,7 @@ import {
   isDeadlinePlacementValid,
 } from "@/lib/admin/deadlineRule";
 import { formatRoundOptionLabel } from "@/lib/admin/roundLabel";
-import {
-  formatDateTimeRu,
-  fromDatetimeLocal,
-  toDatetimeLocal,
-} from "@/lib/admin/format";
+import { formatDateTimeRu, fromDatetimeLocal, toDatetimeLocal } from "@/lib/admin/format";
 import { RoundBuilderForm } from "@/components/admin/RoundBuilderForm";
 import { RoundPhasePanel } from "@/components/admin/RoundPhasePanel";
 import {
@@ -96,8 +92,7 @@ export function RoundManagementPanel({
   const isAdmin = user?.role === "ADMIN";
   const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
   const effectiveDeadlinePassed =
-    deadlinePassed ||
-    (selectedRound != null && isDeadlinePassedNow(selectedRound.deadline));
+    deadlinePassed || (selectedRound != null && isDeadlinePassedNow(selectedRound.deadline));
   const hasDraft = rounds.some((r) => r.status === "DRAFT");
   const atRoundCap = rounds.length >= contest.total_rounds;
 

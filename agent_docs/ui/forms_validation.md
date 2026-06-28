@@ -38,7 +38,7 @@ z.object({
 }).refine(d => d.new_password === d.confirm, { path:['confirm'], message:'Пароли не совпадают' })
 ```
 
-### PredictionForm  (batch)
+### PredictionForm  (batch) — **Implemented (2.2)** → `frontend/src/lib/validation/prediction.ts`, `frontend/src/lib/validation/score.ts`
 ```ts
 const score = (max:number) => z.number().int().min(0).max(max);
 const prediction = (max:number) => z.object({
@@ -198,3 +198,4 @@ Duplicate login → `400 VALIDATION_ERROR`.
 | 2026-06-28 | Stage 2.3.1: 24h placement vs change lockout; RoundBuilder deadline validation updated. |
 | 2026-06-28 | Stage 2.3.3: slim `createContestSchema`; `deriveRoundRobinStructure` on Parameters. |
 | 2026-06-28 | Stage 2.3.4: `buildRulesJsonPatch`; start readiness validation mirrors backend 422. |
+| 2026-06-28 | Stage 2.2: `scoreInputSchema`, `predictionBatchSchema`, `buildPredictionBatch` — empty ≠ 0. |

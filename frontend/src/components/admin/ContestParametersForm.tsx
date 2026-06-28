@@ -49,8 +49,11 @@ export function ContestParametersForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [showSetupHint, setShowSetupHint] = useState(false);
-  const { readiness, loading: readinessLoading, refetch: refetchReadiness } =
-    useContestStartReadiness(contest.id, contest.total_teams);
+  const {
+    readiness,
+    loading: readinessLoading,
+    refetch: refetchReadiness,
+  } = useContestStartReadiness(contest.id, contest.total_teams);
 
   useEffect(() => {
     setTotalTeams(contest.total_teams);

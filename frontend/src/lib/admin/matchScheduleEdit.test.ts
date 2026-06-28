@@ -42,11 +42,7 @@ describe("matchScheduleEdit", () => {
   });
 
   it("detects long postponement (>= 7 days)", () => {
-    expect(
-      isLongPostponement("2026-06-27T18:00:00.000Z", "2026-07-05T18:00:00.000Z"),
-    ).toBe(true);
-    expect(
-      isLongPostponement("2026-06-27T18:00:00.000Z", "2026-06-27T21:00:00.000Z"),
-    ).toBe(false);
+    expect(isLongPostponement("2026-06-27T18:00:00.000Z", "2026-07-05T18:00:00.000Z")).toBe(true);
+    expect(isLongPostponement("2026-06-27T18:00:00.000Z", "2026-06-27T21:00:00.000Z")).toBe(false);
   });
 });

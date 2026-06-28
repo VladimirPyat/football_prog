@@ -9,9 +9,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { apiGet } from "@/lib/api/client";
-import { contests as contestEndpoints } from "@/lib/api/endpoints";
 import { getActiveContestId, setActiveContestId } from "@/lib/auth/token";
+import { fetchContestDetails } from "@/lib/contest/fetchContestDetails";
 import { resolveDefaultContestId } from "@/lib/contest/resolveDefaultContestId";
 import type { ContestOut } from "@/types/api";
 
@@ -47,9 +46,8 @@ export function ContestProvider({ children }: { children: ReactNode }) {
     setContestIdState(id);
     setActiveContestId(id);
     if (fetchDetails) {
-      setContest(null);
       try {
-        const details = await apiGet<ContestOut>(contestEndpoints.byId(id));
+        const details = await fetchContestDetails(id);
         setContest(details);
       } catch {
         setContest(null);

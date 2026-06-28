@@ -149,8 +149,8 @@ async def visible_predictions(
     session: AsyncSession,
     contest_id: int,
     round_id: int,
-    viewer_role: str,
-    viewer_id: int,
+    viewer_role: str | None,
+    viewer_id: int | None,
 ) -> list[dict]:
     """Return predictions filtered by deadline and viewer role."""
     round_ = await ensure_round_closed_if_expired(session, round_id)
@@ -173,7 +173,11 @@ async def visible_predictions(
 
     result: list[dict] = []
     for pred in predictions:
-        if after_deadline or is_privileged or pred.user_id == viewer_id:
+        if (
+            after_deadline
+            or is_privileged
+            or (viewer_id is not None and pred.user_id == viewer_id)
+        ):
             result.append(
                 {
                     "user_id": pred.user_id,

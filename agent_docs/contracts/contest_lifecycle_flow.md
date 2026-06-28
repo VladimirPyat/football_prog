@@ -99,7 +99,7 @@ Illegal: skip states (e.g. ACTIVE → CALCULATED), mutate PUBLISHED round struct
 | `now < round.deadline` | Allowed |
 | Any of above fails | 403 |
 
-GET predictions visibility: pre-deadline — own scores only for USER and SUPERVISOR; ADMIN sees all (support). Post-deadline — full table for everyone. Aligns with `docs/03_user_scenarios.md` §4.
+GET predictions visibility: pre-deadline — own scores only for USER and SUPERVISOR; ADMIN sees all (support). Anonymous callers receive **403** `PREDICTIONS_NOT_PUBLIC`. Post-deadline — full table for everyone (including anonymous). Aligns with `docs/03_user_scenarios.md` §4.
 
 ### 3.4 Results window
 

@@ -86,7 +86,7 @@ async def get_predictions(
     contest_id: int,
     round_id: int,
     session: DbSession,
-    user: CurrentUser,
+    user: OptionalUser,
     _contest: ContestContext,
 ) -> RoundPredictionsView:
     """Прогнозы тура с учётом дедлайна и прав видимости.

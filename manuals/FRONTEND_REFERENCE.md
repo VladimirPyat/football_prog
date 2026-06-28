@@ -45,7 +45,27 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 
 ### Stage 2.2 — Predictions & privacy
 
-*(Coder 2.2: append routes, components, and copy table when implemented.)*
+#### Routes
+
+| Route | Page file | Role / guard | Main features |
+|-------|-----------|--------------|---------------|
+| `/contest/[contestId]` | `frontend/src/app/contest/[contestId]/page.tsx` | All (privacy per tab) | `PublicTabs` (Лидерборд / Прогнозы / Результаты), `RoundSelector`, `PredictionsMatrix` on Прогнозы tab |
+| `/contest/[contestId]/predict/[roundId]` | `frontend/src/app/contest/[contestId]/predict/[roundId]/page.tsx` | USER+ (`requireNotTempPassword`) | `PredictionForm`, `DeadlineCountdown`, batch save 8/8 |
+
+#### Components (editable Russian copy)
+
+| Component | Source file | Key copy |
+|-----------|-------------|----------|
+| `PublicTabs` | `frontend/src/components/contest/PublicTabs.tsx` | «Лидерборд», «Прогнозы», «Результаты» |
+| `RoundSelector` | `frontend/src/components/contest/RoundSelector.tsx` | «Выберите тур:», labels via `formatRoundTitle()` |
+| `PredictionForm` | `frontend/src/components/predictions/PredictionForm.tsx` | «Сохранить прогноз», «Редактировать», «Заполните прогнозы на все матчи тура» |
+| `DeadlineCountdown` | `frontend/src/components/predictions/DeadlineCountdown.tsx` | Countdown label; «Дедлайн прошёл» |
+| `DeadlineWarningBanner` | `frontend/src/components/predictions/DeadlineWarningBanner.tsx` | «До дедлайна осталось менее 24 часов. Успейте сохранить прогноз.» |
+| `PredictionsMatrix` | `frontend/src/components/predictions/PredictionsMatrix.tsx` | Table headers «Счет», match columns |
+| `PrivacyMask` | `frontend/src/components/predictions/PrivacyMask.tsx` | «Прогноз сделан» |
+| `PredictionsVisitorStub` | `frontend/src/components/predictions/PredictionsVisitorStub.tsx` | «Будет доступно после дедлайна» (visitor pre-deadline only) |
+| `OutcomeStatsFooter` | `frontend/src/components/predictions/OutcomeStatsFooter.tsx` | «Статистика», П1 / Х / П2 |
+| `ProfileMenu` | `frontend/src/components/profile/ProfileMenu.tsx` | «Сделать прогноз» (links to active round) |
 
 ### Stage 2.3 — Supervisor admin UI
 
@@ -106,3 +126,4 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | 2026-06-24 | 2.1 / 2.1.1 | Baseline shell, auth routes, admin stubs |
 | 2026-06-24 | 2.3 | Full supervisor admin UI: settings, rounds, results, lifecycle, B5 logo |
 | 2026-06-27 | 2.3.2 | ACTIVE schedule-only editing, match status confirms, empty score guard on results |
+| 2026-06-28 | 2.2 | Prediction form, privacy matrix, deadline UX, contest Прогнозы tab |

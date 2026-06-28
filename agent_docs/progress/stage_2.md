@@ -214,8 +214,39 @@
 - Verified: lint/tsc OK; Vitest 118/118
 - Next: tester pass for deadline transition (optional E2E)
 
-## 2026-06-28 — Coder (2.3.5 fix deadline — UI sync)
+## 2026-06-28 — Coder (2.2 predictions & privacy)
 - STATUS: READY_FOR_TEST
-- Files: frontend/src/lib/admin/roundEffectiveStatus.ts (+test), useRoundMatches.ts (onDeadlinePassed), admin/rounds/page.tsx, admin/results/page.tsx, RoundManagementPanel.tsx, RoundStatusSidebar.tsx, ResultsEntryPanel.tsx, deriveAdminUiMode.ts (+test)
-- Verified: `npm run lint`, `npm run type-check`, `npm run test:unit` — 118 passed
-- Next: optional tester pass for 2.3.5
+- Scope: PredictionForm, PredictionsMatrix, deadline UX, privacy helpers, PublicTabs, RoundSelector
+- UI rules: batch-only, 0..maxScore, **empty≠0 (no coerce)**, NULL≠0, 24h warning, privacy pre/post deadline
+- Key paths: `frontend/src/components/predictions/*`, `frontend/src/app/contest/[contestId]/*`, `frontend/src/lib/privacy/*`, `frontend/src/lib/validation/{score,prediction}.ts`
+- Verified: npm run test:unit (150 passed), lint/tsc OK; prettier fixed
+- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.2
+- Next: agent_docs/instructions/tester_2.2.md
+
+## 2026-06-28 — Planner (2.2.1 visitor public predictions)
+- STATUS: INSTRUCTIONS_READY
+- Artifacts: `backend/coder_1.16_fix_public_predictions.md`, `coder_2.2.1.md`, `tester_2.2.1.md`
+- Goal: align `docs/03_user_scenarios.md` §4 — Visitor sees full predictions post-deadline without login (reverts 2.2 §5.4 login-prompt deviation)
+- Order: backend 1.16 public predictions → frontend 2.2.1 → tester 2.2.1
+- Note: distinct from `coder_1.16_fix_deadline.md` (auto-close, already shipped)
+
+## 2026-06-28 — Coder (1.16 public predictions — backend)
+- STATUS: READY_FOR_TEST
+- Instruction: `agent_docs/instructions/backend/coder_1.16_fix_public_predictions.md`
+- Scope: OptionalUser on GET predictions; 403 `PREDICTIONS_NOT_PUBLIC` pre-deadline anonymous; full table post-deadline; legacy shim aligned
+- Key files: contest_ops.py, predictions.py, handlers/predictions.py, prediction_service.py, test_predictions_public_1_16.py
+- Contracts: api_v1.yaml, frontend_api_integration.md §5.4, contest_lifecycle_flow.md §3.3, manuals/API_GUIDE.md
+- Verified: pytest predictions 9/9; ruff on touched files
+
+## 2026-06-28 — Coder (2.2.1 visitor public predictions — frontend)
+- STATUS: READY_FOR_TEST
+- Instruction: `agent_docs/instructions/coder_2.2.1.md`
+- Scope: guest post-deadline public matrix; deadline gate via `isDeadlinePassedNow`; removed PredictionsLoginPrompt; `prediction-score` testid; apiFetch 401 fix for tokenless callers
+- Key files: contest/[contestId]/page.tsx, PredictionsMatrix.tsx, lib/contest/deadline.ts, lib/api/client.ts
+- Verified: lint/tsc/format/build OK; Vitest 151/151
+
+## 2026-06-28 — Tester (2.2.1)
+- STATUS: TEST_PASS
+- Report: agent_docs/reports/test_2.2.1.md
+- E2E: visitor stub + public, privacy, batch, user predict — 6/6 PASS
+- Note: full pytest 368 pass / 15 fail (pre-existing, out of 2.2.1 scope)

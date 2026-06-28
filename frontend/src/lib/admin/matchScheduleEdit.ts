@@ -27,10 +27,7 @@ export function canCancelMatch(match: { status: string }): boolean {
 }
 
 /** Only ADMIN may restore CANCELED / POSTPONED back to SCHEDULED. */
-export function canRestoreMatchStatus(
-  match: { status: string },
-  isAdmin: boolean,
-): boolean {
+export function canRestoreMatchStatus(match: { status: string }, isAdmin: boolean): boolean {
   return isAdmin && (match.status === "CANCELED" || match.status === "POSTPONED");
 }
 

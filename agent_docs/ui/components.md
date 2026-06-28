@@ -70,14 +70,14 @@ Global layout guard; redirects authenticated `is_temp_password` users to `/chang
 - props: `{ rows: ScoreDetail&{rank,predictions_count}[] }`.
 - ⚠️ count columns need B4; if absent, hide the four columns (documented fallback).
 
-### `PredictionsMatrix`  (`user_predict.jpg`)
+### `PredictionsMatrix`  (`user_predict.jpg`) — **Implemented (2.2)** → `frontend/src/components/predictions/PredictionsMatrix.tsx`
 First column `Счет` + `Тур N` sub-row; one column per match header `TeamA-TeamB`; participant rows with `score1:score2` cells. Footer `OutcomeStatsFooter`.
 - Privacy: own row = scores; others pre-deadline = `PrivacyMask`; visitor pre-deadline = stub message.
-- props: `{ matches, entries, deadlinePassed, currentUserId }`.
+- props: `{ matches, entries, deadlinePassed, viewer, roundTitle }`.
 
-### `OutcomeStatsFooter`
+### `OutcomeStatsFooter` — **Implemented (2.2)** → `frontend/src/components/predictions/OutcomeStatsFooter.tsx`
 Per-match `П1 / Х / П2` counts (home win / draw / away win), colored.
-- props: `{ matches, entries }` (computed client-side from visible predictions, or from API if provided).
+- props: `{ matches, entries }` (computed client-side from visible predictions).
 
 ### `ResultsMatrix`  (`user_result.jpg`)
 First column `Счет`; per-match header + actual `score1:score2` sub-row; cells = per-match points (`0/4/8/12/16`, non-zero green); right columns `Бонус 1 · Бонус 2 · Итого без бон. · Бонус 3 · ИТОГ`. `-` where bonus N/A. Horizontal scroll.
@@ -86,9 +86,9 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 ### Cell atoms
 | Component | Renders |
 |-----------|---------|
-| `ScoreCell` | `N:M` |
+| `ScoreCell` | `N:M` (inline in `PredictionsMatrix`) |
 | `PointsCell` | points with green highlight when >0 |
-| `PrivacyMask` | «Прогноз сделан» |
+| `PrivacyMask` — **Implemented (2.2)** → `frontend/src/components/predictions/PrivacyMask.tsx` | «Прогноз сделан» |
 
 ---
 
@@ -98,8 +98,9 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 |-----------|---------|
 | `LoginForm` | LoginModal — **Implemented (2.1)** → `frontend/src/components/auth/LoginForm.tsx` |
 | `ChangePasswordForm` | `/change-password` — **Implemented (2.1)** → `frontend/src/components/auth/ChangePasswordForm.tsx` |
-| `PredictionForm` | `/contest/[id]/predict/[rid]` |
-| `ScoreInput` | inside PredictionForm / ResultsEntryGrid |
+| `PredictionForm` | `/contest/[id]/predict/[rid]` — **Implemented (2.2)** → `frontend/src/components/predictions/PredictionForm.tsx` |
+| `ScoreInput` | inside PredictionForm — **Implemented (2.2)** → `frontend/src/components/predictions/ScoreInput.tsx` |
+| `PredictionMatchRow` | inside PredictionForm — **Implemented (2.2)** → `frontend/src/components/predictions/PredictionMatchRow.tsx` |
 | `ContactsForm` | `/profile` (B3) — **Implemented (2.1)** → `frontend/src/components/profile/ContactsForm.tsx` |
 | `CreateContestForm` | NewContestButton — **Implemented (2.3)** → `frontend/src/components/admin/CreateContestForm.tsx` — **name + optional slug only** (2.3.3); structure defaults from backend |
 | `ContestParametersForm` | Настройки → Параметры — **Implemented (2.3)** → `frontend/src/components/admin/ContestParametersForm.tsx` — round-robin sync, rules save (2.3.3–2.3.4) |
@@ -178,3 +179,4 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | 2026-06-28 | Stage 2.3.1: `RoundPhasePanel`, `RoundStatusSidebar`, status hints; LockBanner scope; public visibility helper. |
 | 2026-06-28 | Stage 2.3.3–2.3.4: slim create; `RulesEditorPanel`, `ContestLifecycleActions`, `ContestStartReadinessPanel`; `roundLabel`, `rulesEditor`, `contestStartReadiness`. |
 | 2026-06-28 | Stage 2.3.5: `roundEffectiveStatus`; `MatchResultRow`; removed manual close UX from sidebar. |
+| 2026-06-28 | Stage 2.2: prediction form, matrix, privacy, deadline UX, `PublicTabs`, `RoundSelector`. |

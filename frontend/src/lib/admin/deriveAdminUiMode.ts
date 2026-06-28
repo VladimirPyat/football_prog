@@ -1,9 +1,6 @@
 import type { ContestOut, RoundOut } from "@/types/api";
 import { canChangeDeadline, getDeadlineRuleHours } from "@/lib/admin/deadlineRule";
-import {
-  effectiveRoundStatus,
-  isDeadlinePassedNow,
-} from "@/lib/admin/roundEffectiveStatus";
+import { effectiveRoundStatus, isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
 
 export interface AdminUiMode {
   /** Settings pages only — contest is locked for structural edits. */
@@ -56,8 +53,7 @@ export function deriveAdminUiMode({
   const rawRoundStatus = round?.status ?? null;
   const resolvedDeadlinePassed =
     deadlinePassed || (round?.deadline ? isDeadlinePassedNow(round.deadline, now) : false);
-  const roundStatus =
-    round === null ? null : effectiveRoundStatus(round, resolvedDeadlinePassed);
+  const roundStatus = round === null ? null : effectiveRoundStatus(round, resolvedDeadlinePassed);
   const isActiveRound = roundStatus === "ACTIVE";
 
   const showSetupLockBanner = isLocked;
@@ -65,8 +61,7 @@ export function deriveAdminUiMode({
   const showPausedBanner = isPaused;
   const showFinishedBanner = isFinished;
   const disableAllMutations = isPaused || isFinished;
-  const setupReadonly =
-    isLocked || status !== "DRAFT" || disableAllMutations;
+  const setupReadonly = isLocked || status !== "DRAFT" || disableAllMutations;
 
   const canCreateRound = !disableAllMutations && !hasDraftRound;
 

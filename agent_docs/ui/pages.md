@@ -22,17 +22,17 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 - **Supervisor/Admin:** managed contests (`GET /contests`).
 - Row → set active contest → navigate to contest page or admin.
 
-### `/contest/[contestId]` — public tabbed page  (`user_*.jpg`) — **Placeholder (2.1)** → `frontend/src/app/contest/[contestId]/page.tsx`
+### `/contest/[contestId]` — public tabbed page  (`user_*.jpg`) — **Implemented (2.2)** → `frontend/src/app/contest/[contestId]/page.tsx`
 - **Roles:** all (privacy rules per tab).
 - **Header:** title `Конкурс спортивных прогнозов` + subtitle; top-right `RoundSelector` (`Тур N (Текущий)` or `ДопТурN` for supplementary rounds — 2.3.4).
 - **Tabs (`PublicTabs`):**
   - **Лидерборд** (default): `LeaderboardTable` from `GET /contests/{id}/leaderboard` (global) or round leaderboard when a round is selected. **PUBLISHED only** (2.3.1 F12): rounds in `CALCULATED`/`CLOSED`/`ACTIVE`/`DRAFT` → stub «Будет доступно после проверки организатором»; skip leaderboard fetch.
-  - **Прогнозы:** `PredictionsMatrix` + `OutcomeStatsFooter` from `GET …/rounds/{rid}/predictions`. Privacy: current round before deadline → others masked / visitor stub («Будет доступно после дедлайна»); past rounds → full.
+  - **Прогнозы:** `PredictionsMatrix` + `OutcomeStatsFooter` from `GET …/rounds/{rid}/predictions`. Visitor pre-deadline → stub («Будет доступно после дедлайна», no API call). Post-deadline → public matrix without login. Authenticated USER pre-deadline → own scores only; others masked.
   - **Результаты:** `ResultsMatrix` from `GET …/rounds/{rid}/results`. **PUBLISHED only** (2.3.1 F12); else same stub as leaderboard.
 - Deep link: `/contest/[contestId]/round/[roundId]` preserves selected round (+ tab via query).
 - Helper: `isRoundPubliclyVisible()` in `frontend/src/lib/contest/roundPublicVisibility.ts`.
 
-### `/contest/[contestId]/predict/[roundId]` — prediction entry
+### `/contest/[contestId]/predict/[roundId]` — prediction entry — **Implemented (2.2)** → `frontend/src/app/contest/[contestId]/predict/[roundId]/page.tsx`
 - **Roles:** USER+ (`requireNotTempPassword`).
 - `RoundSelector` (current→last). `PredictionForm`: match list (place, time, teams) + `[A] _ : _ [B]`.
 - Batch save (8/8, 0..max), Edit/Save toggle, readonly after deadline, 403 handling.
@@ -149,3 +149,4 @@ All under `AdminTopNav` shell with `ContestPicker`. **Roles:** SUPERVISOR+ unles
 | 2026-06-28 | Stage 2.3.3: slim create modal; Parameters start/delete lifecycle; round-robin auto-sync; «Запустить конкурс» on Parameters. |
 | 2026-06-28 | Stage 2.3.4: RulesEditorPanel; start readiness panel; ДопТур labels; bonuses_pending notes; ContestProvider refetch. |
 | 2026-06-28 | Stage 2.3.5: effective round status; deadline refetch; removed manual «Закрыть тур»; Results eligible rounds sync. |
+| 2026-06-28 | Stage 2.2.1: visitor post-deadline public matrix (no login prompt); pre-deadline stub unchanged. |

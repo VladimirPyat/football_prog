@@ -59,10 +59,13 @@ Lightweight SWR-style hooks over the typed API client (no external SWR lib unles
 
 | Hook | Endpoint | Cache |
 |------|----------|-------|
-| `useRounds(contestId)` | `GET /contests/{id}/rounds` | in-memory; refetch after admin mutations |
+| `useRounds(contestId)` | `GET /contests/{id}/rounds` | in-memory; refetch after admin mutations — **Implemented (2.2)** → `frontend/src/hooks/useRounds.ts` |
 | `useLeaderboard(contestId, roundId?)` | `…/leaderboard` | ETag + `localStorage` seed |
 | `useRoundResults(contestId, roundId)` | `…/rounds/{rid}/results` | ETag |
-| `usePredictionsView(contestId, roundId)` | `GET …/predictions` | **never cached** (privacy) |
+| `usePredictionsView(contestId, roundId)` | `GET …/predictions` | **never cached** (privacy) — **Implemented (2.2)** → `frontend/src/hooks/usePredictionsView.ts` |
+| `usePredictionSubmit(contestId, roundId)` | `POST …/predictions` | no cache — **Implemented (2.2)** → `frontend/src/hooks/usePredictionSubmit.ts` |
+| `useDeadline(round, deadlinePassed?)` | client clock vs `round.deadline` | 1s tick — **Implemented (2.2)** → `frontend/src/hooks/useDeadline.ts` |
+| `useMaxScore()` | from `ContestProvider` rules | in-memory — **Implemented (2.2)** → `frontend/src/hooks/useMaxScore.ts` |
 | `useMyContests()` | `GET /me/contests` (B1) | in-memory — **Implemented (2.1)** → `frontend/src/hooks/useMyContests.ts` |
 | `usePublicContests()` | `GET /contests/public` (B2) | in-memory — **Implemented (2.1)** → `frontend/src/hooks/usePublicContests.ts` |
 | `useContacts()` | `GET/PATCH /auth/me/contacts` (B3) | in-memory; **fallback:** readonly UI if GET fails — **Implemented (2.1)** → `frontend/src/hooks/useContacts.ts` |
@@ -153,3 +156,4 @@ Phase derivation lives in **`deriveAdminUiMode(contest, round, { deadlinePassed 
 | 2026-06-28 | Stage 2.3.1: 24h policy (placement vs change lockout); `roundStatusHint`. |
 | 2026-06-28 | Stage 2.3.4: ContestProvider refetch on id change; `useContestStartReadiness`; `contest-setup-changed` events. |
 | 2026-06-28 | Stage 2.3.5: `effectiveRoundStatus`; `useRoundMatches.onDeadlinePassed`; rounds refetch on deadline transition. |
+| 2026-06-28 | Stage 2.2: `usePredictionsView`, `usePredictionSubmit`, `useDeadline`, `useMaxScore`, `useRounds`. |

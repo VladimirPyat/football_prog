@@ -34,9 +34,7 @@ function activeStatusOptions(
       : STATUS_OPTIONS.filter((o) => o.value === "POSTPONED" || o.value === "CANCELED");
   }
   if (match.status === "CANCELED") {
-    return isAdmin
-      ? STATUS_OPTIONS
-      : STATUS_OPTIONS.filter((o) => o.value === "CANCELED");
+    return isAdmin ? STATUS_OPTIONS : STATUS_OPTIONS.filter((o) => o.value === "CANCELED");
   }
   return STATUS_OPTIONS.filter((o) => o.value === match.status);
 }
@@ -96,122 +94,122 @@ export function MatchEditorRow({
 
   return (
     <tr className="border-t border-gray-200">
-        <td className="px-3 py-2 text-sm">
-          {canEditStructure && teams.length > 0 ? (
-            <div className="flex items-center gap-1">
-              <select
-                value={match.team1_id ?? ""}
-                onChange={(e) => applyPatch({ team1_id: Number(e.target.value) })}
-                className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-              >
-                <option value="">—</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              <span className="text-gray-400">—</span>
-              <select
-                value={match.team2_id ?? ""}
-                onChange={(e) => applyPatch({ team2_id: Number(e.target.value) })}
-                className="border border-gray-300 rounded px-1 py-0.5 text-xs"
-              >
-                <option value="">—</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <>
-              {match.team1} — {match.team2}
-            </>
-          )}
-        </td>
-        <td className="px-3 py-2 text-sm">
-          {isActiveMode && canRescheduleMatch(match, now) ? (
-            <div className="space-y-1">
-              <input
-                type="datetime-local"
-                key={`${match.id}-${match.date_time}`}
-                defaultValue={toDatetimeLocal(match.date_time)}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (!value) return;
-                  const iso = fromDatetimeLocal(value);
-                  if (isLongPostponement(match.date_time, iso)) {
-                    setDateWarning(longPostponementHint());
-                  } else {
-                    setDateWarning(null);
-                  }
-                  applyPatch({ date_time: iso });
-                }}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
-              />
-              {dateWarning && <p className="text-xs text-amber-700">{dateWarning}</p>}
-            </div>
-          ) : canEditStatusAndDate && !isActiveMode ? (
+      <td className="px-3 py-2 text-sm">
+        {canEditStructure && teams.length > 0 ? (
+          <div className="flex items-center gap-1">
+            <select
+              value={match.team1_id ?? ""}
+              onChange={(e) => applyPatch({ team1_id: Number(e.target.value) })}
+              className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+            >
+              <option value="">—</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-gray-400">—</span>
+            <select
+              value={match.team2_id ?? ""}
+              onChange={(e) => applyPatch({ team2_id: Number(e.target.value) })}
+              className="border border-gray-300 rounded px-1 py-0.5 text-xs"
+            >
+              <option value="">—</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <>
+            {match.team1} — {match.team2}
+          </>
+        )}
+      </td>
+      <td className="px-3 py-2 text-sm">
+        {isActiveMode && canRescheduleMatch(match, now) ? (
+          <div className="space-y-1">
             <input
               type="datetime-local"
+              key={`${match.id}-${match.date_time}`}
               defaultValue={toDatetimeLocal(match.date_time)}
               onChange={(e) => {
                 const value = e.target.value;
-                applyPatch({ date_time: value ? fromDatetimeLocal(value) : "" });
+                if (!value) return;
+                const iso = fromDatetimeLocal(value);
+                if (isLongPostponement(match.date_time, iso)) {
+                  setDateWarning(longPostponementHint());
+                } else {
+                  setDateWarning(null);
+                }
+                applyPatch({ date_time: iso });
               }}
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             />
-          ) : (
-            formatDateTimeRu(match.date_time)
-          )}
-        </td>
-        <td className="px-3 py-2 text-sm">
-          {isActiveMode && canChangeActiveStatus(match, isAdmin) ? (
-            <select
-              value={match.status}
-              onChange={(e) => handleActiveStatusChange(e.target.value as MatchStatus)}
-              className="border border-gray-300 rounded px-3 py-1 text-sm"
-            >
-              {activeStatusOptions(match, isAdmin).map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          ) : isActiveMode ? (
-            <select
-              value={match.status}
-              disabled
-              className="border border-gray-300 rounded px-3 py-1 text-sm disabled:bg-gray-100"
-            >
-              {STATUS_OPTIONS.filter((o) => o.value === match.status).map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          ) : canEditStatusAndDate ? (
-            <select
-              value={match.status}
-              onChange={(e) => applyPatch({ status: e.target.value as MatchStatus })}
-              className="border border-gray-300 rounded px-3 py-1 text-sm"
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            matchStatusLabel(match.status)
-          )}
-        </td>
-        {!canEditStructure && !canEditStatusAndDate && (
-          <td className="px-3 py-2 text-sm text-gray-400">Только просмотр</td>
+            {dateWarning && <p className="text-xs text-amber-700">{dateWarning}</p>}
+          </div>
+        ) : canEditStatusAndDate && !isActiveMode ? (
+          <input
+            type="datetime-local"
+            defaultValue={toDatetimeLocal(match.date_time)}
+            onChange={(e) => {
+              const value = e.target.value;
+              applyPatch({ date_time: value ? fromDatetimeLocal(value) : "" });
+            }}
+            className="border border-gray-300 rounded px-2 py-1 text-sm"
+          />
+        ) : (
+          formatDateTimeRu(match.date_time)
         )}
-      </tr>
+      </td>
+      <td className="px-3 py-2 text-sm">
+        {isActiveMode && canChangeActiveStatus(match, isAdmin) ? (
+          <select
+            value={match.status}
+            onChange={(e) => handleActiveStatusChange(e.target.value as MatchStatus)}
+            className="border border-gray-300 rounded px-3 py-1 text-sm"
+          >
+            {activeStatusOptions(match, isAdmin).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : isActiveMode ? (
+          <select
+            value={match.status}
+            disabled
+            className="border border-gray-300 rounded px-3 py-1 text-sm disabled:bg-gray-100"
+          >
+            {STATUS_OPTIONS.filter((o) => o.value === match.status).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : canEditStatusAndDate ? (
+          <select
+            value={match.status}
+            onChange={(e) => applyPatch({ status: e.target.value as MatchStatus })}
+            className="border border-gray-300 rounded px-3 py-1 text-sm"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          matchStatusLabel(match.status)
+        )}
+      </td>
+      {!canEditStructure && !canEditStatusAndDate && (
+        <td className="px-3 py-2 text-sm text-gray-400">Только просмотр</td>
+      )}
+    </tr>
   );
 }
 

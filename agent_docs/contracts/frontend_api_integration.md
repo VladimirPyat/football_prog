@@ -241,7 +241,7 @@ const next = await res.json(); saveEtag(url, res.headers.get('ETag')); return ne
 | Method | Path | Role |
 |--------|------|------|
 | GET | `/api/v1/contests/{id}/rounds` | public |
-| GET | `/api/v1/contests/{id}/rounds/{rid}/predictions` | USER+ (privacy) |
+| GET | `/api/v1/contests/{id}/rounds/{rid}/predictions` | public post-deadline; USER+ pre-deadline (privacy) |
 | POST | `/api/v1/contests/{id}/rounds/{rid}/predictions` | USER+ |
 | GET | `/api/v1/contests/{id}/rounds/{rid}/leaderboard` | public (ETag) |
 | GET | `/api/v1/contests/{id}/rounds/{rid}/results` | public (ETag) |
@@ -358,3 +358,5 @@ types/api.ts       // interfaces from §7
 | 2026-06-27 | Stage 1.12: §2.1.1 invite/setup flow (`setup-preview`, `complete-setup`, `request-password-reset`, `ParticipantInviteOut.setup_url`); `PASSWORD_SETUP_REQUIRED` login gate; training mode restore `POST /contests/{id}/restore`. |
 | 2026-06-27 | Stage 2.1.2: `resolveAssetUrl()` for team logos; supervisor lifecycle CTAs on parameters page; login «Забыли пароль?» checkbox → `request-password-reset`. |
 | 2026-06-28 | Stage 2.3.1 / 2.2 prep: §4.1 public LB/results `PUBLISHED` client gate; `RoundOut` supplementary fields; cross-ref `admin_ui_status_matrix.md`. |
+| 2026-06-28 | Stage 2.2.1: GET predictions public post-deadline (no Bearer); visitor pre-deadline 403/stub; removed login prompt. |
+| 2026-06-28 | Stage 2.2: predictions GET/POST wired; privacy matrix via `shouldShowScore`; 60s poll pre-deadline. |

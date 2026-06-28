@@ -494,9 +494,11 @@ paths:
       tags: [predictions]
       summary: Get predictions for round (pre-deadline privacy)
       description: >-
-        Before deadline: USER and SUPERVISOR see only own scores; others show submitted-only.
-        ADMIN sees all (support). After deadline: full table for any authenticated caller.
-      security: [{ bearerAuth: [] }]
+        Optional Bearer. Before deadline: anonymous callers receive 403
+        (code PREDICTIONS_NOT_PUBLIC). Authenticated USER and SUPERVISOR see only own scores;
+        others show submitted-only. ADMIN sees all (support). After deadline: full table
+        for everyone including anonymous callers.
+      security: []
       parameters:
         - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
@@ -505,6 +507,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RoundPredictionsView' }
+        '403':
+          description: Pre-deadline anonymous access denied (PREDICTIONS_NOT_PUBLIC)
     post:
       tags: [predictions]
       summary: Submit predictions (batch-only, RUNNING + ACTIVE + before deadline)

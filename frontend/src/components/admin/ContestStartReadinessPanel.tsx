@@ -8,15 +8,7 @@ interface ContestStartReadinessPanelProps {
   loading?: boolean;
 }
 
-function StatusLine({
-  ok,
-  label,
-  href,
-}: {
-  ok: boolean;
-  label: string;
-  href: string;
-}) {
+function StatusLine({ ok, label, href }: { ok: boolean; label: string; href: string }) {
   return (
     <p className={ok ? "text-gray-700" : "text-red-700"}>
       <span className="font-medium">{label}</span>

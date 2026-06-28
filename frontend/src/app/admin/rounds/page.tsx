@@ -13,8 +13,15 @@ import { AppError } from "@/lib/api/client";
 
 export default function AdminRoundsPage() {
   const { contest, contestId, refetch: refetchContest } = useContestAdmin();
-  const { rounds, loading, refetch: refetchRounds, createRound, activateRound, updateRound, createFreeTour } =
-    useAdminRounds(contestId);
+  const {
+    rounds,
+    loading,
+    refetch: refetchRounds,
+    createRound,
+    activateRound,
+    updateRound,
+    createFreeTour,
+  } = useAdminRounds(contestId);
   const { teams } = useTeams(contestId);
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
   const handleDeadlinePassed = useCallback(() => {
@@ -32,8 +39,7 @@ export default function AdminRoundsPage() {
 
   const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
   const effectiveDeadlinePassed =
-    deadlinePassed ||
-    (selectedRound != null && isDeadlinePassedNow(selectedRound.deadline));
+    deadlinePassed || (selectedRound != null && isDeadlinePassedNow(selectedRound.deadline));
 
   useEffect(() => {
     if (effectiveDeadlinePassed && selectedRound?.status === "ACTIVE") {

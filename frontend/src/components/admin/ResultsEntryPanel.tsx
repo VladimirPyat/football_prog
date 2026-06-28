@@ -103,7 +103,9 @@ export function ResultsEntryPanel({
       .then((data) => {
         if (cancelled) return;
         setBonusesPendingMessage(
-          data.bonuses_pending ? data.bonuses_pending_message ?? BONUSES_PENDING_FALLBACK_MESSAGE : null,
+          data.bonuses_pending
+            ? (data.bonuses_pending_message ?? BONUSES_PENDING_FALLBACK_MESSAGE)
+            : null,
         );
       })
       .catch(() => {

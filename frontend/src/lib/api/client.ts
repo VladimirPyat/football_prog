@@ -32,7 +32,8 @@ export async function apiFetch<T>(
   const res = await fetch(`${base}${path}`, { ...options, headers });
 
   if (res.status === 401) {
-    if (typeof window !== "undefined") {
+    const hadToken = options?.auth !== false && Boolean(getToken());
+    if (hadToken && typeof window !== "undefined") {
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     }
     throw new AppError(401, "Unauthorized");

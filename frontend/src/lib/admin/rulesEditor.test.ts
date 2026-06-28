@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildRulesJsonPatch, formStateToRulesJson, rulesJsonToFormState } from "@/lib/admin/rulesEditor";
+import {
+  buildRulesJsonPatch,
+  formStateToRulesJson,
+  rulesJsonToFormState,
+} from "@/lib/admin/rulesEditor";
 
 const sampleRules = {
   scoring_rules: {

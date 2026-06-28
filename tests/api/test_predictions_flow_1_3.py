@@ -184,12 +184,3 @@ async def _user_id(sf, login: str) -> int:
         user = await session.scalar(select(User).where(User.login == login))
         assert user
         return user.id
-
-
-@pytest.mark.asyncio
-async def test_pred_visitor_unauthorized(loaded_api):
-    """[API-PRED-VISITOR] GET predictions without token → 401."""
-    client, sf, _ = loaded_api
-    rid = await get_round_id(sf, 10)
-    resp = await client.get(f"{API_PREFIX}/rounds/{rid}/predictions")
-    assert resp.status_code == 401

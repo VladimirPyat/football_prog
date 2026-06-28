@@ -128,25 +128,19 @@ export function RulesEditorPanel({ form, readonly, onChange }: RulesEditorPanelP
                 label="1 место"
                 value={form.bonus3Rank.first}
                 disabled={readonly}
-                onChange={(v) =>
-                  patch({ bonus3Rank: { ...form.bonus3Rank, first: v } })
-                }
+                onChange={(v) => patch({ bonus3Rank: { ...form.bonus3Rank, first: v } })}
               />
               <NumberField
                 label="2 место"
                 value={form.bonus3Rank.second}
                 disabled={readonly}
-                onChange={(v) =>
-                  patch({ bonus3Rank: { ...form.bonus3Rank, second: v } })
-                }
+                onChange={(v) => patch({ bonus3Rank: { ...form.bonus3Rank, second: v } })}
               />
               <NumberField
                 label="3 место"
                 value={form.bonus3Rank.third}
                 disabled={readonly}
-                onChange={(v) =>
-                  patch({ bonus3Rank: { ...form.bonus3Rank, third: v } })
-                }
+                onChange={(v) => patch({ bonus3Rank: { ...form.bonus3Rank, third: v } })}
               />
             </div>
             <div className="grid grid-cols-2 gap-2 pt-2">

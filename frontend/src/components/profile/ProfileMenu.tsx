@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useContest } from "@/hooks/useContest";
+import { useRounds } from "@/hooks/useRounds";
 import { resolveDefaultContestId } from "@/lib/contest/resolveDefaultContestId";
 
 export function ProfileMenu() {
   const { logout } = useAuth();
   const { contestId } = useContest();
   const activeId = contestId ?? resolveDefaultContestId();
+  const { activeRound } = useRounds(activeId);
 
   const scrollToContacts = () => {
     document.getElementById("contacts")?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const predictHref = activeRound != null ? `/contest/${activeId}/predict/${activeRound.id}` : null;
 
   return (
     <nav className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
@@ -33,9 +37,21 @@ export function ProfileMenu() {
           </Link>
         </li>
         <li>
-          <span className="block text-sm text-gray-400 py-1.5 cursor-not-allowed">
-            Сделать прогноз — Скоро (2.2)
-          </span>
+          {predictHref ? (
+            <Link
+              href={predictHref}
+              className="block text-sm text-gray-700 hover:text-blue-600 py-1.5"
+            >
+              Сделать прогноз
+            </Link>
+          ) : (
+            <span
+              className="block text-sm text-gray-400 py-1.5 cursor-not-allowed"
+              title="Нет активного тура для прогнозов"
+            >
+              Сделать прогноз
+            </span>
+          )}
         </li>
         <li>
           <Link

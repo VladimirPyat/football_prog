@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.exceptions import NotFoundError
+from core.exceptions import ContestRuleError, NotFoundError
 from database.models import Match, Team, User
 from schemas.predictions import RoundPredictionsView
 from services.prediction_service import visible_predictions
@@ -29,7 +29,7 @@ async def build_round_predictions_view(
     session: AsyncSession,
     contest_id: int,
     round_id: int,
-    user: User,
+    user: User | None,
 ) -> RoundPredictionsView:
     """Build predictions view for a round with visibility rules."""
     round_ = await ensure_round_closed_if_expired(session, round_id)
@@ -40,6 +40,13 @@ async def build_round_predictions_view(
     deadline = round_.deadline
     if deadline.tzinfo is None:
         deadline = deadline.replace(tzinfo=UTC)
+
+    deadline_passed = now >= deadline
+    if user is None and not deadline_passed:
+        raise ContestRuleError(
+            "Прогнозы будут доступны после дедлайна",
+            code="PREDICTIONS_NOT_PUBLIC",
+        )
 
     matches = (
         await session.scalars(select(Match).where(Match.round_id == round_id))
@@ -66,7 +73,11 @@ async def build_round_predictions_view(
             }
         )
 
-    raw = await visible_predictions(session, contest_id, round_id, user.role, user.id)
+    viewer_role = user.role if user is not None else None
+    viewer_id = user.id if user is not None else None
+    raw = await visible_predictions(
+        session, contest_id, round_id, viewer_role, viewer_id
+    )
     users = {u.id: u for u in (await session.scalars(select(User))).all()}
     by_user: dict[int, list] = {}
     for item in raw:
@@ -98,7 +109,7 @@ async def build_round_predictions_view(
 
     return RoundPredictionsView(
         round_id=round_id,
-        deadline_passed=now >= deadline,
+        deadline_passed=deadline_passed,
         matches=match_out,
         entries=entries,
     )

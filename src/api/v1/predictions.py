@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from typing import Annotated
 
-from api.deps import CurrentUser, DbSession, resolve_default_contest_id
+from fastapi import APIRouter, Depends
+
+from api.deps import CurrentUser, DbSession, get_optional_user, resolve_default_contest_id
 from api.handlers.predictions import build_round_predictions_view
+from database.models import User
 from schemas.predictions import (
     PredictionBatchRequest,
     PredictionBatchResponse,
@@ -16,12 +19,14 @@ from services.prediction_service import submit_batch
 
 router = APIRouter(prefix="/rounds", tags=["legacy (deprecated)", "predictions"])
 
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
 
 @router.get("/{round_id}/predictions", response_model=RoundPredictionsView, deprecated=True)
 async def get_predictions(
     round_id: int,
     session: DbSession,
-    user: CurrentUser,
+    user: OptionalUser,
 ) -> RoundPredictionsView:
     """Прогнозы тура. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)

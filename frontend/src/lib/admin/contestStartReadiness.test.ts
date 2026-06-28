@@ -6,11 +6,7 @@ describe("assessContestStartReadiness", () => {
     const result = assessContestStartReadiness({
       totalTeams: 8,
       teamsCount: 8,
-      participants: [
-        { status: "ACCEPTED" },
-        { status: "ACCEPTED" },
-        { status: "PENDING" },
-      ],
+      participants: [{ status: "ACCEPTED" }, { status: "ACCEPTED" }, { status: "PENDING" }],
     });
     expect(result.ready).toBe(true);
     expect(result.issues).toHaveLength(0);

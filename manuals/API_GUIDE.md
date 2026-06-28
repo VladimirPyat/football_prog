@@ -406,7 +406,7 @@ No background job. Expired ACTIVE rounds (`now >= deadline`) transition to `CLOS
 | Operation | Behaviour |
 |-----------|-----------|
 | `POST …/predictions` | Rejected — `403` `DEADLINE_PASSED` and/or `ROUND_NOT_ACTIVE` |
-| `GET …/predictions` | Full table for all roles (except pre-deadline privacy rules); response `deadline_passed=true` |
+| `GET …/predictions` | Full table when `now >= deadline` (any caller, including no Bearer). Pre-deadline: authenticated privacy rules; anonymous → **403** `PREDICTIONS_NOT_PUBLIC` |
 | `PUT …/results`, `POST …/calculate` | Allowed once round is `CLOSED` (auto-closed inline if still `ACTIVE` in DB) |
 | `GET …/rounds` | Returns `status=CLOSED` for expired tours (batch hook and/or prior per-round ensures) |
 
