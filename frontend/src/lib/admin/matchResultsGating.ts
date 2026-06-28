@@ -1,5 +1,7 @@
 const TERMINAL_NO_SCORE = new Set(["VOID", "CANCELED"]);
 
+import { parseApiUtc } from "@/lib/datetime/parseApiUtc";
+
 /** True when supervisor may enter/edit score for this match on Результаты. */
 export function canEnterMatchResult(
   match: { status: string; date_time: string },
@@ -11,7 +13,7 @@ export function canEnterMatchResult(
 
   if (roundStatus === "CLOSED") {
     if (TERMINAL_NO_SCORE.has(matchStatus)) return false;
-    const kickoff = Date.parse(dateTime);
+    const kickoff = parseApiUtc(dateTime);
     if (Number.isNaN(kickoff)) return false;
     return now.getTime() >= kickoff;
   }
@@ -30,7 +32,7 @@ export function roundHasStartedMatches(
 ): boolean {
   const nowMs = now.getTime();
   return matches.some((m) => {
-    const kickoff = Date.parse(m.date_time);
+    const kickoff = parseApiUtc(m.date_time);
     return !Number.isNaN(kickoff) && kickoff <= nowMs;
   });
 }

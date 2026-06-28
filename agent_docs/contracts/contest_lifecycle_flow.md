@@ -72,11 +72,17 @@ Illegal: skip states (e.g. ACTIVE → CALCULATED), mutate PUBLISHED round struct
 
 ### 3.2 Auto-close (sync, no BackgroundTasks)
 
-**Function:** `auto_close_expired_rounds(session, contest_id)`
+**Batch hook:** `auto_close_expired_rounds(session, contest_id)`
 
-- Invoked at the start of every contest-scoped API handler (via shared dependency).
+- Invoked at the start of every contest-scoped API handler (via `ContestContext` in `deps.py`).
 - Select rounds where `contest_id = ? AND status = ACTIVE AND deadline <= now(UTC)`.
-- For each: `transition_round(session, round_id, CLOSED)`.
+- For each: `ensure_round_closed_if_expired` → `transition_round(session, round_id, CLOSED)`.
+- Commits when any round closed (see `get_contest_context`).
+
+**Per-round hook:** `ensure_round_closed_if_expired(session, round_id)` [NEW 1.16]
+
+- Called at the start of prediction, result, calculate, and leaderboard services for a specific round.
+- Covers legacy shims (`GET/POST /rounds/…` without `contest_id`) and single-round mutations without a prior list fetch.
 - Idempotent; same DB transaction as the caller when possible.
 
 **Explicit close:** `POST /api/v1/contests/{contest_id}/admin/rounds/{id}/close`
@@ -102,9 +108,11 @@ GET predictions visibility: pre-deadline — own scores only for USER and SUPERV
 | `contest.status = RUNNING` | Allowed |
 | `round.status = CLOSED` | Allowed (auto-close ensures this after deadline) |
 | `now >= round.deadline` | Allowed |
-| Round ACTIVE and `now >= deadline` | 403 — close first (auto-close on next request) |
+| Round ACTIVE and `now >= deadline` | Auto-closed inline via `ensure_round_closed_if_expired` before guard [UPDATED 1.16] |
 
 Calculate requires `round.status = CLOSED` (not ACTIVE).
+
+**Admin UI matrix (effective status, match «Идёт», per-page actions):** [admin_ui_status_matrix.md](admin_ui_status_matrix.md)
 
 ## 4. Free Tour (operational exception)
 
@@ -118,6 +126,8 @@ Calculate requires `round.status = CLOSED` (not ACTIVE).
 | Action | Create new round; **move** matches (`UPDATE round_id`); set new `date_time` |
 | Round number | `max(number)+1` within contest |
 | Source rounds | Decrement `matches_count`; validate min matches if needed |
+| Round metadata | `kind=SUPPLEMENTARY`, `supplementary_index` (ДопТур1, 2, …); `matches.origin_round_id` set on move |
+| Scoring | Logical tour = origin round + moved matches; `scores` row stays on **origin** `round_id` — see [scoring_flow.md](scoring_flow.md) §6, [bonus_rules.md](bonus_rules.md) |
 
 Activation of free-tour round follows normal activate flow (does not re-lock contest).
 

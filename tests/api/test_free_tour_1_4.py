@@ -54,11 +54,28 @@ async def test_op_free_tour(loaded_api):
         },
     )
     assert resp.status_code == 200, resp.text
-    new_round_id = resp.json()["round_id"]
+    body = resp.json()
+    new_round_id = body["round_id"]
+    assert body["kind"] == "SUPPLEMENTARY"
+    assert body["supplementary_index"] is not None
+    assert body["source_round_numbers"] == [10]
 
     async with sf() as session:
         moved = await session.get(Match, mid)
         assert moved.round_id == new_round_id
+        assert moved.origin_round_id == rid
+        new_round = await session.get(Round, new_round_id)
+        assert new_round is not None
+        assert new_round.kind == "SUPPLEMENTARY"
+        assert new_round.supplementary_index is not None
+
+    listed = await client.get(contest_url(DEFAULT_CONTEST_ID, "/rounds"), headers=h)
+    assert listed.status_code == 200
+    free_round = next(r for r in listed.json() if r["id"] == new_round_id)
+    assert free_round["kind"] == "SUPPLEMENTARY"
+    assert free_round["source_round_numbers"] == [10]
+
+    async with sf() as session:
         source_count_after = await session.scalar(
             select(func.count()).select_from(Match).where(Match.round_id == rid)
         )

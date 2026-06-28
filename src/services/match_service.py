@@ -14,6 +14,7 @@ from core.exceptions import (
 )
 from database.models import Contest, Match, MatchStatus, Round, RoundStatus
 from services.contest_lifecycle_service import assert_contest_running
+from services.round_auto_close_service import ensure_round_closed_if_expired
 
 
 async def _get_match(session: AsyncSession, match_id: int) -> Match:
@@ -49,9 +50,7 @@ async def set_result(
 ) -> Match:
     """Record a final result for a match and mark it FINISHED."""
     match = await _get_match(session, match_id)
-    round_ = await session.get(Round, match.round_id)
-    if round_ is None:
-        raise NotFoundError(f"Тур для матча {match_id} не найден")
+    round_ = await ensure_round_closed_if_expired(session, match.round_id)
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Матч {match_id} не принадлежит конкурсу {contest_id}")
 
@@ -104,8 +103,8 @@ async def change_status(
         )
 
     match = await _get_match(session, match_id)
-    round_ = await session.get(Round, match.round_id)
-    if round_ is None or round_.contest_id != contest_id:
+    round_ = await ensure_round_closed_if_expired(session, match.round_id)
+    if round_.contest_id != contest_id:
         raise NotFoundError(f"Матч {match_id} не принадлежит конкурсу {contest_id}")
 
     match.status = new_status

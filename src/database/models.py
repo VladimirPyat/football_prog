@@ -37,6 +37,11 @@ class RoundStatus(StrEnum):
     PUBLISHED = "PUBLISHED"
 
 
+class RoundKind(StrEnum):
+    REGULAR = "REGULAR"
+    SUPPLEMENTARY = "SUPPLEMENTARY"
+
+
 class MatchStatus(StrEnum):
     SCHEDULED = "SCHEDULED"
     POSTPONED = "POSTPONED"
@@ -180,6 +185,10 @@ class Round(Base):
     deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     matches_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    kind: Mapped[str] = mapped_column(
+        String, nullable=False, default=RoundKind.REGULAR.value
+    )
+    supplementary_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     contest: Mapped[Contest] = relationship(back_populates="rounds")
 
@@ -194,6 +203,9 @@ class Match(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     round_id: Mapped[int] = mapped_column(ForeignKey("rounds.id"), nullable=False)
+    origin_round_id: Mapped[int | None] = mapped_column(
+        ForeignKey("rounds.id"), nullable=True
+    )
     team1_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False)
     team2_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False)
     date_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

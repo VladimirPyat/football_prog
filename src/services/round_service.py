@@ -13,7 +13,7 @@ from core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from database.models import Contest, Match, MatchStatus, Round, RoundStatus
+from database.models import Contest, Match, MatchStatus, Round, RoundKind, RoundStatus
 
 _VALID_TRANSITIONS: dict[RoundStatus, set[RoundStatus]] = {
     RoundStatus.DRAFT: {RoundStatus.ACTIVE},
@@ -56,16 +56,25 @@ def validate_round_deadline_placement(
     earliest_match: datetime,
     *,
     now: datetime | None = None,
+    min_before_match_minutes: int = 0,
 ) -> None:
     """Deadline must be in the future and strictly before the first match kickoff."""
     deadline = _ensure_utc(deadline)
     earliest_match = _ensure_utc(earliest_match)
     now = _ensure_utc(now or datetime.now(UTC))
+    min_gap = timedelta(minutes=max(0, min_before_match_minutes))
 
-    if deadline >= earliest_match:
+    if deadline + min_gap >= earliest_match:
         raise ValidationError("Дедлайн должен быть раньше первого матча тура")
     if deadline <= now:
         raise ValidationError("Дедлайн должен быть в будущем")
+
+
+def get_deadline_min_before_match_minutes(rules_json: dict) -> int:
+    """Optional minimum gap from rules_json.contest_structure (default 0)."""
+    structure = rules_json.get("contest_structure") or {}
+    minutes = structure.get("deadline_min_before_match_minutes", 0)
+    return int(minutes) if isinstance(minutes, int) and minutes >= 0 else 0
 
 
 def assert_deadline_change_allowed(
@@ -132,7 +141,12 @@ async def set_deadline(
     if RoundStatus(round_.status) == RoundStatus.ACTIVE:
         assert_deadline_change_allowed(round_.deadline, deadline_rule_hours, now=now)
 
-    validate_round_deadline_placement(new_deadline, earliest, now=now)
+    validate_round_deadline_placement(
+        new_deadline,
+        earliest,
+        now=now,
+        min_before_match_minutes=get_deadline_min_before_match_minutes(contest.rules_json),
+    )
 
     round_.deadline = new_deadline
     return round_
@@ -176,7 +190,14 @@ async def create_free_tour(
     max_number = await session.scalar(
         select(func.max(Round.number)).where(Round.contest_id == contest_id)
     )
+    max_supplementary = await session.scalar(
+        select(func.max(Round.supplementary_index)).where(
+            Round.contest_id == contest_id,
+            Round.kind == RoundKind.SUPPLEMENTARY.value,
+        )
+    )
     new_number = (max_number or 0) + 1
+    new_supplementary_index = (max_supplementary or 0) + 1
 
     new_round = Round(
         contest_id=contest_id,
@@ -184,6 +205,8 @@ async def create_free_tour(
         deadline=deadline,
         status=RoundStatus.DRAFT,
         matches_count=len(matches),
+        kind=RoundKind.SUPPLEMENTARY.value,
+        supplementary_index=new_supplementary_index,
     )
     session.add(new_round)
     await session.flush()
@@ -209,6 +232,7 @@ async def create_free_tour(
             )
 
         source_round_counts[match.round_id] = source_round_counts.get(match.round_id, 0) + 1
+        match.origin_round_id = match.round_id
         match.round_id = new_round.id
         match.date_time = new_date_time
         match.status = MatchStatus.SCHEDULED

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdminPageShell } from "@/components/admin/AdminPageShell";
 import { RoundManagementPanel } from "@/components/admin/RoundManagementPanel";
 import { useContestAdmin } from "@/hooks/useContestAdmin";
@@ -8,21 +8,38 @@ import { useAdminRounds } from "@/hooks/useAdminRounds";
 import { useRoundMatches } from "@/hooks/useRoundMatches";
 import { useTeams } from "@/hooks/useTeams";
 import { useToast } from "@/hooks/useToast";
+import { isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
 import { AppError } from "@/lib/api/client";
 
 export default function AdminRoundsPage() {
   const { contest, contestId, refetch: refetchContest } = useContestAdmin();
-  const { rounds, loading, createRound, activateRound, updateRound, createFreeTour, closeRound } =
+  const { rounds, loading, refetch: refetchRounds, createRound, activateRound, updateRound, createFreeTour } =
     useAdminRounds(contestId);
   const { teams } = useTeams(contestId);
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
+  const handleDeadlinePassed = useCallback(() => {
+    void refetchRounds();
+  }, [refetchRounds]);
   const {
     matches,
     deadlinePassed,
     loading: matchesLoading,
     refetch: refetchMatches,
-  } = useRoundMatches(contestId, selectedRoundId);
+  } = useRoundMatches(contestId, selectedRoundId, {
+    onDeadlinePassed: handleDeadlinePassed,
+  });
   const { showSuccess, showError } = useToast();
+
+  const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
+  const effectiveDeadlinePassed =
+    deadlinePassed ||
+    (selectedRound != null && isDeadlinePassedNow(selectedRound.deadline));
+
+  useEffect(() => {
+    if (effectiveDeadlinePassed && selectedRound?.status === "ACTIVE") {
+      void refetchRounds();
+    }
+  }, [effectiveDeadlinePassed, selectedRound?.status, selectedRound?.id, refetchRounds]);
 
   useEffect(() => {
     if (rounds.length && !selectedRoundId) {
@@ -40,7 +57,7 @@ export default function AdminRoundsPage() {
         teams={teams}
         selectedRoundId={selectedRoundId}
         matches={matches}
-        deadlinePassed={deadlinePassed}
+        deadlinePassed={effectiveDeadlinePassed}
         loading={loading || matchesLoading}
         onSelectRound={setSelectedRoundId}
         onCreateRound={async (data) => {
@@ -75,15 +92,6 @@ export default function AdminRoundsPage() {
             showSuccess("Свободный тур создан");
           } catch (err) {
             showError(err instanceof AppError ? err.detail : "Ошибка");
-          }
-        }}
-        onCloseRound={async (roundId) => {
-          try {
-            await closeRound(roundId);
-            await refetchMatches();
-            showSuccess("Тур закрыт");
-          } catch (err) {
-            showError(err instanceof AppError ? err.detail : "Ошибка закрытия тура");
           }
         }}
         onRefetchMatches={refetchMatches}

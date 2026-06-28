@@ -93,7 +93,7 @@ export function FreeTourModal({ open, contestId, onClose, onSubmit }: FreeTourMo
                     onChange={() => toggle(m.id)}
                   />
                   <span>
-                    {m.team1} — {m.team2} (тур {m.roundNumber})
+                    {m.team1} — {m.team2} ({m.roundTitle})
                   </span>
                   <span className="text-gray-500">{formatDateTimeRu(m.date_time)}</span>
                   {selected.has(m.id) && (

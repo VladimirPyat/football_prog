@@ -288,3 +288,30 @@
 - Verified: `uv run ruff check` on modified src files OK; `uv run pytest tests/api/test_contest_start_1_15.py -v` 9 passed; `tests/api/test_contest_restore.py` 7 passed
 - Note: full `uv run ruff check src/` and `uv run mypy src/` have pre-existing project-wide issues unrelated to this change
 - Next: agent_docs/instructions/tester_2.3.3_fix_setup.md
+
+## 2026-06-28 — Coder (1.15 QA follow-up — chat-driven backend)
+- STATUS: READY_FOR_TEST
+- Instruction: `agent_docs/instructions/backend/coder_1.15_qa_followup.md` (not in `coder_1.15_fix_setup.md`)
+- Scope: soft-delete (`deleted_at` + list filter + purge script), start readiness validation (teams + ≥2 ACCEPTED), supplementary round metadata (`kind`, `supplementary_index`, `origin_round_id`), `bonuses_pending` on leaderboard API, `dev_invite_setup.py list-pending` + env password, `dev_setup.py` QA cheatsheet
+- Migrations: `f7a8b9c0d1e2_contest_soft_delete`, `g8h9i0j1k2l3_supplementary_rounds` — require `uv run alembic upgrade head`
+- Key files: contest_lifecycle_service.py, contest_purge_service.py, round_serialization.py, round_scoring_pending.py, leaderboard_service.py, contest_restore_service.py, dev_invite_setup.py, dev_setup.py, purge_deleted_contests.py
+- Tests: test_contest_soft_delete.py, test_contest_start_1_15.py (readiness), test_dev_invite_setup.py, test_free_tour_1_4.py, test_round_scoring_pending.py, stage_112_helpers.fulfill_start_prerequisites
+- Contracts/manuals: scoring_flow.md §6, bonus_rules.md, api_v1.yaml, DEV_SETUP.md
+- Deferred: full bonus2/3 deferral inside scoring engine (contract only)
+- Next: `agent_docs/instructions/coder_2.3.4_qa_followup.md` (frontend counterpart)
+
+## 2026-06-28 — Coder (1.16 fix deadline — per-round auto-close)
+- STATUS: READY_FOR_TEST
+- Instruction: `agent_docs/instructions/backend/coder_1.16_fix_deadline.md`
+- Scope: `ensure_round_closed_if_expired()` in round_auto_close_service; called from prediction/match/scoring/LB services + build_round_predictions_view; batch hook unchanged in ContestContext
+- Tests: `tests/api/test_round_deadline_auto_close_1_16.py` — 9 passed (+ regression test_round_auto_close_1_4.py 2/2)
+- Contracts: `contest_lifecycle_flow.md` §3.2–3.4 updated
+- Verified: `uv run ruff check` on touched files OK
+- Next: `agent_docs/instructions/coder_2.3.5_fix_deadline.md` (frontend UI sync)
+
+## 2026-06-28 — Coder (1.16 fix deadline — per-round auto-close)
+- STATUS: READY_FOR_TEST
+- Files: src/services/round_auto_close_service.py (ensure_round_closed_if_expired, DRY batch hook), prediction_service.py, match_service.py, scoring_persistence.py, leaderboard_service.py, api/handlers/predictions.py, tests/api/test_round_deadline_auto_close_1_16.py
+- Verified: `uv run ruff check` on touched src files OK; `uv run pytest tests/api/test_round_deadline_auto_close_1_16.py -v` 9 passed
+- Contracts: contest_lifecycle_flow.md §3.2 (per-round ensure documented)
+- Next: coder_2.3.5_fix_deadline.md (frontend UI sync)

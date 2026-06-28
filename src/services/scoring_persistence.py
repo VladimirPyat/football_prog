@@ -21,6 +21,7 @@ from database.models import (
 from scoring.engine import score_round
 from scoring.rules import ScoringRules
 from scoring.types import MatchResult, UserPrediction
+from services.round_auto_close_service import ensure_round_closed_if_expired
 
 logger = logging.getLogger(__name__)
 
@@ -145,9 +146,7 @@ async def calculate_round(
     session: AsyncSession, round_id: int, contest_id: int
 ) -> int:
     """Compute and persist scores for a CLOSED round; transition it to CALCULATED."""
-    round_ = await session.get(Round, round_id)
-    if round_ is None:
-        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await ensure_round_closed_if_expired(session, round_id)
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
     if RoundStatus(round_.status) != RoundStatus.CLOSED:
@@ -178,9 +177,7 @@ async def recalculate_round(
     session: AsyncSession, round_id: int, contest_id: int
 ) -> int:
     """Re-run scoring for a CALCULATED round."""
-    round_ = await session.get(Round, round_id)
-    if round_ is None:
-        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await ensure_round_closed_if_expired(session, round_id)
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
     if RoundStatus(round_.status) != RoundStatus.CALCULATED:

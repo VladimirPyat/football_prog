@@ -59,3 +59,57 @@ If a match status is set to `VOID`:
 - All base points for this match = 0.
 - Bonus 1 for this match = 0.
 - Bonus 2 and Bonus 3 must be recalculated for the round based on the remaining valid matches.
+
+## 6. Postponed matches & supplementary rounds (ДопТур)
+
+> **Status:** CONTRACT (Stage 2.3+). Scoring engine defers Bonus 2/3 per
+> `agent_docs/contracts/bonus_rules.md` — Deferred bonuses.
+
+### 6.1 Logical tour
+
+Scoring for a regular round **R** includes:
+
+1. Matches with `match.round_id = R.id`.
+2. Matches with `match.origin_round_id = R.id` (played in a supplementary / free tour).
+
+Supplementary rounds (`rounds.kind = SUPPLEMENTARY`) are **operational containers** for
+rescheduling; they are **not** separate scoring rounds.
+
+### 6.2 Persistence (`scores` table — unchanged schema)
+
+- One row per `(user_id, origin_round_id)` — **no new table**.
+- Base points accumulate in that row as each match in the logical tour finishes.
+- `bonus1` per match is applied when that match's base is known.
+- `bonus2`, `bonus3`, `total_without_bonus3`, `total_with_bonus3` are **final only when**
+  all non-excluded matches in the logical tour are terminal (`FINISHED`, or excluded).
+
+### 6.3 Settlement timeline
+
+```
+Regular tour R: main matches FINISHED → close R → calculate
+  → write base (+ bonus1) for finished main matches
+  → if any POSTPONED / SCHEDULED postponed match remains → bonuses_pending
+
+Later: POSTPONED → free tour → ДопТур D → match FINISHED
+  → add base (+ bonus1) to scores(round_id=R)
+  → when no pending matches left → recompute bonus2, bonus3 for R
+```
+
+### 6.4 Canceled matches
+
+`CANCELED` (and `VOID`) matches are **excluded** from the logical tour for bonus
+thresholds — they neither contribute to `correct_outcomes` nor block bonus settlement.
+Rare case: technical defeat / disciplinary cancel.
+
+### 6.5 Client visibility
+
+`GET /contests/{id}/rounds/{round_id}/leaderboard` for the **origin** round returns:
+
+| Field | Meaning |
+|-------|---------|
+| `bonuses_pending` | `true` while Bonus 2/3 are not final |
+| `bonuses_pending_message` | e.g. «Бонусы тура будут рассчитаны после сыгранных перенесённых матчей…» |
+
+UI must show this note on admin results / leaderboard preview while pending.
+
+**Cross-page UI matrix:** [admin_ui_status_matrix.md](admin_ui_status_matrix.md) §11–§12.

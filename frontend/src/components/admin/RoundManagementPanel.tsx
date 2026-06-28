@@ -3,17 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { deriveAdminUiMode } from "@/lib/admin/deriveAdminUiMode";
 import {
+  effectiveRoundStatus,
+  isDeadlinePassedNow,
+  isPhaseRoundStatus,
+} from "@/lib/admin/roundEffectiveStatus";
+import {
   canChangeDeadline,
   deadlineChangeClosedMessage,
   deadlineErrorMessage,
   earliestMatchTime,
   getDeadlineRuleHours,
-  isDeadlineValid,
+  isDeadlinePlacementValid,
 } from "@/lib/admin/deadlineRule";
+import { formatRoundOptionLabel } from "@/lib/admin/roundLabel";
 import {
   formatDateTimeRu,
   fromDatetimeLocal,
-  roundStatusLabel,
   toDatetimeLocal,
 } from "@/lib/admin/format";
 import { RoundBuilderForm } from "@/components/admin/RoundBuilderForm";
@@ -67,7 +72,6 @@ interface RoundManagementPanelProps {
     deadline: string;
     matches: { match_id: number; new_date_time: string }[];
   }) => Promise<void>;
-  onCloseRound?: (roundId: number) => Promise<void>;
   onRefetchMatches: () => Promise<void>;
   refetchContest: () => Promise<void>;
 }
@@ -85,13 +89,15 @@ export function RoundManagementPanel({
   onActivate,
   onUpdateRound,
   onCreateFreeTour,
-  onCloseRound,
   onRefetchMatches,
   refetchContest,
 }: RoundManagementPanelProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
+  const effectiveDeadlinePassed =
+    deadlinePassed ||
+    (selectedRound != null && isDeadlinePassedNow(selectedRound.deadline));
   const hasDraft = rounds.some((r) => r.status === "DRAFT");
   const atRoundCap = rounds.length >= contest.total_rounds;
 
@@ -99,7 +105,7 @@ export function RoundManagementPanel({
     contest,
     round: selectedRound,
     matches,
-    deadlinePassed,
+    deadlinePassed: effectiveDeadlinePassed,
     hasDraftRound: hasDraft,
   });
 
@@ -112,7 +118,6 @@ export function RoundManagementPanel({
   const [showDraftEdit, setShowDraftEdit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [closing, setClosing] = useState(false);
   const [pendingMatchAction, setPendingMatchAction] = useState<{
     action: MatchRowAction;
     match: MatchOut;
@@ -132,7 +137,7 @@ export function RoundManagementPanel({
   const deadlinePlacementValid =
     !deadlineEdit || earliest === null
       ? true
-      : isDeadlineValid(deadlineIso, new Date(earliest).toISOString());
+      : isDeadlinePlacementValid(deadlineIso, new Date(earliest).toISOString(), contest.rules_json);
   const changeWindowOpen =
     selectedRound?.status === "ACTIVE" && selectedRound?.deadline != null
       ? canChangeDeadline(new Date(), selectedRound.deadline, ruleHours)
@@ -168,17 +173,6 @@ export function RoundManagementPanel({
     } finally {
       setActionSaving(false);
       setPendingMatchAction(null);
-    }
-  };
-
-  const handleCloseRound = async () => {
-    if (!selectedRound || !onCloseRound) return;
-    setClosing(true);
-    try {
-      await onCloseRound(selectedRound.id);
-      await onRefetchMatches();
-    } finally {
-      setClosing(false);
     }
   };
 
@@ -243,10 +237,14 @@ export function RoundManagementPanel({
   if (loading && !rounds.length) return <LoadingState message="Загрузка туров…" />;
 
   // Determine if selected round is in a "phase" (CLOSED/CALCULATED/PUBLISHED)
-  const isPhaseRound =
-    selectedRound?.status === "CLOSED" ||
-    selectedRound?.status === "CALCULATED" ||
-    selectedRound?.status === "PUBLISHED";
+  const effectiveStatus = selectedRound
+    ? effectiveRoundStatus(selectedRound, effectiveDeadlinePassed)
+    : null;
+  const isPhaseRound = effectiveStatus ? isPhaseRoundStatus(effectiveStatus) : false;
+  const phaseRound =
+    selectedRound && effectiveStatus
+      ? { ...selectedRound, status: effectiveStatus }
+      : selectedRound;
 
   // DRAFT edit data
   const draftInitialValues =
@@ -275,7 +273,7 @@ export function RoundManagementPanel({
           <option value="">Выберите тур</option>
           {rounds.map((r) => (
             <option key={r.id} value={r.id}>
-              Тур {r.number} — {roundStatusLabel(r.status)}
+              {formatRoundOptionLabel(r)}
             </option>
           ))}
         </select>
@@ -330,7 +328,7 @@ export function RoundManagementPanel({
               <section className="border border-gray-200 rounded-lg p-4">
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
                   <h3 className="font-semibold text-gray-900">
-                    Тур {selectedRound.number} — {roundStatusLabel(selectedRound.status)}
+                    {formatRoundOptionLabel(selectedRound)}
                   </h3>
                   {selectedRound.status === "PUBLISHED" && (
                     <span className="text-sm font-medium text-green-700 bg-green-50 px-2 py-1 rounded">
@@ -338,14 +336,14 @@ export function RoundManagementPanel({
                     </span>
                   )}
                 </div>
-                <RoundPhasePanel contest={contest} round={selectedRound} matches={localMatches} />
+                <RoundPhasePanel contest={contest} round={phaseRound!} matches={localMatches} />
               </section>
             ) : (
               /* DRAFT and ACTIVE panels */
               <section className="border border-gray-200 rounded-lg p-4">
                 <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
                   <h3 className="font-semibold text-gray-900">
-                    Тур {selectedRound.number} — {roundStatusLabel(selectedRound.status)}
+                    {formatRoundOptionLabel(selectedRound)}
                   </h3>
                   {/* DRAFT: Редактировать / Активировать */}
                   {selectedRound.status === "DRAFT" && !uiMode.disableAllMutations && (
@@ -395,17 +393,23 @@ export function RoundManagementPanel({
                 )}
 
                 {/* ACTIVE: phase-aware hints */}
-                {selectedRound.status === "ACTIVE" && (
+                {effectiveStatus === "ACTIVE" && (
                   <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 mb-3">
                     Тур активен. Состав матчей изменить нельзя. До начала матча можно перенести
                     время; отмена — в любой момент. Перенос на другую неделю — статус «Перенесён» и
                     свободный тур.
                   </p>
                 )}
+                {uiMode.showDeadlinePassedHint && (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
+                    Дедлайн прогнозов прошёл. Прогнозы закрыты; ввод результатов — на вкладке
+                    «Результаты».
+                  </p>
+                )}
 
                 {/* Deadline editor (hidden in DRAFT inline edit — form has its own field) */}
-                {(selectedRound.status === "DRAFT" || selectedRound.status === "ACTIVE") &&
-                  !(selectedRound.status === "DRAFT" && showDraftEdit) && (
+                {(effectiveStatus === "DRAFT" || effectiveStatus === "ACTIVE") &&
+                  !(effectiveStatus === "DRAFT" && showDraftEdit) && (
                     <div className="mb-4 max-w-xs">
                       <label className="block text-sm text-gray-700 mb-1">Дедлайн прогнозов</label>
                       <input
@@ -427,7 +431,7 @@ export function RoundManagementPanel({
                   )}
 
                 {/* Match table (DRAFT full or ACTIVE depending on phase) */}
-                {selectedRound.status !== "DRAFT" || !showDraftEdit ? (
+                {effectiveStatus !== "DRAFT" || !showDraftEdit ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-50">
@@ -442,7 +446,7 @@ export function RoundManagementPanel({
                           <MatchEditorRow
                             key={m.id}
                             match={m}
-                            roundStatus={selectedRound.status}
+                            roundStatus={effectiveStatus ?? selectedRound.status}
                             isAdmin={isAdmin}
                             teams={teams}
                             canEditStructure={uiMode.canEditRoundStructure}
@@ -469,9 +473,9 @@ export function RoundManagementPanel({
                   </p>
                 )}
 
-                {(selectedRound.status === "ACTIVE" || selectedRound.status === "DRAFT") &&
+                {(effectiveStatus === "ACTIVE" || effectiveStatus === "DRAFT") &&
                   !uiMode.disableAllMutations &&
-                  selectedRound.status !== "DRAFT" && (
+                  effectiveStatus !== "DRAFT" && (
                     <button
                       type="button"
                       onClick={handleSaveActive}
@@ -495,10 +499,7 @@ export function RoundManagementPanel({
             contest={contest}
             round={selectedRound}
             matches={localMatches}
-            deadlinePassed={deadlinePassed}
-            disableAllMutations={uiMode.disableAllMutations}
-            onCloseRound={onCloseRound ? handleCloseRound : undefined}
-            closing={closing}
+            deadlinePassed={effectiveDeadlinePassed}
           />
         </div>
       )}

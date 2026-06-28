@@ -130,3 +130,52 @@ bonus3(u) = rank_pts(u) + extra(u)
    `total_without_bonus3 = base + bonus1 + bonus2`.
 
 On VOID / result change, re-run the whole round in one transaction.
+
+---
+
+## Deferred bonuses — postponed matches & supplementary rounds (Stage 2.3+)
+
+> **Status:** CONTRACT — engine implementation follows in a later stage.
+> **Related:** `agent_docs/contracts/scoring_flow.md` §6,
+> `agent_docs/contracts/contest_lifecycle_flow.md` §4,
+> `matches.origin_round_id`, `rounds.kind = SUPPLEMENTARY`.
+
+### Logical tour
+
+A **logical tour** is the scoring unit keyed by the **origin** (regular) round `R_id`:
+
+- all matches still in `R_id`, plus
+- all matches with `origin_round_id = R_id` (moved to ДопТур / supplementary rounds).
+
+`scores` rows remain **`UNIQUE (user_id, round_id)` with `round_id = R_id`** — no separate
+score row for supplementary rounds. Base points from a postponed match are added to the
+**same** `scores` row when the match is played in ДопТур.
+
+### When base points vs bonuses are settled
+
+| Phase | What is written to `scores` for `R_id` |
+|-------|----------------------------------------|
+| Main matches finished, tour `CLOSED` → `calculate` | **Base points** (+ per-match Bonus 1) for every **FINISHED** match in the logical tour that has a result so far. **Bonus 2 and Bonus 3 are NOT final** if bonuses are pending. |
+| Postponed match played in ДопТур → result entered | **Add** base (+ Bonus 1) for that match into the existing `scores` row for `R_id`. |
+| All non-excluded matches in logical tour terminal | **Recompute Bonus 2 and Bonus 3** for `R_id` in the same `scores` row; clear pending state. |
+
+### Excluded matches (do not block bonuses)
+
+Matches with status **`CANCELED`** or **`VOID`** are **removed from the logical tour**
+for bonus purposes (e.g. technical defeat). They do not count toward `correct_outcomes`
+and are not waited on.
+
+Matches still **`POSTPONED`** or **`SCHEDULED`** (including in ДопТур) **block** Bonus 2/3.
+
+### API / UI
+
+`GET …/rounds/{origin_round_id}/leaderboard` includes:
+
+- `bonuses_pending: true` while any logical-tour match is `POSTPONED` or `SCHEDULED`
+  (excluding only `CANCELED`/`VOID`);
+- `bonuses_pending_message` — human-readable note for supervisors and participants.
+
+While `bonuses_pending`, UI shows that **bonuses will be calculated later**; displayed
+`bonus2` / `bonus3` / `total_with_bonus3` may be provisional or zero until final pass.
+
+**Admin UI matrix (visibility, predictions, deferred bonuses):** [admin_ui_status_matrix.md](admin_ui_status_matrix.md)

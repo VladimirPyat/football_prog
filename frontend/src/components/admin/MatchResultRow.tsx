@@ -8,6 +8,7 @@ import { useState } from "react";
 
 interface MatchResultRowProps {
   match: MatchOut;
+  /** Effective round phase (CLOSED when ACTIVE + deadline passed). */
   roundStatus: string;
   maxScore: number;
   scoresReadonly: boolean;

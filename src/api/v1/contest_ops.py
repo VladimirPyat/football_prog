@@ -49,9 +49,11 @@ from services.contest_lifecycle_service import (
 from services.leaderboard_service import compute_etag
 from services.match_service import change_status, set_result
 from services.prediction_service import submit_batch
+from services.round_serialization import rounds_to_out, source_round_numbers_by_round_id
 from services.round_service import (
     close_round,
     create_free_tour,
+    get_deadline_min_before_match_minutes,
     set_deadline,
     transition_round,
     validate_round_deadline_placement,
@@ -76,7 +78,7 @@ async def list_rounds(
             select(Round).where(Round.contest_id == contest_id).order_by(Round.number)
         )
     ).all()
-    return [RoundOut.model_validate(r) for r in rounds]
+    return await rounds_to_out(session, list(rounds))
 
 
 @router.get("/rounds/{round_id}/predictions", response_model=RoundPredictionsView)
@@ -210,7 +212,12 @@ async def create_round(
         if dt_check < now:
             raise ValidationError("Дата матча не может быть в прошлом")
     _ = deadline_rule  # rule_hours retained for future warnings; placement rule does not use it
-    validate_round_deadline_placement(dl, earliest, now=now)
+    validate_round_deadline_placement(
+        dl,
+        earliest,
+        now=now,
+        min_before_match_minutes=get_deadline_min_before_match_minutes(contest.rules_json),
+    )
 
     existing = await session.scalar(
         select(Round).where(Round.contest_id == contest_id, Round.number == body.number)
@@ -371,7 +378,14 @@ async def free_tour(
         body.deadline,
     )
     await session.commit()
-    return {"round_id": new_round.id, "round_number": new_round.number}
+    sources = await source_round_numbers_by_round_id(session, [new_round.id])
+    return {
+        "round_id": new_round.id,
+        "round_number": new_round.number,
+        "kind": new_round.kind,
+        "supplementary_index": new_round.supplementary_index,
+        "source_round_numbers": sources.get(new_round.id, []),
+    }
 
 
 @router.put("/admin/matches/{match_id}/result", response_model=MatchResultResponse, dependencies=[_supervisor])

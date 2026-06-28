@@ -1,6 +1,7 @@
 "use client";
 
 import { matchStatusLabel, roundStatusHint, roundStatusLabel } from "@/lib/admin/format";
+import { effectiveRoundStatus, isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
 import type { ContestOut, MatchOut, RoundOut } from "@/types/api";
 
 interface RoundStatusSidebarProps {
@@ -8,9 +9,6 @@ interface RoundStatusSidebarProps {
   round: RoundOut;
   matches: MatchOut[];
   deadlinePassed: boolean;
-  disableAllMutations: boolean;
-  onCloseRound?: () => Promise<void>;
-  closing?: boolean;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -21,30 +19,33 @@ const STATUS_BADGE: Record<string, string> = {
   PUBLISHED: "bg-purple-100 text-purple-800",
 };
 
+const POST_DEADLINE_HINT =
+  "Дедлайн прогнозов прошёл. Прогнозы закрыты; ввод результатов — на вкладке «Результаты».";
+
 export function RoundStatusSidebar({
   contest,
   round,
   matches,
   deadlinePassed,
-  disableAllMutations,
-  onCloseRound,
-  closing = false,
 }: RoundStatusSidebarProps) {
-  const badgeClass = STATUS_BADGE[round.status] ?? "bg-gray-100 text-gray-800";
-  const hint = roundStatusHint(round.status);
+  const passed = deadlinePassed || isDeadlinePassedNow(round.deadline);
+  const displayStatus = effectiveRoundStatus(round, passed);
+  const badgeClass = STATUS_BADGE[displayStatus] ?? "bg-gray-100 text-gray-800";
+  const hint = roundStatusHint(displayStatus);
 
-  // Schedule-only editing on ACTIVE (structure locked after activation)
   const activeHint =
-    round.status === "ACTIVE"
+    displayStatus === "ACTIVE"
       ? "Тур активен. Состав фиксирован; до начала матча — перенос времени, отмена или свободный тур."
-      : hint;
+      : displayStatus === "CLOSED" && round.status === "ACTIVE" && passed
+        ? POST_DEADLINE_HINT
+        : hint;
 
   return (
     <aside className="border border-gray-200 rounded-lg p-4 space-y-4 h-fit">
       <h3 className="text-sm font-semibold text-gray-900">Статус тура</h3>
       <div>
         <span className={`inline-block text-xs font-semibold px-2 py-1 rounded ${badgeClass}`}>
-          {roundStatusLabel(round.status)}
+          {roundStatusLabel(displayStatus)}
         </span>
       </div>
 
@@ -70,17 +71,6 @@ export function RoundStatusSidebar({
           </dd>
         </div>
       </dl>
-
-      {round.status === "ACTIVE" && deadlinePassed && !disableAllMutations && onCloseRound && (
-        <button
-          type="button"
-          disabled={closing}
-          onClick={() => void onCloseRound()}
-          className="w-full px-3 py-2 text-sm text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
-        >
-          {closing ? "Закрытие…" : "Закрыть тур"}
-        </button>
-      )}
 
       {matches.length > 0 && round.status !== "DRAFT" && (
         <div className="pt-2 border-t border-gray-100">

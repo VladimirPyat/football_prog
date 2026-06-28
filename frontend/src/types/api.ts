@@ -124,6 +124,9 @@ export interface RoundOut {
   deadline: string;
   status: RoundStatus;
   matches_count: number;
+  kind: "REGULAR" | "SUPPLEMENTARY";
+  supplementary_index: number | null;
+  source_round_numbers: number[];
 }
 
 export interface MatchOut {

@@ -91,6 +91,34 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 | `team_logo_target_px` | `TEAM_LOGO_TARGET_PX` | `64` | Logo resize target (px) |
 | `default_team_logo_url` | `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback logo URL |
 | `contest_defaults_path` | — | `docs/test_data/config/contest_defaults.json` | Seed JSON path (code only) |
+| `api_timestamp_timezone` | `API_TIMESTAMP_TIMEZONE` | `UTC` | Canonical zone for DB/API timestamps (only `UTC` supported) |
+
+### Datetime policy (backend + frontend)
+
+All deadlines and kickoffs are **UTC instants** in the database. Supervisors type **wall-clock time** in a display zone; the frontend converts to UTC before API calls.
+
+| Layer | Zone | Configuration |
+|-------|------|---------------|
+| DB / API storage | UTC | `API_TIMESTAMP_TIMEZONE` / `settings.api_timestamp_timezone` |
+| CSV test loader | UTC | `config/test_data_loader.json` → `datetime.timezone` |
+| Wire JSON | UTC ISO 8601 | Naive `2026-06-28T17:00:00` = **17:00 UTC**, not local |
+| Supervisor datetime-local | Display wall clock | `frontend/.env.local` → `NEXT_PUBLIC_DISPLAY_TIMEZONE` (e.g. `Europe/Moscow`) |
+| Omit display zone | Browser local | Leave `NEXT_PUBLIC_DISPLAY_TIMEZONE` unset |
+| UI labels | Display zone | `NEXT_PUBLIC_DATETIME_LOCALE` (default `ru-RU`) |
+| Parse API on read | UTC | `NEXT_PUBLIC_API_TIMESTAMP_TIMEZONE=UTC` → `parseApiUtc()` |
+
+Copy [`frontend/.env.local.example`](../frontend/.env.local.example) → `frontend/.env.local` (`dev_setup.py --run` does this on first run).
+
+Code: `frontend/src/lib/datetime/config.ts`, `formatApiDateTime.ts`. Contracts: [frontend_api_integration.md](../agent_docs/contracts/frontend_api_integration.md) §1.1.
+
+### Deadline vs first match (`rules_json.contest_structure`)
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `deadline_rule_hours` | `24` | **Lockout:** supervisor may change deadline only while `now ≤ current_deadline − N hours`. **Not** a gap before first match. |
+| `deadline_min_before_match_minutes` | `0` | **Placement:** minimum gap between deadline and earliest kickoff. `0` = strict `<` only (1 minute earlier is OK). |
+
+Backend: `validate_round_deadline_placement` in `round_service.py`. Frontend: `isDeadlinePlacementValid` in `deadlineRule.ts`.
 
 ### Local / CI tuning (not in `.env`)
 

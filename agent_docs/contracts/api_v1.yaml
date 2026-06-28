@@ -1168,6 +1168,15 @@ components:
         contest_id: { type: integer }
         round_id: { type: integer, nullable: true }
         round_number: { type: integer, nullable: true }
+        bonuses_pending:
+          type: boolean
+          description: >
+            True while Bonus 2/3 for the logical tour are not final (postponed matches
+            still SCHEDULED or POSTPONED). Base points may already be present.
+        bonuses_pending_message:
+          type: string
+          nullable: true
+          description: Human-readable note when bonuses_pending is true
         leaderboard:
           type: array
           items:

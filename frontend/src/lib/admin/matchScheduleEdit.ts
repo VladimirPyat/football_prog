@@ -1,9 +1,11 @@
+import { parseApiUtc } from "@/lib/datetime/parseApiUtc";
+
 /** Match schedule editing rules for supervisor ACTIVE rounds (frontend-only policy). */
 
 export const LONG_POSTPONE_MS = 7 * 24 * 3_600_000;
 
 export function matchKickoffMs(dateTime: string): number | null {
-  const ms = Date.parse(dateTime);
+  const ms = parseApiUtc(dateTime);
   return Number.isNaN(ms) ? null : ms;
 }
 

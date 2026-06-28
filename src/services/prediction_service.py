@@ -25,6 +25,7 @@ from database.models import (
     User,
     UserRole,
 )
+from services.round_auto_close_service import ensure_round_closed_if_expired
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,7 @@ async def submit_batch(
     matches_per_round: int = contest.matches_per_round
     max_score: int = contest.rules_json["constraints"]["score_validation_range"][1]
 
-    round_ = await session.get(Round, round_id)
-    if round_ is None:
-        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await ensure_round_closed_if_expired(session, round_id)
 
     now = datetime.now(UTC)
     deadline = round_.deadline
@@ -154,9 +153,7 @@ async def visible_predictions(
     viewer_id: int,
 ) -> list[dict]:
     """Return predictions filtered by deadline and viewer role."""
-    round_ = await session.get(Round, round_id)
-    if round_ is None:
-        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await ensure_round_closed_if_expired(session, round_id)
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 

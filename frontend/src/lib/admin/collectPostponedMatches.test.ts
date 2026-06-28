@@ -16,8 +16,28 @@ describe("collectPostponedMatches", () => {
   it("returns only POSTPONED matches across rounds", async () => {
     mockedApiGet
       .mockResolvedValueOnce([
-        { id: 1, number: 1, contest_id: 1, deadline: "", status: "ACTIVE", matches_count: 2 },
-        { id: 2, number: 2, contest_id: 1, deadline: "", status: "CLOSED", matches_count: 1 },
+        {
+          id: 1,
+          number: 1,
+          contest_id: 1,
+          deadline: "",
+          status: "ACTIVE",
+          matches_count: 2,
+          kind: "REGULAR",
+          supplementary_index: null,
+          source_round_numbers: [],
+        },
+        {
+          id: 2,
+          number: 2,
+          contest_id: 1,
+          deadline: "",
+          status: "CLOSED",
+          matches_count: 1,
+          kind: "REGULAR",
+          supplementary_index: null,
+          source_round_numbers: [],
+        },
       ])
       .mockResolvedValueOnce({
         matches: [
@@ -59,14 +79,24 @@ describe("collectPostponedMatches", () => {
 
     expect(result).toHaveLength(2);
     expect(result.every((m) => m.status === "POSTPONED")).toBe(true);
-    expect(result[0].roundNumber).toBe(1);
+    expect(result[0].roundTitle).toBe("Тур 1");
     expect(result[1].roundNumber).toBe(2);
   });
 
   it("returns empty when no postponed matches", async () => {
     mockedApiGet
       .mockResolvedValueOnce([
-        { id: 1, number: 1, contest_id: 1, deadline: "", status: "ACTIVE", matches_count: 1 },
+        {
+          id: 1,
+          number: 1,
+          contest_id: 1,
+          deadline: "",
+          status: "ACTIVE",
+          matches_count: 1,
+          kind: "REGULAR",
+          supplementary_index: null,
+          source_round_numbers: [],
+        },
       ])
       .mockResolvedValueOnce({
         matches: [

@@ -48,6 +48,9 @@ export interface RoundOut {
   number: number;
   status: string;
   deadline: string;
+  kind?: string;
+  supplementary_index?: number | null;
+  source_round_numbers?: number[];
 }
 
 export interface MatchOut {
@@ -453,8 +456,27 @@ const ROUND_STATUS_LABELS: Record<string, string> = {
   PUBLISHED: "Опубликован",
 };
 
-export function roundOptionLabel(roundNumber: number, status: string): string {
-  return `Тур ${roundNumber} — ${ROUND_STATUS_LABELS[status] ?? status}`;
+export function roundOptionLabel(round: RoundOut): string;
+export function roundOptionLabel(roundNumber: number, status: string): string;
+export function roundOptionLabel(
+  roundOrNumber: RoundOut | number,
+  status?: string,
+): string {
+  if (typeof roundOrNumber === "number") {
+    return `Тур ${roundOrNumber} — ${ROUND_STATUS_LABELS[status ?? ""] ?? status}`;
+  }
+  const round = roundOrNumber;
+  const title =
+    round.kind === "SUPPLEMENTARY" && round.supplementary_index != null
+      ? `ДопТур${round.supplementary_index}${
+          round.source_round_numbers?.length === 1
+            ? ` (из тура ${round.source_round_numbers[0]})`
+            : round.source_round_numbers && round.source_round_numbers.length > 1
+              ? ` (из туров ${[...round.source_round_numbers].sort((a, b) => a - b).join(", ")})`
+              : ""
+        }`
+      : `Тур ${round.number}`;
+  return `${title} — ${ROUND_STATUS_LABELS[round.status] ?? round.status}`;
 }
 
 export async function ensureRound10Active(contestId = 1): Promise<RoundOut> {

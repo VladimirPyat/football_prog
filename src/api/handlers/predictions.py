@@ -9,9 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import NotFoundError
-from database.models import Match, Round, Team, User
+from database.models import Match, Team, User
 from schemas.predictions import RoundPredictionsView
 from services.prediction_service import visible_predictions
+from services.round_auto_close_service import ensure_round_closed_if_expired
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,8 @@ async def build_round_predictions_view(
     user: User,
 ) -> RoundPredictionsView:
     """Build predictions view for a round with visibility rules."""
-    round_ = await session.get(Round, round_id)
-    if round_ is None or round_.contest_id != contest_id:
+    round_ = await ensure_round_closed_if_expired(session, round_id)
+    if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не найден")
 
     now = datetime.now(UTC)

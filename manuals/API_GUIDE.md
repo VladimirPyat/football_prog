@@ -81,7 +81,7 @@ Client → FastAPI (Uvicorn) → CORS → logging
 | Error mapping | `src/api/error_handlers.py` | `AppError` → HTTP JSON; unhandled → 500 + `notify_admin()` |
 | Exceptions | `src/core/exceptions.py` | `AppError` hierarchy (`NotFoundError`, `ValidationError`, `ContestRuleError`, …) |
 | Logging | `src/core/logging_config.py` | Root logger format; level from `LOG_LEVEL` |
-| Dependencies | `src/api/deps.py` | DB session, JWT user resolution, RBAC, contest context, auto-close hook |
+| Dependencies | `src/api/deps.py` | DB session, JWT user resolution, RBAC, contest context, **batch auto-close hook** [UPDATED 1.16] |
 | Routers | `src/api/v1/*.py` | HTTP mapping only — delegates to services or `src/api/handlers/` |
 | Admin users | `src/api/v1/admin_users.py` | `POST /admin/users/supervisor` (ADMIN only) [NEW] |
 | Shared handlers | `src/api/handlers/` | DRY builders for predictions view and leaderboard/results |
@@ -389,7 +389,32 @@ def validate_round_deadline_placement(deadline, earliest_match, *, now=None) -> 
 def assert_deadline_change_allowed(current_deadline, deadline_rule_hours, *, now=None) -> None
 async def transition_round(session, round_id, target_status: RoundStatus) -> Round
 async def set_deadline(session, round_id, new_deadline: datetime) -> Round
+async def close_round(session, contest_id, round_id) -> Round
 ```
+
+**Auto-close (lazy, no scheduler) [NEW Stage 1.16]:**
+
+No background job. Expired ACTIVE rounds (`now >= deadline`) transition to `CLOSED` synchronously during API requests.
+
+| Layer | Trigger | Implementation |
+|-------|---------|----------------|
+| **Batch** | `ContestContext` on `/api/v1/contests/{contest_id}/…` | `auto_close_expired_rounds(session, contest_id)` in `deps.get_contest_context`; `commit` if any round closed |
+| **Per-round** | Any service touching a specific round | `ensure_round_closed_if_expired(session, round_id)` in `round_auto_close_service.py` — called before prediction/result/calculate/LB guards |
+
+**Guarantees after deadline:**
+
+| Operation | Behaviour |
+|-----------|-----------|
+| `POST …/predictions` | Rejected — `403` `DEADLINE_PASSED` and/or `ROUND_NOT_ACTIVE` |
+| `GET …/predictions` | Full table for all roles (except pre-deadline privacy rules); response `deadline_passed=true` |
+| `PUT …/results`, `POST …/calculate` | Allowed once round is `CLOSED` (auto-closed inline if still `ACTIVE` in DB) |
+| `GET …/rounds` | Returns `status=CLOSED` for expired tours (batch hook and/or prior per-round ensures) |
+
+Legacy shims (`GET/POST /api/v1/rounds/…` without `contest_id`) do **not** use `ContestContext`; they rely on **per-round** ensure inside services/handlers.
+
+Explicit close: `POST /api/v1/contests/{contest_id}/admin/rounds/{id}/close` — same end state; requires `now >= deadline` (idempotent if already `CLOSED`).
+
+See `agent_docs/contracts/contest_lifecycle_flow.md` §3.2 and `manuals/STATUS_REFERENCE.md` §2.
 
 **Status machine** (one-step only; illegal transitions raise `IllegalTransitionError`):
 ```
@@ -421,7 +446,7 @@ async def set_result(session, match_id, score1: int, score2: int) -> Match
 async def change_status(session, match_id, new_status: MatchStatus) -> Match
 ```
 
-- `set_result`: validates `0 ≤ score ≤ max_score_value`; sets `FINISHED`. Allowed when `round.status` is `CLOSED` or `CALCULATED` and `now >= deadline`. On `CALCULATED`, triggers `recalculate_round` after score update so `scores` and staff LB preview stay in sync. [UPDATED] Error `ROUND_NOT_CLOSED` when round is not `CLOSED`/`CALCULATED`: message «Результат можно внести только на закрытом или рассчитанном туре».
+- `set_result`: validates `0 ≤ score ≤ max_score_value`; sets `FINISHED`. Allowed when `round.status` is `CLOSED` or `CALCULATED` and `now >= deadline`. **`ensure_round_closed_if_expired`** runs first so an `ACTIVE` row past deadline is closed inline [NEW 1.16]. On `CALCULATED`, triggers `recalculate_round` after score update so `scores` and staff LB preview stay in sync. [UPDATED] Error `ROUND_NOT_CLOSED` when round is not `CLOSED`/`CALCULATED`: message «Результат можно внести только на закрытом или рассчитанном туре».
 - `change_status(VOID)`: if round is `CALCULATED`, triggers `recalculate_round` atomically.
 
 ### `prediction_service.py` [UPDATED]
@@ -431,7 +456,7 @@ async def submit_batch(session, user_id, round_id, items: list[tuple[int,int,int
 async def visible_predictions(session, round_id, viewer_role, viewer_id) -> list[dict]
 ```
 
-Before deadline: own scores only for `USER` and `SUPERVISOR`; `ADMIN` sees all. After deadline: full table.
+Before deadline: own scores only for `USER` and `SUPERVISOR`; `ADMIN` sees all. After deadline: full table (`visible_predictions` uses `now >= deadline`; **`ensure_round_closed_if_expired`** on GET/POST [NEW 1.16]).
 
 API adds `assert_contest_running` before submit. Incomplete batch → `400`; deadline/not ACTIVE/contest not RUNNING → `403`.
 

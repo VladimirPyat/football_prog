@@ -22,6 +22,12 @@ const farDeadline = new Date(Date.now() + 48 * 3_600_000).toISOString();
 /** Deadline is 10h from now — change window CLOSED (within 24h). */
 const nearDeadline = new Date(Date.now() + 10 * 3_600_000).toISOString();
 
+const roundDefaults = {
+  kind: "REGULAR" as const,
+  supplementary_index: null,
+  source_round_numbers: [] as number[],
+};
+
 const draftRound: RoundOut = {
   id: 1,
   contest_id: 1,
@@ -29,6 +35,7 @@ const draftRound: RoundOut = {
   deadline: farDeadline,
   status: "DRAFT",
   matches_count: 4,
+  ...roundDefaults,
 };
 
 const activeRoundFarDeadline: RoundOut = { ...draftRound, status: "ACTIVE", deadline: farDeadline };
@@ -83,14 +90,15 @@ describe("deriveAdminUiMode", () => {
     expect(mode.canEditMatchStatusAndDate).toBe(true);
   });
 
-  it("[UNIT-UI-MODE-ACTIVE] ACTIVE + deadlinePassed → structure still frozen", () => {
+  it("[UNIT-UI-MODE-ACTIVE] ACTIVE + deadlinePassed → effective CLOSED, schedule frozen", () => {
     const mode = deriveAdminUiMode({
       contest: baseContest,
       round: activeRoundFarDeadline,
       deadlinePassed: true,
     });
     expect(mode.canEditRoundStructure).toBe(false);
-    expect(mode.canEditMatchStatusAndDate).toBe(true);
+    expect(mode.canEditMatchStatusAndDate).toBe(false);
+    expect(mode.showDeadlinePassedHint).toBe(true);
   });
 
   it("allows structure edit in DRAFT", () => {
@@ -146,13 +154,14 @@ describe("deriveAdminUiMode", () => {
     expect(mode.canVoidMatch).toBe(true);
   });
 
-  it("disables results entry for ACTIVE round even when deadline passed", () => {
+  it("allows results entry when ACTIVE round deadline passed (effective CLOSED)", () => {
     const mode = deriveAdminUiMode({
       contest: baseContest,
       round: activeRoundFarDeadline,
       deadlinePassed: true,
     });
-    expect(mode.canEnterResults).toBe(false);
+    expect(mode.canEnterResults).toBe(true);
+    expect(mode.canCalculate).toBe(true);
   });
 
   it("allows create round when no draft exists", () => {

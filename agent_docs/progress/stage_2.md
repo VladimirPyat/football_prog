@@ -161,7 +161,21 @@
 
 ## 2026-06-28 — Coder (2.3.3 fix setup — frontend)
 - STATUS: READY_FOR_TEST
-- Files: CreateContestForm, ContestParametersForm, ContestLifecycleActions, admin_setup.spec.ts, SUPERVISOR_TESTING_SCENARIOS.md
+- Instruction: `agent_docs/instructions/coder_2.3.3_fix_setup.md`
+- Files:
+  - `CreateContestForm.tsx` — name + slug only
+  - `AdminTopNav.tsx` — slim create payload, setup hint flag
+  - `lib/validation/admin.ts` — slim schema, `deriveRoundRobinStructure`
+  - `ContestParametersForm.tsx` — round-robin sync, help, hint
+  - `ContestLifecycleActions.tsx` — start + delete CTAs
+  - `lib/api/endpoints.ts` — `contests.start`
+  - `app/admin/settings/parameters/page.tsx` — lifecycle callbacks
+  - `LifecyclePanel.tsx` — DRAFT delete copy
+  - `RoundManagementPanel.tsx` — activate modal when locked
+  - `lib/validation/admin.test.ts` — round-robin derive tests
+  - `e2e/admin_setup.spec.ts` — E2E-ADMIN-START, CREATE-MODAL, PARAMS-ROUND-ROBIN
+  - `e2e/fixtures/adminApi.ts` — `startContest()`, flexible `createDraftContest`
+  - `manuals/SUPERVISOR_TESTING_SCENARIOS.md` — S1.11, S0.6/S0.7, S1.12
 - Verified: lint/tsc OK; Vitest 94/94
 
 ## 2026-06-28 — Tester (2.3.3 fix setup)
@@ -179,3 +193,29 @@
 - Delete/restore: API OK; UI E2E skipped (training mode frontend env)
 - Skip: manual S1.11, `[E2E-ACTIVATE-COPY]`, `[LINT-FORMAT]` (7 Coder files)
 - Next: @Coder — document `POST /start` in API_GUIDE; optional activate-copy + delete/restore E2E
+
+## 2026-06-28 — Coder (2.3.4 QA follow-up — chat-driven frontend)
+- STATUS: READY_FOR_TEST
+- Instruction: `agent_docs/instructions/coder_2.3.4_qa_followup.md` (not in `coder_2.3.3_fix_setup.md`)
+- Backend dependency: `agent_docs/instructions/backend/coder_1.15_qa_followup.md`
+- Scope: contest context fix (ContestProvider), RulesEditorPanel + rules_json PATCH + auto-save before start, start readiness panel (variant 2), ДопТур labels (roundLabel.ts), bonuses_pending UI notes, contest-setup-changed events; removed ContestSetupDebugBar
+- Key files: RulesEditorPanel.tsx, rulesEditor.ts, ContestStartReadinessPanel.tsx, useContestStartReadiness.ts, contestStartReadiness.ts, roundLabel.ts, roundScoringPending.ts, RoundLeaderboardPreview.tsx, ResultsEntryPanel.tsx, RoundManagementPanel.tsx, FreeTourModal.tsx, ContestLifecycleActions.tsx, useTeams.ts, useParticipants.ts, types/api.ts (RoundOut)
+- E2E: admin_setup.spec.ts, adminApi.ts (`fulfillStartPrerequisites`, `inviteParticipant`)
+- Verified: lint/tsc OK; Vitest 101+ (incl. rulesEditor, roundLabel, contestStartReadiness tests)
+- Manuals: SUPERVISOR_TESTING_SCENARIOS.md — S1.2, S2.23
+- Next: optional tester pass for 2.3.4; scoring engine bonus deferral (backend follow-up)
+
+## 2026-06-28 — Coder (2.3.5 fix deadline — UI sync)
+- STATUS: READY_FOR_TEST
+- Instruction: `agent_docs/instructions/coder_2.3.5_fix_deadline.md`
+- Backend dependency: `coder_1.16_fix_deadline.md`
+- Scope: `roundEffectiveStatus.ts`, `useRoundMatches` onDeadlinePassed → refetch rounds, phase panel routing, Results eligible rounds, removed manual «Закрыть тур» UX; `deriveAdminUiMode` uses effective status
+- Key files: roundEffectiveStatus.ts, useRoundMatches.ts, admin/rounds/page.tsx, admin/results/page.tsx, RoundManagementPanel.tsx, RoundStatusSidebar.tsx, ResultsEntryPanel.tsx, deriveAdminUiMode.ts
+- Verified: lint/tsc OK; Vitest 118/118
+- Next: tester pass for deadline transition (optional E2E)
+
+## 2026-06-28 — Coder (2.3.5 fix deadline — UI sync)
+- STATUS: READY_FOR_TEST
+- Files: frontend/src/lib/admin/roundEffectiveStatus.ts (+test), useRoundMatches.ts (onDeadlinePassed), admin/rounds/page.tsx, admin/results/page.tsx, RoundManagementPanel.tsx, RoundStatusSidebar.tsx, ResultsEntryPanel.tsx, deriveAdminUiMode.ts (+test)
+- Verified: `npm run lint`, `npm run type-check`, `npm run test:unit` — 118 passed
+- Next: optional tester pass for 2.3.5

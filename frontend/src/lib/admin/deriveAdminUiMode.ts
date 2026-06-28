@@ -1,5 +1,9 @@
 import type { ContestOut, RoundOut } from "@/types/api";
 import { canChangeDeadline, getDeadlineRuleHours } from "@/lib/admin/deadlineRule";
+import {
+  effectiveRoundStatus,
+  isDeadlinePassedNow,
+} from "@/lib/admin/roundEffectiveStatus";
 
 export interface AdminUiMode {
   /** Settings pages only — contest is locked for structural edits. */
@@ -49,7 +53,12 @@ export function deriveAdminUiMode({
   const status = contest?.status ?? null;
   const isPaused = status === "PAUSED";
   const isFinished = status === "FINISHED";
-  const roundStatus = round?.status ?? null;
+  const rawRoundStatus = round?.status ?? null;
+  const resolvedDeadlinePassed =
+    deadlinePassed || (round?.deadline ? isDeadlinePassedNow(round.deadline, now) : false);
+  const roundStatus =
+    round === null ? null : effectiveRoundStatus(round, resolvedDeadlinePassed);
+  const isActiveRound = roundStatus === "ACTIVE";
 
   const showSetupLockBanner = isLocked;
   const showLockBanner = showSetupLockBanner; // backward compat alias
@@ -60,8 +69,6 @@ export function deriveAdminUiMode({
     isLocked || status !== "DRAFT" || disableAllMutations;
 
   const canCreateRound = !disableAllMutations && !hasDraftRound;
-
-  const isActiveRound = roundStatus === "ACTIVE";
 
   // Structure (teams) editable only in DRAFT — after activation, league calendar is fixed.
   const canEditRoundStructure = !disableAllMutations && roundStatus === "DRAFT";
@@ -74,13 +81,13 @@ export function deriveAdminUiMode({
   const ruleHours = getDeadlineRuleHours(contest?.rules_json ?? {});
   const changeWindowOpen =
     isActiveRound &&
-    !deadlinePassed &&
+    !resolvedDeadlinePassed &&
     round?.deadline != null &&
     canChangeDeadline(now, round.deadline, ruleHours);
 
   const canEditDeadline =
     !disableAllMutations &&
-    (roundStatus === "DRAFT" || (isActiveRound && !deadlinePassed && changeWindowOpen));
+    (roundStatus === "DRAFT" || (isActiveRound && !resolvedDeadlinePassed && changeWindowOpen));
 
   const roundEditorReadonly =
     roundStatus === "CLOSED" ||
@@ -89,7 +96,7 @@ export function deriveAdminUiMode({
     disableAllMutations;
 
   const showActiveRoundHint = isActiveRound;
-  const showDeadlinePassedHint = isActiveRound && deadlinePassed;
+  const showDeadlinePassedHint = rawRoundStatus === "ACTIVE" && resolvedDeadlinePassed;
 
   const canEnterResults =
     (roundStatus === "CLOSED" || roundStatus === "CALCULATED") && !disableAllMutations;

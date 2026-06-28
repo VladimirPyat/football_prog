@@ -1,10 +1,12 @@
 import { apiGet } from "@/lib/api/client";
 import { contestAdmin } from "@/lib/api/endpoints";
+import { formatRoundTitle } from "@/lib/admin/roundLabel";
 import type { MatchOut, RoundOut } from "@/types/api";
 
 export interface PostponedMatchItem extends MatchOut {
   roundId: number;
   roundNumber: number;
+  roundTitle: string;
 }
 
 export async function collectPostponedMatches(contestId: number): Promise<PostponedMatchItem[]> {
@@ -21,6 +23,7 @@ export async function collectPostponedMatches(contestId: number): Promise<Postpo
           ...match,
           roundId: round.id,
           roundNumber: round.number,
+          roundTitle: formatRoundTitle(round),
         });
       }
     }

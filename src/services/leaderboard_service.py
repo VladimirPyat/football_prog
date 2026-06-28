@@ -13,6 +13,8 @@ from core.exceptions import ContestRuleError, NotFoundError
 from database.models import ContestParticipant, Match, Round, RoundStatus, Score, Team, User
 from scoring.standings import build_standings
 from scoring.types import UserRoundScore
+from services.round_auto_close_service import ensure_round_closed_if_expired
+from services.round_scoring_pending import origin_round_bonuses_pending
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +86,7 @@ def _score_to_user_round(score: Score) -> UserRoundScore:
 async def get_round_leaderboard(
     session: AsyncSession, contest_id: int, round_id: int, *, viewer_role: str | None = None
 ) -> dict:
-    round_ = await session.get(Round, round_id)
-    if round_ is None:
-        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await ensure_round_closed_if_expired(session, round_id)
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
@@ -132,10 +132,14 @@ async def get_round_leaderboard(
             }
         )
 
+    pending, pending_message = await origin_round_bonuses_pending(session, round_id)
+
     return {
         "contest_id": contest_id,
         "round_id": round_id,
         "round_number": round_.number,
+        "bonuses_pending": pending,
+        "bonuses_pending_message": pending_message,
         "leaderboard": rows,
     }
 
@@ -205,9 +209,7 @@ async def get_global_leaderboard(session: AsyncSession, contest_id: int) -> dict
 async def get_round_results(
     session: AsyncSession, contest_id: int, round_id: int, *, viewer_role: str | None = None
 ) -> dict:
-    round_ = await session.get(Round, round_id)
-    if round_ is None:
-        raise NotFoundError(f"Тур {round_id} не найден")
+    round_ = await ensure_round_closed_if_expired(session, round_id)
     if round_.contest_id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from api.deps import DbSession, resolve_default_contest_id
 from database.models import Round
 from schemas.rounds import RoundOut
+from services.round_serialization import rounds_to_out
 
 router = APIRouter(prefix="/rounds", tags=["legacy (deprecated)", "rounds (public)"])
 
@@ -21,4 +22,4 @@ async def list_rounds(session: DbSession) -> list[RoundOut]:
             select(Round).where(Round.contest_id == contest_id).order_by(Round.number)
         )
     ).all()
-    return [RoundOut.model_validate(r) for r in rounds]
+    return await rounds_to_out(session, list(rounds))

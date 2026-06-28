@@ -3,11 +3,18 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "@/lib/api/client";
 import { contestAdmin } from "@/lib/api/endpoints";
+import { BONUSES_PENDING_FALLBACK_MESSAGE } from "@/lib/admin/roundScoringPending";
 
 interface LeaderboardRow {
   rank: number;
   user_name: string;
   total_with_bonus3: number;
+}
+
+interface LeaderboardResponse {
+  leaderboard: LeaderboardRow[];
+  bonuses_pending?: boolean;
+  bonuses_pending_message?: string | null;
 }
 
 interface RoundLeaderboardPreviewProps {
@@ -21,14 +28,20 @@ interface RoundLeaderboardPreviewProps {
  */
 export function RoundLeaderboardPreview({ contestId, roundId }: RoundLeaderboardPreviewProps) {
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
+  const [bonusesPending, setBonusesPending] = useState(false);
+  const [bonusesPendingMessage, setBonusesPendingMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    apiGet<{ leaderboard: LeaderboardRow[] }>(contestAdmin.rounds.leaderboard(contestId, roundId))
-      .then((data) => setRows(data.leaderboard))
+    apiGet<LeaderboardResponse>(contestAdmin.rounds.leaderboard(contestId, roundId))
+      .then((data) => {
+        setRows(data.leaderboard);
+        setBonusesPending(Boolean(data.bonuses_pending));
+        setBonusesPendingMessage(data.bonuses_pending_message ?? null);
+      })
       .catch(() => setError("Не удалось загрузить таблицу"))
       .finally(() => setLoading(false));
   }, [contestId, roundId]);
@@ -40,6 +53,11 @@ export function RoundLeaderboardPreview({ contestId, roundId }: RoundLeaderboard
 
   return (
     <div className="space-y-2">
+      {bonusesPending && (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          {bonusesPendingMessage ?? BONUSES_PENDING_FALLBACK_MESSAGE}
+        </p>
+      )}
       <div className="flex items-center gap-2">
         <h4 className="text-sm font-semibold text-gray-900">Таблица тура</h4>
         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">

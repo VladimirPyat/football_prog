@@ -5,6 +5,7 @@ import {
   deadlineErrorMessage,
   getDeadlineRuleHours,
   isDeadlineValid,
+  isDeadlinePlacementValid,
 } from "@/lib/admin/deadlineRule";
 
 describe("deadlineRule", () => {
@@ -39,6 +40,17 @@ describe("deadlineRule", () => {
 
   it("[UNIT-DEADLINE-PLACEMENT] fails when deadline equals first match time", () => {
     expect(isDeadlineValid(matchTime, matchTime)).toBe(false);
+  });
+
+  it("[UNIT-DEADLINE-PLACEMENT] min gap from rules_json (default 0)", () => {
+    const deadline = "2026-07-01T17:59:00.000Z";
+    const match = "2026-07-01T18:00:00.000Z";
+    expect(isDeadlinePlacementValid(deadline, match, {})).toBe(true);
+    expect(
+      isDeadlinePlacementValid(deadline, match, {
+        contest_structure: { deadline_min_before_match_minutes: 2 },
+      }),
+    ).toBe(false);
   });
 
   it("[UNIT-DEADLINE-PLACEMENT] fails when deadline is after first match", () => {

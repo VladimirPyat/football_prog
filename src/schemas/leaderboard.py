@@ -29,6 +29,8 @@ class LeaderboardOut(BaseModel):
     contest_id: int | None = None
     round_id: int | None = None
     round_number: int | None = None
+    bonuses_pending: bool = False
+    bonuses_pending_message: str | None = None
     leaderboard: list[ScoreDetailOut]
 
 

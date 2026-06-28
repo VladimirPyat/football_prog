@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { deriveAdminUiMode } from "@/lib/admin/deriveAdminUiMode";
-import { roundStatusHint, roundStatusLabel } from "@/lib/admin/format";
+import { formatRoundOptionLabel } from "@/lib/admin/roundLabel";
+import { effectiveRoundStatus, isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
+import {
+  BONUSES_PENDING_FALLBACK_MESSAGE,
+  roundHasVisiblePostponements,
+} from "@/lib/admin/roundScoringPending";
+import { roundStatusHint } from "@/lib/admin/format";
 import type { ContestOut, MatchOut, RoundOut } from "@/types/api";
 import { MatchResultRow } from "@/components/admin/MatchResultRow";
 import { RoundLeaderboardPreview } from "@/components/admin/RoundLeaderboardPreview";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { apiGet } from "@/lib/api/client";
+import { contestAdmin } from "@/lib/api/endpoints";
 
 interface ResultsEntryPanelProps {
   contest: ContestOut;
@@ -23,7 +31,6 @@ interface ResultsEntryPanelProps {
   onVoid: (matchId: number) => Promise<void>;
   onCalculate: (roundId: number) => Promise<void>;
   onPublish: (roundId: number) => Promise<void>;
-  onCloseRound?: (roundId: number) => Promise<void>;
 }
 
 function resultsStatusHint(roundStatus: string): string {
@@ -53,23 +60,59 @@ export function ResultsEntryPanel({
   onVoid,
   onCalculate,
   onPublish,
-  onCloseRound,
 }: ResultsEntryPanelProps) {
   const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
-  const uiMode = deriveAdminUiMode({ contest, round: selectedRound, matches });
+  const displayRoundStatus = selectedRound ? effectiveRoundStatus(selectedRound) : null;
+  const uiMode = deriveAdminUiMode({
+    contest,
+    round: selectedRound,
+    matches,
+  });
   const [voidId, setVoidId] = useState<number | null>(null);
   const [working, setWorking] = useState(false);
-  const [closing, setClosing] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [publishedStubOpen, setPublishedStubOpen] = useState(false);
+  const [bonusesPendingMessage, setBonusesPendingMessage] = useState<string | null>(null);
 
-  const eligibleRounds = rounds.filter((r) =>
-    ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status),
+  const eligibleRounds = rounds.filter(
+    (r) =>
+      ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status) ||
+      (r.status === "ACTIVE" && isDeadlinePassedNow(r.deadline)),
   );
 
   const allFinished = matches.every(
     (m) => m.status === "FINISHED" || m.status === "VOID" || m.status === "CANCELED",
   );
+
+  const showBonusesPendingNote =
+    roundHasVisiblePostponements(matches) || bonusesPendingMessage != null;
+
+  useEffect(() => {
+    if (!selectedRoundId || !selectedRound) {
+      setBonusesPendingMessage(null);
+      return;
+    }
+    if (!["CALCULATED", "PUBLISHED"].includes(selectedRound.status)) {
+      setBonusesPendingMessage(null);
+      return;
+    }
+    let cancelled = false;
+    void apiGet<{ bonuses_pending?: boolean; bonuses_pending_message?: string | null }>(
+      contestAdmin.rounds.leaderboard(contest.id, selectedRoundId),
+    )
+      .then((data) => {
+        if (cancelled) return;
+        setBonusesPendingMessage(
+          data.bonuses_pending ? data.bonuses_pending_message ?? BONUSES_PENDING_FALLBACK_MESSAGE : null,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setBonusesPendingMessage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contest.id, selectedRoundId, selectedRound]);
 
   if (loading && !rounds.length) return <LoadingState message="Загрузка…" />;
 
@@ -77,29 +120,15 @@ export function ResultsEntryPanel({
     <div className="space-y-6">
       {eligibleRounds.length === 0 && (
         <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded px-4 py-3">
-          Нет туров, готовых к вводу результатов. Закройте активный тур на странице «Туры».
+          Нет туров, готовых к вводу результатов. Дождитесь окончания дедлайна активного тура.
         </p>
       )}
 
-      {activeRoundId != null && activeDeadlinePassed && onCloseRound && (
-        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <span>Дедлайн прошёл. Закройте тур, чтобы ввести результаты.</span>
-          <button
-            type="button"
-            disabled={closing}
-            onClick={async () => {
-              setClosing(true);
-              try {
-                await onCloseRound(activeRoundId);
-              } finally {
-                setClosing(false);
-              }
-            }}
-            className="px-3 py-1.5 text-sm text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
-          >
-            {closing ? "Закрытие…" : "Закрыть тур"}
-          </button>
-        </div>
+      {activeRoundId != null && activeDeadlinePassed && eligibleRounds.length === 0 && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-3">
+          Дедлайн прогнозов прошёл. Прогнозы закрыты; ввод результатов — на этой вкладке после
+          обновления списка туров.
+        </p>
       )}
 
       <div className="flex flex-wrap items-center gap-3">
@@ -112,7 +141,7 @@ export function ResultsEntryPanel({
           <option value="">Выберите тур</option>
           {eligibleRounds.map((r) => (
             <option key={r.id} value={r.id}>
-              Тур {r.number} — {roundStatusLabel(r.status)}
+              {formatRoundOptionLabel(r)}
             </option>
           ))}
         </select>
@@ -126,12 +155,20 @@ export function ResultsEntryPanel({
       {selectedRound && (
         <>
           <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded px-3 py-2">
-            {roundStatusHint(selectedRound.status)}
+            {roundStatusHint(displayRoundStatus ?? selectedRound.status)}
           </p>
 
-          <p className="text-sm text-gray-600">{resultsStatusHint(selectedRound.status)}</p>
+          <p className="text-sm text-gray-600">
+            {resultsStatusHint(displayRoundStatus ?? selectedRound.status)}
+          </p>
 
-          {selectedRound.status === "CLOSED" && (
+          {showBonusesPendingNote && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              {bonusesPendingMessage ?? BONUSES_PENDING_FALLBACK_MESSAGE}
+            </p>
+          )}
+
+          {displayRoundStatus === "CLOSED" && (
             <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
               Счёт можно вносить после времени начала каждого матча.
             </p>
@@ -153,7 +190,7 @@ export function ResultsEntryPanel({
                   <MatchResultRow
                     key={m.id}
                     match={m}
-                    roundStatus={selectedRound.status}
+                    roundStatus={displayRoundStatus ?? selectedRound.status}
                     maxScore={maxScore}
                     scoresReadonly={uiMode.resultsReadonly || !uiMode.canEnterResults}
                     canVoid={uiMode.canVoidMatch && m.status !== "VOID"}
@@ -209,7 +246,7 @@ export function ResultsEntryPanel({
                 Результаты участников
               </button>
             )}
-            {selectedRound.status === "CLOSED" && (
+            {displayRoundStatus === "CLOSED" && (
               <span
                 title="Сначала рассчитайте тур"
                 className="px-4 py-2 text-sm border border-gray-200 rounded text-gray-400 cursor-not-allowed"

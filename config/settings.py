@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     log_archive_max_bytes: int = 5_242_880  # 5 MiB
     log_archive_interval_days: int = 7
 
+    # ── Datetime (API / DB) ───────────────────────────────────────────────────
+    # All TIMESTAMPTZ values are stored and compared in this zone (UTC only today).
+    api_timestamp_timezone: str = "UTC"
+
     # ── Paths & seed data ────────────────────────────────────────────────────
     contest_defaults_path: Path = DEFAULT_CONTEST_DEFAULTS_PATH
     upload_dir: Path = PROJECT_ROOT / "uploads"

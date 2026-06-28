@@ -18,6 +18,7 @@ from services.contest_lifecycle_service import (
 )
 from services.round_service import (
     close_round,
+    get_deadline_min_before_match_minutes,
     set_deadline,
     transition_round,
     validate_round_deadline_placement,
@@ -63,7 +64,12 @@ async def create_round(body: CreateRoundRequest, session: DbSession) -> dict:
         if dt_check < now:
             raise ValidationError("Дата матча не может быть в прошлом")
     _ = deadline_rule  # rule_hours retained for future warnings; placement rule does not use it
-    validate_round_deadline_placement(dl, earliest, now=now)
+    validate_round_deadline_placement(
+        dl,
+        earliest,
+        now=now,
+        min_before_match_minutes=get_deadline_min_before_match_minutes(contest.rules_json),
+    )
 
     existing = await session.scalar(
         select(Round).where(Round.contest_id == contest_id, Round.number == body.number)

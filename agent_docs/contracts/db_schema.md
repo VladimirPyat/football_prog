@@ -57,11 +57,14 @@
 - `deadline`: TIMESTAMPTZ NOT NULL
 - `status`: VARCHAR NOT NULL (Enum: 'DRAFT', 'ACTIVE', 'CLOSED', 'CALCULATED', 'PUBLISHED')
 - `matches_count`: INTEGER NOT NULL DEFAULT 0
+- `kind`: VARCHAR NOT NULL DEFAULT `'REGULAR'` (`REGULAR` | `SUPPLEMENTARY`)
+- `supplementary_index`: INTEGER NULL — 1, 2, 3… for ДопТур labels (only when `kind=SUPPLEMENTARY`)
 - **Constraints**: `UNIQUE (contest_id, number)`
 
 ### 1.7 `matches`
 - `id`: INTEGER PRIMARY KEY
 - `round_id`: INTEGER NOT NULL REFERENCES `rounds(id)`
+- `origin_round_id`: INTEGER NULL REFERENCES `rounds(id)` — set when match moved to supplementary round
 - `team1_id`: INTEGER NOT NULL REFERENCES `teams(id)`
 - `team2_id`: INTEGER NOT NULL REFERENCES `teams(id)`
 - `date_time`: TIMESTAMPTZ NOT NULL
@@ -99,6 +102,9 @@
 - `total_without_bonus3`: INTEGER NOT NULL DEFAULT 0
 - `total_with_bonus3`: INTEGER NOT NULL DEFAULT 0
 - `correct_outcomes`: INTEGER NOT NULL DEFAULT 0
+- **Scoring scope:** row always references the **origin (regular) round** `round_id`.
+  Matches played in supplementary (ДопТур) rounds add points to this same row via
+  `matches.origin_round_id`. See [scoring_flow.md](scoring_flow.md) §6.
 - **Constraints**:
   - `UNIQUE (user_id, round_id)`
 

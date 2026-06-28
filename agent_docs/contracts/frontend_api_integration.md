@@ -15,8 +15,24 @@
 | API prefix | `/api/v1` |
 | Default contest (fallback) | `NEXT_PUBLIC_DEFAULT_CONTEST_ID` — used when B1/B2 lists empty or unavailable |
 | CORS | Backend `cors_origins` default `["*"]` (`config/settings.py`); direct browser→FastAPI calls OK in dev |
-| Timestamps | TIMESTAMPTZ, UTC, ISO 8601 — parse as UTC, render local |
+| Timestamps | See [§1.1 Timestamps](#11-timestamps) |
 | Content type | `application/json` (except team logo upload B5 → `multipart/form-data`) |
+
+### 1.1 Timestamps
+
+| Layer | Timezone | Config |
+|-------|----------|--------|
+| **DB / API storage** | UTC | Backend `TIMESTAMPTZ`; naive ISO from API → UTC (`config/settings.py` → `api_timestamp_timezone`) |
+| **Wire format** | UTC ISO 8601 | Prefer `…Z`; naive `2026-06-28T17:00:00` is **UTC wall clock**, not local |
+| **Parse on read** | UTC | `frontend/src/lib/datetime/parseApiUtc.ts` + `NEXT_PUBLIC_API_TIMESTAMP_TIMEZONE=UTC` |
+| **Supervisor input** | Display zone | `<input type="datetime-local">` — wall time in `NEXT_PUBLIC_DISPLAY_TIMEZONE` (default `Europe/Moscow`) |
+| **Submit to API** | UTC | `fromDatetimeLocal()` → `toISOString()` |
+| **Labels in UI** | Display zone | `formatDateTimeRu()` via `NEXT_PUBLIC_DISPLAY_TIMEZONE` + `NEXT_PUBLIC_DATETIME_LOCALE` |
+| **Unset display zone** | Browser local | Omit `NEXT_PUBLIC_DISPLAY_TIMEZONE` — inputs/labels follow supervisor device |
+
+Implementation hub: `frontend/src/lib/datetime/config.ts`, `formatApiDateTime.ts`.
+
+**Do not** use bare `Date.parse(naiveIso)` on API fields — browsers treat naive ISO as local; backend treats it as UTC.
 
 **Path builder convention:** all contest data is scoped: `${API}/api/v1/contests/${contestId}/…`. Never call legacy deprecated shims (`/api/v1/rounds`, `/api/v1/leaderboard`, `/api/v1/admin/contest-settings`, `/api/v1/admin/*` without contest) from new code.
 

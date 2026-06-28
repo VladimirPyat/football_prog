@@ -14,5 +14,8 @@ class RoundOut(BaseModel):
     deadline: datetime
     status: str
     matches_count: int
+    kind: str = "REGULAR"
+    supplementary_index: int | None = None
+    source_round_numbers: list[int] = []
 
     model_config = {"from_attributes": True}

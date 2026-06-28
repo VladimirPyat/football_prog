@@ -96,12 +96,19 @@ async def _build_snapshot(session: AsyncSession, contest_id: int) -> dict:
                 "deadline": _iso(r.deadline),
                 "status": r.status,
                 "matches_count": r.matches_count,
+                "kind": r.kind,
+                "supplementary_index": r.supplementary_index,
             }
             for r in rounds
         ],
         "matches": [
             {
                 "round_number": round_number_by_id[m.round_id],
+                "origin_round_number": (
+                    round_number_by_id.get(m.origin_round_id)
+                    if m.origin_round_id is not None
+                    else None
+                ),
                 "team1_id": m.team1_id,
                 "team2_id": m.team2_id,
                 "date_time": _iso(m.date_time),
@@ -206,15 +213,24 @@ async def restore_contest_from_snapshot(session: AsyncSession, contest_id: int) 
             deadline=_parse_dt(rnd["deadline"]),
             status=rnd["status"],
             matches_count=rnd.get("matches_count", 0),
+            kind=rnd.get("kind", "REGULAR"),
+            supplementary_index=rnd.get("supplementary_index"),
         )
         session.add(entity)
         await session.flush()
         round_id_by_number[int(rnd["number"])] = entity.id
 
     for match in data.get("matches", []):
+        origin_round_number = match.get("origin_round_number")
+        origin_round_id = (
+            round_id_by_number.get(int(origin_round_number))
+            if origin_round_number is not None
+            else None
+        )
         session.add(
             Match(
                 round_id=round_id_by_number[int(match["round_number"])],
+                origin_round_id=origin_round_id,
                 team1_id=team_id_map[int(match["team1_id"])],
                 team2_id=team_id_map[int(match["team2_id"])],
                 date_time=_parse_dt(match["date_time"]),

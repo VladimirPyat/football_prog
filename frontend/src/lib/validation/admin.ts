@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseApiUtc } from "@/lib/datetime/parseApiUtc";
 import { deadlineErrorMessage, isDeadlineValid } from "@/lib/admin/deadlineRule";
 
 export const createContestSchema = z.object({
@@ -99,7 +100,7 @@ export function roundBuilderSchema(matchesPerRound: number, rules: Record<string
         });
       }
       const validTimestamps = d.matches
-        .map((m) => Date.parse(m.date_time))
+        .map((m) => parseApiUtc(m.date_time))
         .filter((t) => !Number.isNaN(t));
       if (validTimestamps.length === 0) return;
       const earliest = Math.min(...validTimestamps);
