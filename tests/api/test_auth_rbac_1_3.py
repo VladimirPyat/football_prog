@@ -34,34 +34,38 @@ async def test_auth_login_invalid(loaded_api):
 
 
 @pytest.mark.asyncio
-async def test_auth_temp_password_restricted(loaded_api):
-    """[AUTH-TEMP] temp password → 403 on predictions; change-password OK."""
-    client, _, _ = loaded_api
-    token = await api_login(client, "temp_user")
+async def test_auth_temp_password_restricted(stage_112_api):
+    """[AUTH-TEMP] temp login blocked; after complete-setup user gets JWT."""
+    from tests.api.stage_112_helpers import (
+        NEW_SECURE_PASSWORD,
+        complete_setup,
+        create_draft_contest,
+        invite_participant,
+        login_raw,
+    )
+
+    client, _, _ = stage_112_api
+    cid, h = await create_draft_contest(client, name="Auth Temp")
+    data = await invite_participant(
+        client, cid, h, email="temp_gate@example.com", login="temp_gate_user"
+    )
+
+    blocked = await login_raw(client, data["login"], data["temp_password"])
+    assert blocked.status_code == 403
+    assert blocked.json()["code"] == "PASSWORD_SETUP_REQUIRED"
+
+    await complete_setup(client, data["setup_url"])
+    token = await api_login(client, data["login"], NEW_SECURE_PASSWORD)
     headers = auth_header(token)
 
     me = await client.get(f"{API_PREFIX}/auth/me", headers=headers)
     assert me.status_code == 200
-    assert me.json()["is_temp_password"] is True
-
-    rid = 1
-    rounds = await client.get(f"{API_PREFIX}/rounds")
-    for r in rounds.json():
-        if r["number"] == 10:
-            rid = r["id"]
-            break
-
-    pred = await client.post(
-        f"{API_PREFIX}/rounds/{rid}/predictions",
-        headers=headers,
-        json={"predictions": []},
-    )
-    assert pred.status_code == 403
+    assert me.json()["is_temp_password"] is False
 
     change = await client.post(
         f"{API_PREFIX}/auth/change-password",
         headers=headers,
-        json={"old_password": TEST_PASSWORD, "new_password": "newpass456"},
+        json={"old_password": NEW_SECURE_PASSWORD, "new_password": "newpass456"},
     )
     assert change.status_code == 200
 

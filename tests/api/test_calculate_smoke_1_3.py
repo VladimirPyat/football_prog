@@ -8,8 +8,11 @@ from sqlalchemy import select
 from database.models import Match, RoundStatus, Score
 from tests.api.conftest import (
     API_PREFIX,
+    DEFAULT_CONTEST_ID,
+    TEST_PASSWORD,
     api_login,
     auth_header,
+    contest_url,
     ensure_contest_running,
     get_round_id,
     get_round10_match_ids,
@@ -105,18 +108,29 @@ async def test_cache_headers_public_get(loaded_api):
 
 @pytest.mark.asyncio
 async def test_cache_etag_changes_after_calculate(loaded_api):
-    """[API-CACHE-ETAG] ETag changes after calculate."""
+    """[API-CACHE-ETAG] ETag changes after calculate (staff CALCULATED → publish)."""
     client, sf, _ = loaded_api
     await ensure_contest_running(sf, client)
     sup = await api_login(client, "supervisor_api")
     h = auth_header(sup)
 
     rid2 = await get_round_id(sf, 2)
-    first = await client.get(f"{API_PREFIX}/rounds/{rid2}/leaderboard")
-    assert first.status_code in (200, 403, 404)
+    lb_url = contest_url(DEFAULT_CONTEST_ID, f"/rounds/{rid2}/leaderboard")
+    calc_url = contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid2}/calculate")
 
-    await client.post(f"{API_PREFIX}/admin/rounds/{rid2}/calculate", headers=h)
-    second = await client.get(f"{API_PREFIX}/rounds/{rid2}/leaderboard")
+    calc = await client.post(calc_url, headers=h)
+    assert calc.status_code == 200
+
+    first = await client.get(lb_url, headers=h)
+    assert first.status_code == 200
+
+    publish = await client.post(
+        contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid2}/publish"),
+        headers=h,
+    )
+    assert publish.status_code == 200
+
+    second = await client.get(lb_url, headers=h)
     assert second.status_code == 200
-    if first.status_code == 200 and "etag" in first.headers:
+    if "etag" in first.headers:
         assert second.headers.get("etag") != first.headers.get("etag")

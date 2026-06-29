@@ -518,6 +518,26 @@ async def calculate_rounds_via_http(
         assert resp.status_code == 200, f"Round {n}: {resp.text}"
 
 
+async def publish_rounds_via_http(
+    client: httpx.AsyncClient,
+    sf: async_sessionmaker[AsyncSession],
+    contest_id: int = DEFAULT_CONTEST_ID,
+    round_numbers: range | None = None,
+) -> None:
+    """Publish rounds after calculate (global LB requires PUBLISHED)."""
+    if round_numbers is None:
+        round_numbers = range(1, 10)
+    sup = await api_login(client, "supervisor_api")
+    h = auth_header(sup)
+    for n in round_numbers:
+        rid = await get_round_id(sf, n, contest_id)
+        resp = await client.post(
+            contest_url(contest_id, f"/admin/rounds/{rid}/publish"),
+            headers=h,
+        )
+        assert resp.status_code == 200, f"Round {n} publish: {resp.text}"
+
+
 def _ensure_src_api_importable() -> None:
     """pytest adds tests/api/ to sys.path — remove shadow of src/api."""
     test_dir = str(Path(__file__).resolve().parent)

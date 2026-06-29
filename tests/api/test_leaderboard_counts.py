@@ -13,6 +13,7 @@ from tests.api.conftest import (
     calculate_rounds_via_http,
     contest_url,
     get_round_id,
+    publish_rounds_via_http,
 )
 from tests.api.reference_compare import load_leaderboard
 
@@ -64,16 +65,18 @@ async def test_lb_counts_global(loaded_api):
     """[LB-COUNTS-GLOBAL] Global leaderboard count_* match StandingRow aggregates."""
     client, sf, _ = loaded_api
     await calculate_rounds_via_http(client, sf, DEFAULT_CONTEST_ID)
+    await publish_rounds_via_http(client, sf, DEFAULT_CONTEST_ID)
 
     resp = await client.get(contest_url(DEFAULT_CONTEST_ID, "/leaderboard"))
     assert resp.status_code == 200
-    rows = {r["user_name"]: r for r in resp.json()["leaderboard"]}
+    rows = {r["user_id"]: r for r in resp.json()["leaderboard"]}
 
     csv_rows = {r["user_login"]: r for r in load_leaderboard()}
     async with sf() as session:
         larin = await session.scalar(select(User).where(User.login == "larin"))
+        assert larin is not None
 
-    larin_row = rows[f"{larin.first_name} {larin.last_name}"]
+    larin_row = rows[larin.id]
     csv = csv_rows["larin"]
     assert larin_row["count_exact_high"] == int(csv["exact_high_count"])
     assert larin_row["count_exact"] == int(csv["exact_count"])

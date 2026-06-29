@@ -561,15 +561,16 @@ async def test_batch_zero_zero_accepted(session: AsyncSession):
 
 
 async def test_batch_after_deadline_rejected(session: AsyncSession):
-    """Submitting after the round deadline raises PermissionError."""
+    """After 1.16 auto-close, expired ACTIVE round is CLOSED before submit_batch deadline check."""
     past_deadline = datetime.now(timezone.utc) - timedelta(hours=1)
     async with session.begin():
         uid, rid, mids = await _setup_batch_env(session, deadline=past_deadline)
 
     items = [(mid, 1, 0) for mid in mids]
-    with pytest.raises(ContestRuleError, match="истёк"):
+    with pytest.raises(ContestRuleError) as exc_info:
         async with session.begin():
             await submit_batch(session, CONTEST_ID, uid, rid, items)
+    assert exc_info.value.code in ("ROUND_NOT_ACTIVE", "DEADLINE_PASSED")
 
 
 async def test_batch_invalid_score_no_partial_save(session: AsyncSession):

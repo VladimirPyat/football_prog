@@ -227,9 +227,15 @@ async def test_op_recalc(loaded_api):
 
 
 @pytest.mark.asyncio
-async def test_setup_part_auth(empty_api):
-    """[SETUP-PART-AUTH] invite → login → change-password → predictions OK."""
-    client, sf, _ = empty_api
+async def test_setup_part_auth(stage_112_api):
+    """[SETUP-PART-AUTH] invite → complete-setup → login → predictions OK."""
+    from tests.api.stage_112_helpers import (
+        NEW_SECURE_PASSWORD,
+        complete_setup,
+        invite_participant,
+    )
+
+    client, sf, _ = stage_112_api
     sup = await api_login(client, "supervisor_api")
     h = auth_header(sup)
     created = await client.post(
@@ -251,27 +257,17 @@ async def test_setup_part_auth(empty_api):
         )
         tids.append(t.json()["id"])
 
-    invite = await client.post(
-        contest_url(cid, "/participants"),
-        headers=h,
-        json={
-            "email": "player@example.com",
-            "first_name": "Play",
-            "last_name": "Er",
-            "login": "player_auth",
-        },
+    invite = await invite_participant(
+        client,
+        cid,
+        h,
+        email="player@example.com",
+        first_name="Play",
+        last_name="Er",
+        login="player_auth",
     )
-    data = invite.json()
-    temp_pw = data["temp_password"]
-    login = data["login"]
-
-    token = await api_login(client, login, temp_pw)
-    change = await client.post(
-        f"{API_PREFIX}/auth/change-password",
-        headers=auth_header(token),
-        json={"old_password": temp_pw, "new_password": TEST_PASSWORD},
-    )
-    assert change.status_code == 200
+    await complete_setup(client, invite["setup_url"])
+    login = invite["login"]
 
     now = datetime.now(timezone.utc)
     matches = []
@@ -295,7 +291,7 @@ async def test_setup_part_auth(empty_api):
     rid = rnd.json()["round_id"]
     await client.post(contest_url(cid, f"/admin/rounds/{rid}/activate"), headers=h)
 
-    user_token = await api_login(client, login)
+    user_token = await api_login(client, login, NEW_SECURE_PASSWORD)
     async with sf() as session:
         db_matches = (
             await session.scalars(select(Match).where(Match.round_id == rid).order_by(Match.id))

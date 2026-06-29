@@ -154,9 +154,11 @@ async def test_setup_teams_locked_after_activate(empty_api):
 
 
 @pytest.mark.asyncio
-async def test_setup_participant_invite(empty_api):
-    """[SETUP-PART] POST participant → temp password; login works."""
-    client, _, _ = empty_api
+async def test_setup_participant_invite(stage_112_api):
+    """[SETUP-PART] POST participant → complete-setup → login works."""
+    from tests.api.stage_112_helpers import NEW_SECURE_PASSWORD, complete_setup, invite_participant
+
+    client, _, _ = stage_112_api
     sup = await api_login(client, "supervisor_api")
     h = auth_header(sup)
     created = await client.post(
@@ -165,20 +167,18 @@ async def test_setup_participant_invite(empty_api):
         json={"name": "Participants"},
     )
     cid = created.json()["id"]
-    resp = await client.post(
-        contest_url(cid, "/participants"),
-        headers=h,
-        json={
-            "email": "newuser@example.com",
-            "first_name": "New",
-            "last_name": "User",
-            "login": "newuser_e2e",
-        },
+    data = await invite_participant(
+        client,
+        cid,
+        h,
+        email="newuser@example.com",
+        first_name="New",
+        last_name="User",
+        login="newuser_e2e",
     )
-    assert resp.status_code == 200
-    data = resp.json()
     assert data["temp_password"]
-    token = await api_login(client, data["login"], data["temp_password"])
+    await complete_setup(client, data["setup_url"])
+    token = await api_login(client, data["login"], NEW_SECURE_PASSWORD)
     me = await client.get(f"{API_PREFIX}/auth/me", headers=auth_header(token))
     assert me.status_code == 200
 

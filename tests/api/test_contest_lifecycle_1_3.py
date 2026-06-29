@@ -5,11 +5,13 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from database.models import ContestLifecycleStatus, Contest, User
+from database.models import Contest, ContestLifecycleStatus, Match, Round, User
 from tests.api.conftest import (
     API_PREFIX,
+    DEFAULT_CONTEST_ID,
     api_login,
     auth_header,
+    contest_url,
     ensure_contest_running,
     get_round_id,
     reset_contest_unlocked,
@@ -127,58 +129,129 @@ async def test_tiebreak_display_on_leaderboard(loaded_api):
     await ensure_contest_running(sf, client)
     sup = await api_login(client, "supervisor_api")
     admin = await api_login(client, "admin_api")
+    sup_h = auth_header(sup)
     rid = await get_round_id(sf, 1)
     await client.post(
-        f"{API_PREFIX}/admin/rounds/{rid}/calculate",
-        headers=auth_header(sup),
+        contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid}/calculate"),
+        headers=sup_h,
+    )
+    await client.post(
+        contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid}/publish"),
+        headers=sup_h,
     )
     async with sf() as session:
         uid = await session.scalar(select(User.id).where(User.login == "shutov"))
     await client.put(
-        f"{API_PREFIX}/admin/users/{uid}/exceptional-tiebreak",
+        contest_url(DEFAULT_CONTEST_ID, f"/participants/{uid}/exceptional-tiebreak"),
         headers=auth_header(admin),
         json={"points": 3},
     )
-    lb = await client.get(f"{API_PREFIX}/leaderboard")
+    lb = await client.get(contest_url(DEFAULT_CONTEST_ID, "/leaderboard"))
     assert lb.status_code == 200
     row = next(r for r in lb.json()["leaderboard"] if r["user_id"] == uid)
     assert row["exceptional_tiebreak_points"] == 3
 
 
 @pytest.mark.asyncio
-async def test_tiebreak_rank_synthetic(loaded_api):
+async def test_tiebreak_rank_synthetic(stage_112_api):
     """[API-TB-RANK] higher exceptional points rank above on synthetic tie."""
-    client, sf, _ = loaded_api
-    await ensure_contest_running(sf, client)
-    sup = await api_login(client, "supervisor_api")
-    admin = await api_login(client, "admin_api")
-    for n in range(1, 10):
-        rid = await get_round_id(sf, n)
-        await client.post(
-            f"{API_PREFIX}/admin/rounds/{rid}/calculate",
-            headers=auth_header(sup),
-        )
+    from datetime import UTC, datetime, timedelta
+
+    from database.models import Round
+
+    from tests.api.stage_112_helpers import (
+        NEW_SECURE_PASSWORD,
+        activate_first_round,
+        add_teams,
+        complete_setup,
+        create_draft_contest,
+        invite_participant,
+    )
+    from tests.api.test_contest_start_1_15 import _start_contest
+
+    client, sf, _ = stage_112_api
+    cid, sup_h = await create_draft_contest(client, name="Tiebreak Synthetic")
+    tids = await add_teams(client, cid, sup_h)
+
+    inv_a = await invite_participant(
+        client, cid, sup_h, email="tie_a@example.com", login="tie_user_a"
+    )
+    inv_b = await invite_participant(
+        client, cid, sup_h, email="tie_b@example.com", login="tie_user_b"
+    )
+    await complete_setup(client, inv_a["setup_url"])
+    await complete_setup(client, inv_b["setup_url"])
+
+    await _start_contest(client, cid, sup_h)
+    rid = await activate_first_round(client, cid, sup_h, tids)
 
     async with sf() as session:
-        u_high = await session.scalar(select(User.id).where(User.login == "shutov"))
-        u_low = await session.scalar(select(User.id).where(User.login == "volchenko"))
+        matches = (
+            await session.scalars(
+                select(Match).where(Match.round_id == rid).order_by(Match.id)
+            )
+        ).all()
+        mids = [m.id for m in matches]
 
+    preds = [{"match_id": mid, "score1": 1, "score2": 0} for mid in mids]
+    for login in ("tie_user_a", "tie_user_b"):
+        token = await api_login(client, login, NEW_SECURE_PASSWORD)
+        resp = await client.post(
+            contest_url(cid, f"/rounds/{rid}/predictions"),
+            headers=auth_header(token),
+            json={"predictions": preds},
+        )
+        assert resp.status_code == 200, resp.text
+
+    async with sf() as session:
+        async with session.begin():
+            round_ = await session.get(Round, rid)
+            assert round_ is not None
+            round_.deadline = datetime.now(UTC) - timedelta(hours=1)
+
+    close = await client.post(
+        contest_url(cid, f"/admin/rounds/{rid}/close"),
+        headers=sup_h,
+    )
+    assert close.status_code == 200
+
+    for mid in mids:
+        res = await client.put(
+            contest_url(cid, f"/admin/matches/{mid}/result"),
+            headers=sup_h,
+            json={"score1": 1, "score2": 0},
+        )
+        assert res.status_code == 200
+
+    calc = await client.post(
+        contest_url(cid, f"/admin/rounds/{rid}/calculate"),
+        headers=sup_h,
+    )
+    assert calc.status_code == 200
+
+    pub = await client.post(
+        contest_url(cid, f"/admin/rounds/{rid}/publish"),
+        headers=sup_h,
+    )
+    assert pub.status_code == 200
+
+    admin = await api_login(client, "admin_api")
+    admin_h = auth_header(admin)
     await client.put(
-        f"{API_PREFIX}/admin/users/{u_high}/exceptional-tiebreak",
-        headers=auth_header(admin),
+        contest_url(cid, f"/participants/{inv_a['user_id']}/exceptional-tiebreak"),
+        headers=admin_h,
         json={"points": 10},
     )
     await client.put(
-        f"{API_PREFIX}/admin/users/{u_low}/exceptional-tiebreak",
-        headers=auth_header(admin),
+        contest_url(cid, f"/participants/{inv_b['user_id']}/exceptional-tiebreak"),
+        headers=admin_h,
         json={"points": 0},
     )
 
-    lb = await client.get(f"{API_PREFIX}/leaderboard")
+    lb = await client.get(contest_url(cid, "/leaderboard"))
+    assert lb.status_code == 200
     rows = {r["user_id"]: r["rank"] for r in lb.json()["leaderboard"]}
-    if rows.get(u_high) and rows.get(u_low) and rows[u_high] != rows[u_low]:
-        pytest.skip("Users not tied on criteria 1-4 in contracted data")
-    assert rows[u_high] <= rows[u_low]
+    assert rows[inv_a["user_id"]] < rows[inv_b["user_id"]]
 
 
 @pytest.mark.asyncio
@@ -309,21 +382,51 @@ async def test_contest_delete_bad_confirm(delete_api):
 
 @pytest.mark.asyncio
 async def test_contest_delete_ok(delete_api):
-    """[API-CONTEST-DELETE-OK] instant delete → wiped, DRAFT."""
+    """[API-CONTEST-DELETE-OK] soft-delete → DELETED response; DB DRAFT + deleted_at; data wiped."""
+    from sqlalchemy import func
+
+    from database.models import ContestParticipant, Team
+
     client, sf, _ = delete_api
     await ensure_contest_running(sf, client)
     admin = await api_login(client, "admin_api")
-    await client.post(f"{API_PREFIX}/admin/contest/pause", headers=auth_header(admin))
+    admin_h = auth_header(admin)
+    await client.post(
+        contest_url(DEFAULT_CONTEST_ID, "/pause"),
+        headers=admin_h,
+    )
     resp = await client.request(
         "DELETE",
-        f"{API_PREFIX}/admin/contest",
-        headers=auth_header(admin),
+        contest_url(DEFAULT_CONTEST_ID, ""),
+        headers=admin_h,
         json={"confirm": "DELETE"},
     )
     assert resp.status_code == 200
-    assert resp.json()["status"] == "DRAFT"
+    body = resp.json()
+    assert body["status"] == "DELETED"
+    assert body["deleted"] is True
 
     async with sf() as session:
-        contest = await session.scalar(select(Contest).limit(1))
+        contest = await session.get(Contest, DEFAULT_CONTEST_ID)
         assert contest is not None
         assert contest.status == ContestLifecycleStatus.DRAFT.value
+        assert contest.deleted_at is not None
+        assert contest.is_locked is False
+        round_count = await session.scalar(
+            select(func.count()).select_from(Round).where(Round.contest_id == DEFAULT_CONTEST_ID)
+        )
+        team_count = await session.scalar(
+            select(func.count()).select_from(Team).where(Team.contest_id == DEFAULT_CONTEST_ID)
+        )
+        part_count = await session.scalar(
+            select(func.count())
+            .select_from(ContestParticipant)
+            .where(ContestParticipant.contest_id == DEFAULT_CONTEST_ID)
+        )
+        assert round_count == 0
+        assert team_count == 0
+        assert part_count == 0
+
+    deleted = await client.get(f"{API_PREFIX}/contests/deleted", headers=admin_h)
+    assert deleted.status_code == 200
+    assert any(row["id"] == DEFAULT_CONTEST_ID for row in deleted.json())

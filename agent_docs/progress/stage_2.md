@@ -250,3 +250,10 @@
 - Report: agent_docs/reports/test_2.2.1.md
 - E2E: visitor stub + public, privacy, batch, user predict — 6/6 PASS
 - Note: full pytest 368 pass / 15 fail (pre-existing, out of 2.2.1 scope)
+
+## 2026-06-28 — Tester (1.16 fix — pytest regression cleanup)
+- STATUS: TEST_PASS
+- Report: agent_docs/reports/test_1.16_fix.md
+- Instruction: agent_docs/instructions/tester_1.16_fix.md
+- Scope: 15 stale tests updated (password setup, ETag, tiebreak, LB counts, soft-delete, auto-close)
+- Verified: full pytest 383 passed / 1 skipped / 0 failed
