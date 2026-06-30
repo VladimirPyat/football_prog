@@ -51,7 +51,7 @@ export function ScoreInput({
   };
 
   return (
-    <div>
+    <div className="flex flex-col items-center w-14 shrink-0">
       <input
         type="text"
         inputMode="numeric"
@@ -61,9 +61,15 @@ export function ScoreInput({
         onBlur={handleBlur}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-invalid={error != null}
         className="w-12 border border-gray-300 rounded px-2 py-1 text-sm text-center disabled:bg-gray-100"
       />
-      {error && <p className="text-xs text-red-600 mt-0.5">{error}</p>}
+      <p
+        className="mt-0.5 h-8 w-24 text-[10px] leading-tight text-red-600 text-center"
+        role={error ? "alert" : undefined}
+      >
+        {error ?? ""}
+      </p>
     </div>
   );
 }

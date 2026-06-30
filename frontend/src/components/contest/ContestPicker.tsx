@@ -71,8 +71,9 @@ export function ContestPicker({ adminMode = false }: ContestPickerProps) {
     <select
       value={value}
       onChange={handleChange}
-      className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
+      className="text-sm border border-gray-300 rounded px-2 py-1 bg-white max-w-full"
       aria-label="Выбор конкурса"
+      data-testid="contest-picker"
     >
       {items.map((c) => (
         <option key={c.id} value={c.id}>

@@ -22,6 +22,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const [resetEmail, setResetEmail] = useState("");
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -102,14 +103,25 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
           Пароль
         </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          autoComplete="current-password"
-        />
+        <div className="relative">
+          <input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoComplete="current-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-800 px-1"
+            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+            data-testid="password-visibility-toggle"
+          >
+            {showPassword ? "Скрыть" : "Показать"}
+          </button>
+        </div>
         {fieldErrors.password && (
           <p className="text-red-600 text-xs mt-1">{fieldErrors.password}</p>
         )}

@@ -3,22 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { PublicTabs, type PublicTab } from "@/components/contest/PublicTabs";
-import { RoundSelector } from "@/components/contest/RoundSelector";
+import { ContestRoundToolbar } from "@/components/contest/ContestRoundToolbar";
+import { LeaderboardTable } from "@/components/contest/LeaderboardTable";
+import { ResultsMatrix } from "@/components/contest/ResultsMatrix";
 import { PredictionsMatrix } from "@/components/predictions/PredictionsMatrix";
 import { PredictionsVisitorStub } from "@/components/predictions/PredictionsVisitorStub";
 import { OutcomeStatsFooter } from "@/components/predictions/OutcomeStatsFooter";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { filterParticipantEntries } from "@/lib/predictions/filterMatrixEntries";
 import { useAuth } from "@/hooks/useAuth";
 import { useContest } from "@/hooks/useContest";
 import { usePredictionsView } from "@/hooks/usePredictionsView";
 import { useRounds } from "@/hooks/useRounds";
 import { formatRoundTitle } from "@/lib/admin/roundLabel";
 import { isDeadlinePassedNow } from "@/lib/contest/deadline";
+import { isRoundPubliclyVisible } from "@/lib/contest/roundPublicVisibility";
 import {
-  isRoundPubliclyVisible,
-  ROUND_NOT_PUBLISHED_COPY,
-} from "@/lib/contest/roundPublicVisibility";
+  MOCK_LEADERBOARD_ROWS,
+  MOCK_RESULTS_MATCHES,
+  MOCK_RESULTS_ROWS,
+} from "@/lib/mocks/contestDisplayMock";
 import type { RoundOut } from "@/types/api";
 
 function pickDefaultRound(rounds: RoundOut[], tab: PublicTab): number | null {
@@ -33,22 +38,6 @@ function pickDefaultRound(rounds: RoundOut[], tab: PublicTab): number | null {
 
   const published = [...rounds].reverse().find((r) => isRoundPubliclyVisible(r.status));
   return published?.id ?? rounds[rounds.length - 1].id;
-}
-
-function LeaderboardStub() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-600">
-      {ROUND_NOT_PUBLISHED_COPY}
-    </div>
-  );
-}
-
-function ResultsStub() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-600">
-      {ROUND_NOT_PUBLISHED_COPY}
-    </div>
-  );
 }
 
 export default function ContestPage() {
@@ -108,10 +97,10 @@ export default function ContestPage() {
     shouldFetchPredictions,
   );
 
-  const showLbStub =
-    tab === "leaderboard" && selectedRound && !isRoundPubliclyVisible(selectedRound.status);
-  const showResultsStub =
-    tab === "results" && selectedRound && !isRoundPubliclyVisible(selectedRound.status);
+  const participantEntries = useMemo(
+    () => (predictionsData ? filterParticipantEntries(predictionsData.entries) : []),
+    [predictionsData],
+  );
 
   if (!Number.isInteger(contestId) || contestId <= 0) {
     return <ErrorState message="Конкурс не найден" />;
@@ -135,19 +124,27 @@ export default function ContestPage() {
           </p>
         </div>
         {rounds.length > 0 && effectiveRoundId != null && (
-          <RoundSelector
+          <ContestRoundToolbar
             rounds={rounds}
             selectedRoundId={effectiveRoundId}
-            onChange={setSelectedRoundId}
+            onRoundChange={setSelectedRoundId}
           />
         )}
       </div>
 
       <PublicTabs active={tab} onChange={handleTabChange} />
 
-      {tab === "leaderboard" && (showLbStub || !selectedRound) && <LeaderboardStub />}
+      {tab === "leaderboard" && selectedRound && (
+        <LeaderboardTable rows={MOCK_LEADERBOARD_ROWS} />
+      )}
 
-      {tab === "results" && (showResultsStub || !selectedRound) && <ResultsStub />}
+      {tab === "results" && selectedRound && (
+        <ResultsMatrix
+          matches={MOCK_RESULTS_MATCHES}
+          rows={MOCK_RESULTS_ROWS}
+          roundLabel={formatRoundTitle(selectedRound)}
+        />
+      )}
 
       {tab === "predictions" && visitorPreDeadline && <PredictionsVisitorStub />}
 
@@ -159,7 +156,7 @@ export default function ContestPage() {
           <div className="bg-white border border-gray-200 rounded-lg p-4 overflow-x-auto">
             <PredictionsMatrix
               matches={predictionsData.matches}
-              entries={predictionsData.entries}
+              entries={participantEntries}
               deadlinePassed={predictionsData.deadline_passed}
               viewer={user}
               roundTitle={selectedRound ? formatRoundTitle(selectedRound) : ""}
@@ -169,7 +166,7 @@ export default function ContestPage() {
                 <tbody>
                   <OutcomeStatsFooter
                     matches={predictionsData.matches}
-                    entries={predictionsData.entries}
+                    entries={participantEntries}
                   />
                 </tbody>
               </table>

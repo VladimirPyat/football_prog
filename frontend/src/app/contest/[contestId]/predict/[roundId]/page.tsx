@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { RoundSelector } from "@/components/contest/RoundSelector";
+import { ContestRoundToolbar } from "@/components/contest/ContestRoundToolbar";
 import { PredictionForm } from "@/components/predictions/PredictionForm";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -40,10 +40,10 @@ function PredictPageContent() {
           <h1 className="text-2xl font-bold text-gray-900">{contestName}</h1>
           <p className="text-gray-600">{formatRoundTitle(round)}</p>
         </div>
-        <RoundSelector
+        <ContestRoundToolbar
           rounds={rounds}
           selectedRoundId={roundId}
-          onChange={(id) => {
+          onRoundChange={(id) => {
             window.location.href = `/contest/${contestId}/predict/${id}`;
           }}
         />
