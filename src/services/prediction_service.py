@@ -52,7 +52,6 @@ async def submit_batch(
     if contest.id != contest_id:
         raise NotFoundError(f"Тур {round_id} не принадлежит конкурсу {contest_id}")
 
-    matches_per_round: int = contest.matches_per_round
     max_score: int = contest.rules_json["constraints"]["score_validation_range"][1]
 
     round_ = await ensure_round_closed_if_expired(session, round_id)
@@ -90,16 +89,16 @@ async def submit_batch(
             code="PARTICIPANT_NOT_ACCEPTED",
         )
 
-    if len(items) != matches_per_round:
-        raise ValidationError(
-            f"Укажите прогнозы на все матчи тура: ожидается {matches_per_round}, "
-            f"получено {len(items)}"
-        )
-
     round_matches = (
         await session.scalars(select(Match).where(Match.round_id == round_id))
     ).all()
     round_match_ids = {m.id for m in round_matches}
+
+    if len(items) != len(round_match_ids):
+        raise ValidationError(
+            f"Укажите прогнозы на все матчи тура: ожидается {len(round_match_ids)}, "
+            f"получено {len(items)}"
+        )
     submitted_match_ids = {match_id for (match_id, _, _) in items}
 
     if submitted_match_ids != round_match_ids:

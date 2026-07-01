@@ -29,9 +29,9 @@ export function OutcomeStatsFooter({ matches, entries }: OutcomeStatsFooterProps
 
   return (
     <tr className="bg-gray-50 border-t-2 border-gray-200">
-      <td className="px-3 py-2 font-medium text-gray-700">Статистика</td>
+      <td className="px-3 py-2 font-medium text-gray-700 sticky left-0 bg-gray-50">Статистика</td>
       {stats.map((s) => (
-        <td key={s.matchId} className="px-3 py-2 text-center text-xs">
+        <td key={s.matchId} className="px-1 py-2 text-center text-sm min-w-[4.5rem]">
           <div className="text-green-600">П1: {s.p1}</div>
           <div className="text-gray-500">X: {s.x}</div>
           <div className="text-blue-600">П2: {s.p2}</div>

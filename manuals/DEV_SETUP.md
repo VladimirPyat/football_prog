@@ -486,14 +486,47 @@ uv run python src/scripts/dev_invite_setup.py get-unconfirmed --contest-id <ID> 
 
 ### Remove extra / deleted contests
 
+E2E (`admin_setup`, `supervisor_create_round`, …) creates many **DRAFT** and **RUNNING** contests named like `E2E Setup …`. They clutter the contest picker until removed.
+
+#### Per-contest (UI)
+
+| Contest status | Steps |
+|----------------|-------|
+| **DRAFT** | Select contest → `/admin/settings/parameters` → **Удалить конкурс** (instant soft-delete) |
+| **RUNNING** | Same page → **Остановить конкурс** → wait **10 s** (`contest_delete_grace_seconds`, default 10) → **Удалить конкурс** |
+| **PAUSED** | **Удалить конкурс** (after grace if delete button was disabled) |
+| **FINISHED** | No delete in supervisor UI — skip or full DB reset below |
+
+Soft-deleted contests disappear from `GET /contests` but remain in DB until purged. ADMIN may **restore** within the training window on `/admin/lifecycle`.
+
+There is **no bulk script** for deleting many active DRAFT/RUNNING rows — loop in UI or reset DB.
+
+#### Hard-delete soft-deleted rows from DB
+
+```bash
+uv run python src/scripts/purge_deleted_contests.py --all-deleted --dry-run
+uv run python src/scripts/purge_deleted_contests.py --all-deleted
+```
+
+Purge by retention TTL only (default 30 days): `uv run python src/scripts/purge_deleted_contests.py` — see `contest_purge_retention_seconds` in [CONFIG.md](CONFIG.md).
+
+#### Nuclear reset (back to single fixture contest `id=1`)
+
+Wipes loader tables and all extra contests; restores demo users and finalized rounds on contest 1:
+
+```bash
+uv run python src/scripts/dev_setup.py
+```
+
+Use when the picker has dozens of E2E leftovers and you do not need to keep custom contests. Servers keep running if already up; only DB changes. To restart stack: `dev_setup.py --run-only`.
+
 | Goal | Action |
 |------|--------|
 | Hide a draft from lists (soft delete) | UI: «Удалить конкурс» on parameters (DRAFT/PAUSED) |
 | Restore within window | ADMIN: `/admin/lifecycle` → «Восстановить» |
-| **Hard-delete** soft-deleted rows from DB | `uv run python src/scripts/purge_deleted_contests.py --all-deleted --dry-run` then without `--dry-run` |
-| Purge by retention TTL only | `uv run python src/scripts/purge_deleted_contests.py` (see `contest_purge_retention_seconds` in [CONFIG.md](CONFIG.md)) |
-
-There is no bulk script for deleting **active** DRAFT contests — use the UI per contest or reset the whole DB above.
+| **Hard-delete** soft-deleted rows from DB | `purge_deleted_contests.py --all-deleted` (see above) |
+| Purge by retention TTL only | `uv run python src/scripts/purge_deleted_contests.py` |
+| Reset everything to dev fixture | `uv run python src/scripts/dev_setup.py` |
 
 ### Typical new-contest flow (S1.x)
 

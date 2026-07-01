@@ -12,6 +12,7 @@ import { useContest } from "@/hooks/useContest";
 import { usePredictionsView } from "@/hooks/usePredictionsView";
 import { useRounds } from "@/hooks/useRounds";
 import { formatRoundTitle } from "@/lib/admin/roundLabel";
+import { filterParticipantVisibleRounds } from "@/lib/contest/participantRoundFilter";
 
 function PredictPageContent() {
   const params = useParams();
@@ -22,16 +23,23 @@ function PredictPageContent() {
   const { rounds, loading: roundsLoading } = useRounds(contestId);
   const { data, loading, error, refetch } = usePredictionsView(contestId, roundId);
 
-  const round = useMemo(() => rounds.find((r) => r.id === roundId) ?? null, [rounds, roundId]);
+  const visibleRounds = useMemo(
+    () => filterParticipantVisibleRounds(rounds, user?.role),
+    [rounds, user?.role],
+  );
+
+  const round = useMemo(
+    () => visibleRounds.find((r) => r.id === roundId) ?? null,
+    [visibleRounds, roundId],
+  );
 
   if (roundsLoading || loading) return <LoadingState />;
   if (error) return <ErrorState message={error} />;
   if (!data || !round || !user) {
-    return <ErrorState message="Тур не найден" />;
+    return <ErrorState message="Тур не найден или недоступен" />;
   }
 
   const contestName = contest?.name ?? `Конкурс #${contestId}`;
-  const matchesPerRound = contest?.matches_per_round ?? data.matches.length;
 
   return (
     <div className="space-y-4">
@@ -41,7 +49,7 @@ function PredictPageContent() {
           <p className="text-gray-600">{formatRoundTitle(round)}</p>
         </div>
         <ContestRoundToolbar
-          rounds={rounds}
+          rounds={visibleRounds}
           selectedRoundId={roundId}
           onRoundChange={(id) => {
             window.location.href = `/contest/${contestId}/predict/${id}`;
@@ -56,7 +64,6 @@ function PredictPageContent() {
         entries={data.entries}
         deadlinePassed={data.deadline_passed}
         userId={user.id}
-        matchesPerRound={matchesPerRound}
         contestPaused={contestStatus === "PAUSED"}
         onSaved={() => void refetch()}
       />

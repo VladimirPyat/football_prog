@@ -12,6 +12,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | [SCORING_LOGIC.md](SCORING_LOGIC.md) | Points, bonuses, tie-breakers, validation rules |
 | [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) | Initial ADMIN/SUPERVISOR via `.env` + bootstrap script |
 | [DEV_SETUP.md](DEV_SETUP.md) | **Local dev:** deps, bootstrap script, API + frontend, test logins |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | **Server deploy:** PostgreSQL, URLs, CORS, env split, first deploy |
 | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) | **Frontend map:** routes, components, editable UI copy (human quick edits) |
 | [STATUS_REFERENCE.md](STATUS_REFERENCE.md) | **Статусы:** конкурс, тур, матч — смысл, переходы, где в коде; API vs подписи UI |
 | [SUPERVISOR_TESTING_SCENARIOS.md](SUPERVISOR_TESTING_SCENARIOS.md) | **Ручное QA организатора:** чек-лист по маршрутам, фикстура, известные пробелы |
@@ -40,6 +41,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | **2.3.1** — Round LB visibility + deadline rules | [API_GUIDE.md](API_GUIDE.md#round_servicepy-updated), [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3–2.4 |
 | **2.3.2** — CALCULATED result edit + ACTIVE schedule UX | [API_GUIDE.md](API_GUIDE.md#match_servicepy), [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.5, [SUPERVISOR_TESTING_SCENARIOS.md](SUPERVISOR_TESTING_SCENARIOS.md) |
 | **2.x** — Frontend local dev | [DEV_SETUP.md](DEV_SETUP.md) |
+| **2.x** — Server deployment | [DEPLOYMENT.md](DEPLOYMENT.md) |
 | **2.x** — Frontend routes & UI copy | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) |
 | **2.x** — Status glossary (contest / round / match) | [STATUS_REFERENCE.md](STATUS_REFERENCE.md) |
 

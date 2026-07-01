@@ -23,7 +23,6 @@ interface PredictionFormProps {
   entries: PredictionEntryOut[];
   deadlinePassed: boolean;
   userId: number;
-  matchesPerRound: number;
   contestPaused?: boolean;
   onSaved: () => void;
 }
@@ -53,7 +52,6 @@ export function PredictionForm({
   entries,
   deadlinePassed,
   userId,
-  matchesPerRound,
   contestPaused = false,
   onSaved,
 }: PredictionFormProps) {
@@ -76,8 +74,9 @@ export function PredictionForm({
   }, [matches, entries, userId]);
 
   const matchIds = useMemo(() => matches.map((m) => m.id), [matches]);
+  const requiredCount = matchIds.length;
   const filledCount = countFilledMatches(form, matchIds);
-  const batchComplete = filledCount === matchesPerRound && matchIds.length === matchesPerRound;
+  const batchComplete = requiredCount > 0 && filledCount === requiredCount;
 
   const readonly =
     deadline.deadlinePassed ||
@@ -107,7 +106,7 @@ export function PredictionForm({
 
   const handleSave = async () => {
     const batch = buildPredictionBatch(form, matchIds);
-    const parsed = predictionBatchSchema(maxScore, matchesPerRound).safeParse({
+    const parsed = predictionBatchSchema(maxScore, requiredCount).safeParse({
       predictions: batch,
     });
     if (!parsed.success) return;

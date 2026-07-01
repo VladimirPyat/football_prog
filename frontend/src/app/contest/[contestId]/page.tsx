@@ -8,7 +8,6 @@ import { LeaderboardTable } from "@/components/contest/LeaderboardTable";
 import { ResultsMatrix } from "@/components/contest/ResultsMatrix";
 import { PredictionsMatrix } from "@/components/predictions/PredictionsMatrix";
 import { PredictionsVisitorStub } from "@/components/predictions/PredictionsVisitorStub";
-import { OutcomeStatsFooter } from "@/components/predictions/OutcomeStatsFooter";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { filterParticipantEntries } from "@/lib/predictions/filterMatrixEntries";
@@ -18,6 +17,7 @@ import { usePredictionsView } from "@/hooks/usePredictionsView";
 import { useRounds } from "@/hooks/useRounds";
 import { formatRoundTitle } from "@/lib/admin/roundLabel";
 import { isDeadlinePassedNow } from "@/lib/contest/deadline";
+import { filterParticipantVisibleRounds } from "@/lib/contest/participantRoundFilter";
 import { isRoundPubliclyVisible } from "@/lib/contest/roundPublicVisibility";
 import {
   MOCK_LEADERBOARD_ROWS,
@@ -49,6 +49,11 @@ export default function ContestPage() {
   const [tab, setTab] = useState<PublicTab>("predictions");
   const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
 
+  const visibleRounds = useMemo(
+    () => filterParticipantVisibleRounds(rounds, user?.role),
+    [rounds, user?.role],
+  );
+
   useEffect(() => {
     if (Number.isInteger(contestId) && contestId > 0) {
       void setContestId(contestId);
@@ -56,39 +61,40 @@ export default function ContestPage() {
   }, [contestId, setContestId]);
 
   useEffect(() => {
-    if (rounds.length > 0 && selectedRoundId == null) {
-      setSelectedRoundId(pickDefaultRound(rounds, tab));
+    if (visibleRounds.length > 0 && selectedRoundId == null) {
+      setSelectedRoundId(pickDefaultRound(visibleRounds, tab));
     }
-  }, [rounds, selectedRoundId, tab]);
+  }, [visibleRounds, selectedRoundId, tab]);
 
   const handleTabChange = (newTab: PublicTab) => {
     setTab(newTab);
-    if (rounds.length > 0) {
-      setSelectedRoundId(pickDefaultRound(rounds, newTab));
+    if (visibleRounds.length > 0) {
+      setSelectedRoundId(pickDefaultRound(visibleRounds, newTab));
     }
   };
 
   const effectiveRoundId = useMemo(() => {
-    if (rounds.length === 0) return null;
-    return selectedRoundId ?? pickDefaultRound(rounds, tab);
-  }, [rounds, selectedRoundId, tab]);
+    if (visibleRounds.length === 0) return null;
+    return selectedRoundId ?? pickDefaultRound(visibleRounds, tab);
+  }, [visibleRounds, selectedRoundId, tab]);
 
   const selectedRound = useMemo(
-    () => rounds.find((r) => r.id === effectiveRoundId) ?? null,
-    [rounds, effectiveRoundId],
+    () => visibleRounds.find((r) => r.id === effectiveRoundId) ?? null,
+    [visibleRounds, effectiveRoundId],
   );
 
-  const visitorPreDeadline =
-    !isAuthenticated &&
+  const isAdminViewer = user?.role === "ADMIN";
+
+  const showPredictionsPreDeadlineStub =
     tab === "predictions" &&
     selectedRound != null &&
-    selectedRound.status === "ACTIVE" &&
-    !isDeadlinePassedNow(selectedRound.deadline);
+    !isDeadlinePassedNow(selectedRound.deadline) &&
+    !isAdminViewer;
 
   const shouldFetchPredictions =
     tab === "predictions" &&
     effectiveRoundId != null &&
-    !visitorPreDeadline &&
+    !showPredictionsPreDeadlineStub &&
     (isAuthenticated || selectedRound != null);
 
   const { data: predictionsData, loading: predictionsLoading } = usePredictionsView(
@@ -107,7 +113,7 @@ export default function ContestPage() {
   }
 
   if (roundsLoading) return <LoadingState />;
-  if (rounds.length === 0) {
+  if (visibleRounds.length === 0) {
     return <ErrorState message={roundsError ?? "Туры не найдены"} />;
   }
   if (effectiveRoundId == null) return <LoadingState />;
@@ -123,9 +129,9 @@ export default function ContestPage() {
             Добро пожаловать! Просмотрите таблицу лидеров, прогнозы и результаты матчей.
           </p>
         </div>
-        {rounds.length > 0 && effectiveRoundId != null && (
+        {visibleRounds.length > 0 && effectiveRoundId != null && (
           <ContestRoundToolbar
-            rounds={rounds}
+            rounds={visibleRounds}
             selectedRoundId={effectiveRoundId}
             onRoundChange={setSelectedRoundId}
           />
@@ -146,7 +152,9 @@ export default function ContestPage() {
         />
       )}
 
-      {tab === "predictions" && visitorPreDeadline && <PredictionsVisitorStub />}
+      {tab === "predictions" && showPredictionsPreDeadlineStub && (
+        <PredictionsVisitorStub showOwnPredictionHint={isAuthenticated} />
+      )}
 
       {tab === "predictions" &&
         shouldFetchPredictions &&
@@ -160,17 +168,8 @@ export default function ContestPage() {
               deadlinePassed={predictionsData.deadline_passed}
               viewer={user}
               roundTitle={selectedRound ? formatRoundTitle(selectedRound) : ""}
+              showStats={predictionsData.deadline_passed}
             />
-            {predictionsData.deadline_passed && (
-              <table className="min-w-full text-sm mt-0">
-                <tbody>
-                  <OutcomeStatsFooter
-                    matches={predictionsData.matches}
-                    entries={participantEntries}
-                  />
-                </tbody>
-              </table>
-            )}
           </div>
         ) : null)}
     </div>

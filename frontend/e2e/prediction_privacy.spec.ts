@@ -9,7 +9,7 @@ import {
 } from "./fixtures/predictionsApi";
 
 test.describe("[E2E-PRED-PRIVACY-PRE]", () => {
-  test("other users masked before deadline", async ({ page }) => {
+  test("participant sees stub before deadline on predictions tab", async ({ page }) => {
     test.skip(!ADMIN_PASSWORD, "SEED_ADMIN_PASSWORD missing");
     await ensureE2eActiveRound(1);
     const roundId = await getActiveRoundId(1);
@@ -28,8 +28,10 @@ test.describe("[E2E-PRED-PRIVACY-PRE]", () => {
     await page.goto("/contest/1");
     await expect(page.getByTestId("round-selector")).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByTestId("predictions-matrix")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("privacy-mask").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("predictions-pre-deadline-stub")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Будет доступно после дедлайна")).toBeVisible();
+    await expect(page.getByTestId("predictions-matrix")).not.toBeVisible();
+    await expect(page.getByTestId("privacy-mask")).toHaveCount(0);
   });
 });
 

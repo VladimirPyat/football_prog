@@ -9,7 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import ContestRuleError, NotFoundError
-from database.models import Match, Team, User
+from database.models import (
+    ContestParticipant,
+    Match,
+    ParticipantStatus,
+    Team,
+    User,
+    UserRole,
+)
 from schemas.predictions import RoundPredictionsView
 from services.prediction_service import visible_predictions
 from services.round_auto_close_service import ensure_round_closed_if_expired
@@ -78,16 +85,28 @@ async def build_round_predictions_view(
     raw = await visible_predictions(
         session, contest_id, round_id, viewer_role, viewer_id
     )
-    users = {u.id: u for u in (await session.scalars(select(User))).all()}
     by_user: dict[int, list] = {}
     for item in raw:
         uid = item["user_id"]
         by_user.setdefault(uid, []).append(item)
 
+    participant_rows = (
+        await session.execute(
+            select(ContestParticipant, User)
+            .join(User, ContestParticipant.user_id == User.id)
+            .where(
+                ContestParticipant.contest_id == contest_id,
+                ContestParticipant.status == ParticipantStatus.ACCEPTED,
+                User.role == UserRole.USER,
+            )
+        )
+    ).all()
+
     entries = []
-    for uid, preds in by_user.items():
-        u = users.get(uid)
-        name = f"{u.first_name} {u.last_name}" if u else str(uid)
+    for participant, u in participant_rows:
+        uid = participant.user_id
+        name = f"{u.first_name} {u.last_name}"
+        preds = by_user.get(uid, [])
         if preds and "match_id" in preds[0]:
             entries.append(
                 {
@@ -104,8 +123,26 @@ async def build_round_predictions_view(
                     ],
                 }
             )
+        elif preds:
+            entries.append(
+                {
+                    "user_id": uid,
+                    "user_name": name,
+                    "submitted": True,
+                    "predictions": None,
+                }
+            )
         else:
-            entries.append({"user_id": uid, "user_name": name, "submitted": True, "predictions": None})
+            entries.append(
+                {
+                    "user_id": uid,
+                    "user_name": name,
+                    "submitted": False,
+                    "predictions": None,
+                }
+            )
+
+    entries.sort(key=lambda e: (e["user_name"].lower(), e["user_id"]))
 
     return RoundPredictionsView(
         round_id=round_id,

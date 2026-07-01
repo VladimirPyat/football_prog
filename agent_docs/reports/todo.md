@@ -72,4 +72,34 @@ Replace manual `dev_setup.py --run` with compose services for API, UI, and optio
 
 ---
 
-*Last updated: 2026-06-27 — ACTIVE match schedule UX; backend structure lock backlog.*
+## Stage 2 — QA / supervisor setup
+
+### «Создать по образцу» — frontend wizard (phase 1, no new API) — **Open**
+
+**Goal:** Speed up manual QA (e.g. [SUPERVISOR_TESTING_SCENARIOS.md §11](../../manuals/SUPERVISOR_TESTING_SCENARIOS.md#11-кросс-проверка-организатора-и-участников-end-to-end)) when the same contest setup is created and deleted many times — avoid re-entering parameters, teams, and invite rows by hand.
+
+**Phase 1 — frontend-only** (orchestrate existing endpoints; **no** `POST …/duplicate` on backend yet):
+
+| Copy from source contest | How | Notes |
+|--------------------------|-----|-------|
+| Contest parameters | `GET /contests/{id}` → `POST /contests` + `PATCH` new id | `total_teams`, `matches_per_round`, `total_rounds`, `is_round_robin`, `rules_json` (scoring, tiebreakers, constraints) |
+| Team names | `GET …/teams` → `POST …/teams` per row | `name`, `short_name` only; **no** logo file copy — new teams get **default logo** |
+| Participant invites | `GET …/participants` → `POST …/participants` per row | `email`, `first_name`, `last_name` (optional `login`); all land as **PENDING** with new `temp_password` / `setup_url` |
+| Rounds, predictions, results | **Do not copy** | New contest stays DRAFT until supervisor starts and creates tours |
+
+**UX sketch:** button near «+ Новый конкурс» or on contest picker — «Создать по образцу» → pick source → progress «параметры → команды → приглашения (N/M)» → redirect to new DRAFT settings. Show partial-failure summary if an invite fails mid-batch.
+
+**Dev workflow after wizard:** `dev_invite_setup.py confirm-all --contest-id <new_id>` (see [DEV_SETUP.md](../../manuals/DEV_SETUP.md)). Not used in real contests — participants complete setup via email link.
+
+**Explicit non-goals (phase 1):**
+- Re-enroll **existing** `user_id` / same logins in new contest (requires backend `duplicate` or `enroll_existing` — defer to phase 2 if needed).
+- Copy uploaded team logo files (only default logo on new teams).
+- Atomic all-or-nothing clone (acceptable partial state for QA; user can delete DRAFT and retry).
+
+**Phase 2 (later, optional):** `POST /contests/{id}/duplicate` on backend for atomic clone + `enroll_existing` users — only if product needs «season 2» with same accounts without re-invite.
+
+**Referenced in:** manual cross-check route §11; supervisor SETUP flows S1.1–S1.5.
+
+---
+
+*Last updated: 2026-07-02 — contest clone wizard (frontend phase 1) backlog.*

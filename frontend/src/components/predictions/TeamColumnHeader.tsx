@@ -10,7 +10,7 @@ interface TeamColumnHeaderProps {
 
 export function TeamColumnHeader({ team1, team2, size = "compact" }: TeamColumnHeaderProps) {
   const { home, away } = formatTeamPairStacked(team1, team2);
-  const textClass = size === "normal" ? "text-xs" : "text-[10px]";
+  const textClass = size === "normal" ? "text-sm" : "text-[10px]";
 
   return (
     <div

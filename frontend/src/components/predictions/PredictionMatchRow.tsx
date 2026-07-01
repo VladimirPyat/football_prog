@@ -63,7 +63,6 @@ export function PredictionMatchRow({
         >
           {awayShort}
         </span>
-        <span className="text-xs text-gray-400 pt-1.5 shrink-0 whitespace-nowrap">0–{maxScore}</span>
       </div>
     </div>
   );
