@@ -17,6 +17,7 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | [STATUS_REFERENCE.md](STATUS_REFERENCE.md) | **Статусы:** конкурс, тур, матч — смысл, переходы, где в коде; API vs подписи UI |
 | [SUPERVISOR_TESTING_SCENARIOS.md](SUPERVISOR_TESTING_SCENARIOS.md) | **Ручное QA организатора:** чек-лист по маршрутам, фикстура, известные пробелы |
 | [API_GUIDE.md](API_GUIDE.md) | FastAPI routes, auth, RBAC, contest lifecycle |
+| [ADMIN_TO_SUPPORT_RENAME.md](ADMIN_TO_SUPPORT_RENAME.md) | **Planned:** role `ADMIN`→`SUPPORT`, support API paths, verification (not executed yet) |
 | [ERROR_LOGGING.md](ERROR_LOGGING.md) | Политика ошибок и логирования (RU) |
 | [MANUAL_SCORING_VERIFICATION.md](MANUAL_SCORING_VERIFICATION.md) | Stage 1 sign-off: ручная проверка scoring + CANARY (RU) |
 
