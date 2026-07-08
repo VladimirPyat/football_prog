@@ -20,7 +20,7 @@ from database.models import (
 )
 from scoring.engine import score_round
 from scoring.rules import ScoringRules
-from scoring.types import MatchResult, UserPrediction
+from scoring.types import MatchResult, UserPrediction, UserRoundScore
 from services.round_auto_close_service import ensure_round_closed_if_expired
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,17 @@ async def _collect_round_data(
     )
 
     return results, predictions, participant_ids
+
+
+async def compute_round_user_scores(
+    session: AsyncSession, round_id: int, contest_id: int
+) -> dict[int, UserRoundScore]:
+    """Load round inputs and run score_round without persisting."""
+    contest = await _get_contest(session, contest_id)
+    results, predictions, participant_ids = await _collect_round_data(
+        session, round_id, contest_id
+    )
+    return score_round(results, predictions, participant_ids, rules=contest.rules_json)
 
 
 async def _persist_scores(

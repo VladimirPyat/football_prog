@@ -113,9 +113,32 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 **Before → After:** ACTIVE tours no longer show team `<select>`s after activation. Status changes use the same dropdown pattern as tour selection, with `ConfirmDialog` for destructive transitions.
 
 
-### Stage 2.4 — Leaderboard & results
+### Stage 2.4 — Leaderboard & results (API wiring)
 
-*(Coder 2.4: append routes, components, and copy table when implemented.)*
+Public contest page `/contest/[contestId]` — **Лидерборд** and **Результаты** tabs use live API data. **Visual layout unchanged** (existing `LeaderboardTable` / `ResultsMatrix` components).
+
+| Module | Source file | Behavior |
+|--------|-------------|----------|
+| Public paths | `frontend/src/lib/api/endpoints.ts` → `contestPublic` | `roundLeaderboard`, `roundResults`, optional global `leaderboard` |
+| Leaderboard hook | `frontend/src/hooks/useLeaderboard.ts` | `GET …/rounds/{rid}/leaderboard` (no auth); `enabled` when tab active + round `PUBLISHED` |
+| Results hook | `frontend/src/hooks/useRoundResults.ts` | `GET …/rounds/{rid}/results`; maps `points[]` → `match_points[]` |
+| LB mapper | `frontend/src/lib/leaderboard/mapLeaderboardRow.ts` | API `ScoreDetail` + rank → table row; B4 count columns optional |
+| Results mapper | `frontend/src/lib/results/mapRoundResultsRow.ts` | `base_points` per match in `matches[]` order; `total_without_bonus3` → `total_without_bonus` |
+| Public gate | `frontend/src/lib/contest/roundPublicVisibility.ts` + `roundResultsGuard.ts` | Fetch only when `status === 'PUBLISHED'`; else stub, no network |
+| Stub UI | `frontend/src/components/contest/ResultsUnavailableMessage.tsx` | `data-testid="results-unavailable"`; copy `ROUND_NOT_PUBLISHED_COPY` |
+| Page wiring | `frontend/src/app/contest/[contestId]/page.tsx` | Removed `contestDisplayMock`; loading/error/bonuses_pending states |
+
+**Copy (RU):**
+
+| Condition | Message |
+|-----------|---------|
+| Round not `PUBLISHED` | «Будет доступно после проверки организатором» |
+| Empty `points[]` after fetch | «Не удалось загрузить очки по матчам» |
+| `bonuses_pending` | `BONUSES_PENDING_FALLBACK_MESSAGE` (amber banner) |
+
+**Deferred:** ETag `If-None-Match` caching for LB/results (`lib/api/cache.ts` stub remains); global «Общий» leaderboard selector in `RoundSelector`.
+
+**Tests:** `mapLeaderboardRow.test.ts`, `mapRoundResultsRow.test.ts`, `roundResultsGuard.test.ts` (+ existing `roundPublicVisibility.test.ts`).
 
 ---
 
@@ -127,3 +150,4 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | 2026-06-24 | 2.3 | Full supervisor admin UI: settings, rounds, results, lifecycle, B5 logo |
 | 2026-06-27 | 2.3.2 | ACTIVE schedule-only editing, match status confirms, empty score guard on results |
 | 2026-06-28 | 2.2 | Prediction form, privacy matrix, deadline UX, contest Прогнозы tab |
+| 2026-07-08 | 2.4 | Public LB/results API wiring; PUBLISHED gate; mock removed from contest page |

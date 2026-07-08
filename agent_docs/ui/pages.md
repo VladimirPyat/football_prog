@@ -22,13 +22,13 @@ Role hierarchy: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 - **Supervisor/Admin:** managed contests (`GET /contests`).
 - Row → set active contest → navigate to contest page or admin.
 
-### `/contest/[contestId]` — public tabbed page  (`user_*.jpg`) — **Implemented (2.2)** → `frontend/src/app/contest/[contestId]/page.tsx`
+### `/contest/[contestId]` — public tabbed page  (`user_*.jpg`) — **API-wired (2.4)** ✅ → `frontend/src/app/contest/[contestId]/page.tsx`
 - **Roles:** all (privacy rules per tab).
 - **Header:** title `Конкурс спортивных прогнозов` + subtitle; top-right `RoundSelector` (`Тур N (Текущий)` or `ДопТурN` for supplementary rounds — 2.3.4).
 - **Tabs (`PublicTabs`):**
-  - **Лидерборд** (default): `LeaderboardTable` from `GET /contests/{id}/leaderboard` (global) or round leaderboard when a round is selected. **PUBLISHED only** (2.3.1 F12): rounds in `CALCULATED`/`CLOSED`/`ACTIVE`/`DRAFT` → stub «Будет доступно после проверки организатором»; skip leaderboard fetch.
+  - **Лидерборд:** `LeaderboardTable` from `GET …/rounds/{rid}/leaderboard` via `useLeaderboard`. **PUBLISHED only** (2.3.1 F12): non-published → `ResultsUnavailableMessage` (`ROUND_NOT_PUBLISHED_COPY`); **no fetch**. `bonuses_pending` banner when API returns flag.
   - **Прогнозы:** `PredictionsMatrix` + `OutcomeStatsFooter` from `GET …/rounds/{rid}/predictions`. Visitor pre-deadline → stub («Будет доступно после дедлайна», no API call). Post-deadline → public matrix without login. Authenticated USER pre-deadline → own scores only; others masked.
-  - **Результаты:** `ResultsMatrix` from `GET …/rounds/{rid}/results`. **PUBLISHED only** (2.3.1 F12); else same stub as leaderboard.
+  - **Результаты:** `ResultsMatrix` from `GET …/rounds/{rid}/results` via `useRoundResults`. **PUBLISHED only**; else same stub. Empty `points[]` → error «Не удалось загрузить очки по матчам» (never mock).
 - Deep link: `/contest/[contestId]/round/[roundId]` preserves selected round (+ tab via query).
 - Helper: `isRoundPubliclyVisible()` in `frontend/src/lib/contest/roundPublicVisibility.ts`.
 

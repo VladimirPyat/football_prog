@@ -2,7 +2,7 @@
 
 ## Verdict: PASS (2.2.1 scope)
 
-Stage 2.2.1 acceptance gates passed. Full backend pytest suite reports 15 failures unrelated to predictions public access (contacts, me/contests, tiebreak, pre-existing).
+Re-verified 2026-07-08 as part of tester_2.2 full run. All 2.2.1 gates green.
 
 ## API
 
@@ -21,7 +21,7 @@ Command: `uv run pytest tests/api/test_predictions_flow_1_3.py tests/api/test_pr
 | ID | Result |
 |----|--------|
 | [UNIT-PRIVACY-VISITOR-POST] | PASS |
-| All 2.2 unit tests | PASS — 151/151 |
+| All 2.2 unit tests | PASS — 153/153 |
 
 ## E2E
 
@@ -42,14 +42,6 @@ Command: `uv run pytest tests/api/test_predictions_flow_1_3.py tests/api/test_pr
 | `npm run type-check` | PASS |
 | `npm run format:check` | PASS |
 | `npm run build` | PASS |
-| `uv run ruff check` (touched files) | PASS |
-
-## Regression (full suites)
-
-| Suite | Result |
-|-------|--------|
-| Backend full pytest | 368 passed, **15 failed** (pre-existing: contacts, me/contests, tiebreak, auth temp password, etc.) |
-| Frontend unit | 151 passed |
 
 ## Docs
 
@@ -58,10 +50,10 @@ Command: `uv run pytest tests/api/test_predictions_flow_1_3.py tests/api/test_pr
 | [DOC-INTEGRATION] | PASS — §5.4 public post-deadline |
 | [DOC-LIFECYCLE] | PASS — §3.3 anonymous 403/200 |
 | [DOC-UI-PAGES] | PASS — visitor matrix post-deadline |
-| [DOC-NO-LOGIN-PROMPT] | PASS — component moved to `.trash/` |
+| [DOC-NO-LOGIN-PROMPT] | PASS — `PredictionsLoginPrompt` absent |
 
 ## Notes
 
-- **Backend 1.16:** GET predictions uses `OptionalUser`; anonymous pre-deadline → 403 `PREDICTIONS_NOT_PUBLIC`; post-deadline → 200 full table.
-- **Frontend 2.2.1:** Visitor post-deadline shows `PredictionsMatrix` without login; `PredictionsLoginPrompt` removed; deadline gate uses `isDeadlinePassedNow`.
-- **Extra fix:** `apiFetch` no longer dispatches `fp:unauthorized` on 401 when no Bearer token was sent — prevented guest redirect to home when `fetchContestDetails` probed staff-only endpoints.
+- **Backend 1.16:** GET predictions uses `OptionalUser`; anonymous pre-deadline → 403; post-deadline → 200 full table.
+- **Frontend 2.2.1:** Visitor post-deadline shows `PredictionsMatrix` without login; deadline gate uses `isDeadlinePassedNow`.
+- **Auth fixture fix (2026-07-08):** E2E login assertion uses `header-user-login` test id (header UX change since initial 2.2.1 report).

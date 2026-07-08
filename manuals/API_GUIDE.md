@@ -247,6 +247,17 @@ Round leaderboard reads per-round `scores` columns; global leaderboard uses cros
 
 Global leaderboard (`GET …/leaderboard`) sums scores from **`PUBLISHED` rounds only** — `CALCULATED` preview rounds are excluded even for staff. Frontend should gate fetch with [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3 before calling public LB/results for non-`PUBLISHED` rounds.
 
+**Round results matrix (Stage 1.17) [UPDATED]:** `GET …/rounds/{rid}/results` returns `results[]` rows with per-match base points for the public matrix:
+
+| Field | Meaning |
+|-------|---------|
+| `results[].points[]` | One `{ match_id, base_points }` per item in top-level `matches[]`, **same order** |
+| `base_points` | Integer `0`–`16` from scoring engine; `null` if user did not predict or match is not scorable (`VOID`, `CANCELED`, unfinished) |
+| `total_without_bonus3` | Persisted aggregate (base + bonus1 + bonus2) — «Итого без бон.» column |
+| `total` | Persisted `total_with_bonus3` (includes bonus3) |
+
+Per-match cells use **base match points only** — not `bonus1_points` per cell. Round-level `bonus1` / `bonus2` / `bonus3` remain on the row. Values are recomputed on read via `compute_round_user_scores()`; row totals come from persisted `scores`.
+
 **Team logos (Stage 1.9) [UPDATED]:** `TeamOut.logo_url` is never `null` in JSON — when `teams.logo_url` is unset, the API returns `DEFAULT_TEAM_LOGO_URL` (default `/static/assets/default-team-logo.jpg`). Uploaded files are stored under `uploads/teams/{contest_id}/{team_id}.jpg` and served at `{STATIC_URL_PREFIX}/teams/{contest_id}/{team_id}.jpg`. Images are center-cropped and resized to `TEAM_LOGO_TARGET_PX` (default 64×64). Clear a custom logo with `PATCH .../teams/{id}` and `"logo_url": null`.
 
 | Static path | Serving mechanism | Content |

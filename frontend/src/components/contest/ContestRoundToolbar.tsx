@@ -19,7 +19,10 @@ export function ContestRoundToolbar({
   const { isAuthenticated } = useAuth();
 
   return (
-    <div className="flex flex-col items-stretch sm:items-end gap-2" data-testid="contest-round-toolbar">
+    <div
+      className="flex flex-col items-stretch sm:items-end gap-2"
+      data-testid="contest-round-toolbar"
+    >
       {isAuthenticated && <ContestPicker />}
       <RoundSelector rounds={rounds} selectedRoundId={selectedRoundId} onChange={onRoundChange} />
     </div>

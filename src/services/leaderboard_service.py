@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from scoring.standings import build_standings
 from scoring.types import UserRoundScore
 from services.round_auto_close_service import ensure_round_closed_if_expired
 from services.round_scoring_pending import origin_round_bonuses_pending
+from services.scoring_persistence import compute_round_user_scores
 
 logger = logging.getLogger(__name__)
 
@@ -224,10 +226,12 @@ async def get_round_results(
         for t in (await session.scalars(select(Team).where(Team.id.in_(team_ids)))).all()
     }
 
-    match_out = []
+    match_out: list[dict] = []
+    match_ids: list[int] = []
     for m in matches:
         t1 = teams.get(m.team1_id)
         t2 = teams.get(m.team2_id)
+        match_ids.append(m.id)
         match_out.append(
             {
                 "id": m.id,
@@ -245,17 +249,45 @@ async def get_round_results(
     ).all()
     names = await _user_name_map(session)
 
+    t0 = time.perf_counter()
+    engine_scores = await compute_round_user_scores(session, round_id, contest_id)
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    if elapsed_ms > 100:
+        logger.debug(
+            "compute_round_user_scores round_id=%s took %.1fms",
+            round_id,
+            elapsed_ms,
+        )
+
     results = []
     for score in scores:
         uid = score.user_id
+        user_round = engine_scores.get(uid)
+        per_match = {
+            ms.match_id: ms.base_points
+            for ms in (user_round.per_match if user_round else ())
+        }
+        points = [{"match_id": mid, "base_points": per_match.get(mid)} for mid in match_ids]
+        persisted_base = score.points_exact + score.points_diff + score.points_outcome
+        computed_base = sum(p["base_points"] or 0 for p in points)
+        if persisted_base != computed_base:
+            logger.warning(
+                "round results per-match base sum mismatch user_id=%s round_id=%s "
+                "persisted=%s computed=%s",
+                uid,
+                round_id,
+                persisted_base,
+                computed_base,
+            )
         results.append(
             {
                 "user_id": uid,
                 "user_name": names.get(uid, str(uid)),
-                "points": [],
+                "points": points,
                 "bonus1": score.bonus1,
                 "bonus2": score.bonus2,
                 "bonus3": score.bonus3,
+                "total_without_bonus3": score.total_without_bonus3,
                 "total": score.total_with_bonus3,
                 "correct_outcomes": score.correct_outcomes,
             }

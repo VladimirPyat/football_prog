@@ -36,9 +36,7 @@ export function UserNavMenu({ variant = "sidebar", onNavigate }: UserNavMenuProp
   };
 
   const wrapperClass =
-    variant === "sidebar"
-      ? "bg-white border border-gray-200 rounded-lg p-4 space-y-1"
-      : "py-1";
+    variant === "sidebar" ? "bg-white border border-gray-200 rounded-lg p-4 space-y-1" : "py-1";
 
   return (
     <nav className={wrapperClass} data-testid="user-nav-menu">
@@ -47,7 +45,11 @@ export function UserNavMenu({ variant = "sidebar", onNavigate }: UserNavMenuProp
       )}
       <ul className="space-y-0.5">
         <li>
-          <button type="button" onClick={handleContacts} className={`w-full text-left ${linkClass}`}>
+          <button
+            type="button"
+            onClick={handleContacts}
+            className={`w-full text-left ${linkClass}`}
+          >
             Контакты
           </button>
         </li>

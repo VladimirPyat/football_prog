@@ -1197,4 +1197,39 @@ components:
       properties:
         round_id: { type: integer }
         matches: { type: array, items: { $ref: '#/components/schemas/MatchOut' } }
-        results: { type: array, items: { type: object } }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/RoundResultRow' }
+    MatchPoints:
+      type: object
+      required: [match_id, base_points]
+      properties:
+        match_id: { type: integer }
+        base_points:
+          type: integer
+          nullable: true
+          description: Base match points (0, 4, 8, 12, 16); null if no prediction or match not scorable
+    RoundResultRow:
+      type: object
+      required:
+        - user_id
+        - user_name
+        - points
+        - bonus1
+        - bonus2
+        - total_without_bonus3
+        - total
+        - correct_outcomes
+      properties:
+        user_id: { type: integer }
+        user_name: { type: string }
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/MatchPoints' }
+          description: One entry per matches[] item, same order; base_points only (no bonus1 per cell)
+        bonus1: { type: integer }
+        bonus2: { type: integer }
+        bonus3: { type: integer, nullable: true }
+        total_without_bonus3: { type: integer, description: Base + bonus1 + bonus2 (Итого без бон.) }
+        total: { type: integer, description: total_with_bonus3 including bonus3 }
+        correct_outcomes: { type: integer }

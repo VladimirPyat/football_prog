@@ -27,6 +27,14 @@ export const contests = {
   restore: (id: number) => `/api/v1/contests/${id}/restore`,
 };
 
+export const contestPublic = {
+  leaderboard: (contestId: number) => `/api/v1/contests/${contestId}/leaderboard`,
+  roundLeaderboard: (contestId: number, roundId: number) =>
+    `/api/v1/contests/${contestId}/rounds/${roundId}/leaderboard`,
+  roundResults: (contestId: number, roundId: number) =>
+    `/api/v1/contests/${contestId}/rounds/${roundId}/results`,
+};
+
 export const contestAdmin = {
   teams: {
     list: (contestId: number) => `/api/v1/contests/${contestId}/teams`,

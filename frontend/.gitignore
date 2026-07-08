@@ -9,6 +9,7 @@
 # testing
 /coverage
 e2e/.auth-credentials.json
+.playwright-browsers/
 
 # next.js
 /.next/

@@ -51,6 +51,7 @@ test.describe("[E2E-UI-TOUR-PHASE-PANELS]", () => {
   });
 
   test("[UI-TOUR-CALCULATED] round 10 — scores, no LB, CTA only", async ({ page }) => {
+    finalizeLoadedContestFixture();
     const token = await supervisorToken();
 
     await clearAuthStorage(page);

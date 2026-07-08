@@ -11,6 +11,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "test:unit": "vitest run",
+    "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.playwright-browsers\" npx playwright install chromium",
     "test:e2e": "playwright test"
   },
   "dependencies": {

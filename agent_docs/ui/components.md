@@ -64,11 +64,15 @@ Global layout guard; redirects authenticated `is_temp_password` users to `/chang
 
 ## 3. Data display
 
-### `LeaderboardTable`  (`user_leaderboard.jpg`)
+### `LeaderboardTable`  (`user_leaderboard.jpg`) — **API-wired (2.4)** ✅ → `frontend/src/components/contest/LeaderboardTable.tsx`
 13 columns in order: `Место · Фамилия Имя · Дано прогнозов · Точный кр. счет · Точный счет · Разница · Исход · Бонус 1 · Бонус 2 · Бонус 3 · Очки без бонуса · Очки с бонусами · Всего очков`.
 - Bonus cols subtle yellow tint; `Всего очков` green emphasis, right aligned.
-- props: `{ rows: ScoreDetail&{rank,predictions_count}[] }`.
+- props: `{ rows: LeaderboardTableRow[]; showCountColumns?: boolean }` from `useLeaderboard` + `mapLeaderboardRow`.
+- Public gate: fetch only when `round.status === 'PUBLISHED'`; else `ResultsUnavailableMessage`.
 - ⚠️ count columns need B4; if absent, hide the four columns (documented fallback).
+
+### `ResultsUnavailableMessage` — **Implemented (2.4)** → `frontend/src/components/contest/ResultsUnavailableMessage.tsx`
+Stub for non-`PUBLISHED` rounds on **Лидерборд** / **Результаты** tabs (`data-testid="results-unavailable"`). Copy: `ROUND_NOT_PUBLISHED_COPY`.
 
 ### `PredictionsMatrix`  (`user_predict.jpg`) — **Implemented (2.2)** → `frontend/src/components/predictions/PredictionsMatrix.tsx`
 First column `Счет` + `Тур N` sub-row; one column per match header `TeamA-TeamB`; participant rows with `score1:score2` cells. Footer `OutcomeStatsFooter`.
@@ -79,9 +83,10 @@ First column `Счет` + `Тур N` sub-row; one column per match header `TeamA
 Per-match `П1 / Х / П2` counts (home win / draw / away win), colored.
 - props: `{ matches, entries }` (computed client-side from visible predictions).
 
-### `ResultsMatrix`  (`user_result.jpg`)
+### `ResultsMatrix`  (`user_result.jpg`) — **API-wired (2.4)** ✅ → `frontend/src/components/contest/ResultsMatrix.tsx`
 First column `Счет`; per-match header + actual `score1:score2` sub-row; cells = per-match points (`0/4/8/12/16`, non-zero green); right columns `Бонус 1 · Бонус 2 · Итого без бон. · Бонус 3 · ИТОГ`. `-` where bonus N/A. Horizontal scroll.
-- props: `{ matches, results }`.
+- props: `{ matches: ResultsMatrixMatch[]; rows: ResultsMatrixRow[]; roundLabel }` from `useRoundResults` + `mapRoundResultsRow`.
+- Public gate: same as leaderboard (`PUBLISHED` only); `403 RESULTS_NOT_AVAILABLE` → stub.
 
 ### Cell atoms
 | Component | Renders |

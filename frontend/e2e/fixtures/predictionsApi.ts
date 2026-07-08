@@ -132,12 +132,15 @@ export async function patchRoundDeadlineFuture(
   if (!r.ok) throw new Error(`patchRoundDeadlineFuture: ${r.status} ${await r.text()}`);
 }
 
-/** Restore ACTIVE round 10 with a future deadline (dev_setup — avoids 24h PATCH lockout). */
+/** Restore ACTIVE round 10 with a future deadline (hybrid dev_setup profile). */
 export async function ensureE2eActiveRound(contestId = 1): Promise<number | undefined> {
-  execSync("uv run python src/scripts/dev_setup.py --ensure-running-only --e2e", {
-    cwd: REPO_ROOT,
-    stdio: "ignore",
-  });
+  execSync(
+    "uv run python src/scripts/dev_setup.py --ensure-running-only --e2e-with-published",
+    {
+      cwd: REPO_ROOT,
+      stdio: "ignore",
+    },
+  );
   return getActiveRoundId(contestId);
 }
 

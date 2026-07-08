@@ -6,7 +6,7 @@ test.describe("[E2E-VISITOR-PRED-STUB]", () => {
   test("visitor sees stub before deadline on active round", async ({ page }) => {
     await ensureE2eActiveRound(1);
     const activeRoundId = await getActiveRoundId(1);
-    test.skip(!activeRoundId, "No ACTIVE round after dev_setup --e2e");
+    test.skip(!activeRoundId, "No ACTIVE round after dev_setup --e2e-with-published");
 
     await clearAuthStorage(page);
     await page.goto("/contest/1");

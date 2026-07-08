@@ -6,6 +6,7 @@ import { PublicTabs, type PublicTab } from "@/components/contest/PublicTabs";
 import { ContestRoundToolbar } from "@/components/contest/ContestRoundToolbar";
 import { LeaderboardTable } from "@/components/contest/LeaderboardTable";
 import { ResultsMatrix } from "@/components/contest/ResultsMatrix";
+import { ResultsUnavailableMessage } from "@/components/contest/ResultsUnavailableMessage";
 import { PredictionsMatrix } from "@/components/predictions/PredictionsMatrix";
 import { PredictionsVisitorStub } from "@/components/predictions/PredictionsVisitorStub";
 import { LoadingState } from "@/components/ui/LoadingState";
@@ -13,17 +14,20 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { filterParticipantEntries } from "@/lib/predictions/filterMatrixEntries";
 import { useAuth } from "@/hooks/useAuth";
 import { useContest } from "@/hooks/useContest";
+import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { usePredictionsView } from "@/hooks/usePredictionsView";
+import { useRoundResults } from "@/hooks/useRoundResults";
 import { useRounds } from "@/hooks/useRounds";
+import { BONUSES_PENDING_FALLBACK_MESSAGE } from "@/lib/admin/roundScoringPending";
 import { formatRoundTitle } from "@/lib/admin/roundLabel";
 import { isDeadlinePassedNow } from "@/lib/contest/deadline";
 import { filterParticipantVisibleRounds } from "@/lib/contest/participantRoundFilter";
-import { isRoundPubliclyVisible } from "@/lib/contest/roundPublicVisibility";
 import {
-  MOCK_LEADERBOARD_ROWS,
-  MOCK_RESULTS_MATCHES,
-  MOCK_RESULTS_ROWS,
-} from "@/lib/mocks/contestDisplayMock";
+  isRoundPubliclyVisible,
+  ROUND_NOT_PUBLISHED_COPY,
+} from "@/lib/contest/roundPublicVisibility";
+import { mapLeaderboardRows, warnIfMissingCountColumns } from "@/lib/leaderboard/mapLeaderboardRow";
+import { shouldFetchPublicResults } from "@/lib/results/roundResultsGuard";
 import type { RoundOut } from "@/types/api";
 
 function pickDefaultRound(rounds: RoundOut[], tab: PublicTab): number | null {
@@ -85,6 +89,38 @@ export default function ContestPage() {
 
   const isAdminViewer = user?.role === "ADMIN";
 
+  const roundIsPublished = selectedRound != null && shouldFetchPublicResults(selectedRound.status);
+
+  const shouldFetchLeaderboard =
+    tab === "leaderboard" && effectiveRoundId != null && roundIsPublished;
+
+  const shouldFetchResults = tab === "results" && effectiveRoundId != null && roundIsPublished;
+
+  const {
+    data: leaderboardData,
+    loading: leaderboardLoading,
+    error: leaderboardError,
+    notAvailable: leaderboardNotAvailable,
+  } = useLeaderboard(contestId, effectiveRoundId, shouldFetchLeaderboard);
+
+  const {
+    data: resultsData,
+    loading: resultsLoading,
+    error: resultsError,
+    notAvailable: resultsNotAvailable,
+    pointsMissing: resultsPointsMissing,
+  } = useRoundResults(contestId, effectiveRoundId, shouldFetchResults);
+
+  const leaderboardRows = useMemo(() => {
+    if (!leaderboardData) return [];
+    return mapLeaderboardRows(leaderboardData.leaderboard);
+  }, [leaderboardData]);
+
+  const showLeaderboardCountColumns = useMemo(() => {
+    if (!leaderboardData) return true;
+    return warnIfMissingCountColumns(leaderboardData.leaderboard);
+  }, [leaderboardData]);
+
   const showPredictionsPreDeadlineStub =
     tab === "predictions" &&
     selectedRound != null &&
@@ -141,15 +177,47 @@ export default function ContestPage() {
       <PublicTabs active={tab} onChange={handleTabChange} />
 
       {tab === "leaderboard" && selectedRound && (
-        <LeaderboardTable rows={MOCK_LEADERBOARD_ROWS} />
+        <>
+          {!roundIsPublished || leaderboardNotAvailable ? (
+            <ResultsUnavailableMessage message={ROUND_NOT_PUBLISHED_COPY} />
+          ) : leaderboardLoading ? (
+            <LoadingState />
+          ) : leaderboardError ? (
+            <ErrorState message={leaderboardError} />
+          ) : (
+            <div className="space-y-3">
+              {leaderboardData?.bonuses_pending && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  {leaderboardData.bonuses_pending_message ?? BONUSES_PENDING_FALLBACK_MESSAGE}
+                </p>
+              )}
+              <LeaderboardTable
+                rows={leaderboardRows}
+                showCountColumns={showLeaderboardCountColumns}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {tab === "results" && selectedRound && (
-        <ResultsMatrix
-          matches={MOCK_RESULTS_MATCHES}
-          rows={MOCK_RESULTS_ROWS}
-          roundLabel={formatRoundTitle(selectedRound)}
-        />
+        <>
+          {!roundIsPublished || resultsNotAvailable ? (
+            <ResultsUnavailableMessage message={ROUND_NOT_PUBLISHED_COPY} />
+          ) : resultsLoading ? (
+            <LoadingState />
+          ) : resultsError ? (
+            <ErrorState message={resultsError} />
+          ) : resultsPointsMissing ? (
+            <ErrorState message="Не удалось загрузить очки по матчам" />
+          ) : resultsData ? (
+            <ResultsMatrix
+              matches={resultsData.matches}
+              rows={resultsData.rows}
+              roundLabel={formatRoundTitle(selectedRound)}
+            />
+          ) : null}
+        </>
       )}
 
       {tab === "predictions" && showPredictionsPreDeadlineStub && (

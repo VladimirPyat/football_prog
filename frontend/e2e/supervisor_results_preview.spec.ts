@@ -39,7 +39,7 @@ test.describe("[E2E-UI-RESULTS-PREVIEW-CALC]", () => {
   });
 
   test("CALCULATED round 10 — «Результаты участников» opens LB modal", async ({ page }) => {
-    const token = await supervisorToken();
+    finalizeLoadedContestFixture();
 
     await clearAuthStorage(page);
     await seedSupervisorSession(page);

@@ -324,6 +324,17 @@ Helper: `resolveDefaultContestId()` — reads env, validates number, used by Vis
   leaderboard: (ScoreDetail & { rank:number; predictions_count:number;
     exceptional_tiebreak_points:number; tiebreaker_status:null|'manual_override' })[] }
 
+// MatchPoints (Stage 1.17 — results matrix cell)
+{ match_id:number; base_points:number|null }
+
+// RoundResultRow (Stage 1.17)
+{ user_id:number; user_name:string; points:MatchPoints[];
+  bonus1:number; bonus2:number; bonus3:number|null;
+  total_without_bonus3:number; total:number; correct_outcomes:number }
+
+// RoundResults
+{ round_id:number; matches:MatchOut[]; results:RoundResultRow[] }
+
 // PredictionBatchRequest
 { predictions: { match_id:number; score1:number; score2:number }[] }   // all matches; 0 valid; NULL≠0
 ```
@@ -337,10 +348,16 @@ Helper: `resolveDefaultContestId()` — reads env, validates number, used by Vis
 ```
 lib/api/
   client.ts        // fetch wrapper: base url, JWT header, JSON, error parse → AppError {status, detail, code?}
-  endpoints.ts     // typed path builders (contestId injected)
+  endpoints.ts     // typed path builders (contestId injected); contestPublic for public LB/results GETs (2.4)
   errors.ts        // code constants + helpers (isTempPasswordBlock, isContestLocked, …)
-  cache.ts         // ETag store + If-None-Match
+  cache.ts         // ETag store + If-None-Match (stub — full LB/results ETag wiring deferred 2.4)
 types/api.ts       // interfaces from §7
+hooks/
+  useLeaderboard.ts   // public round leaderboard (2.4)
+  useRoundResults.ts  // public results matrix (2.4)
+lib/leaderboard/mapLeaderboardRow.ts
+lib/results/mapRoundResultsRow.ts
+lib/results/roundResultsGuard.ts   // shouldFetchPublicResults(status)
 ```
 
 `client.ts` responsibilities: inject base URL + Bearer; throw typed `AppError` on non-2xx (parse `detail`/`code`); 401 → emit logout event; expose `get/post/patch/put/del/upload` + `getCached` (ETag). **2.3:** `apiUpload()` for B5 team logo — skips `Content-Type` when body is `FormData`.
@@ -360,3 +377,5 @@ types/api.ts       // interfaces from §7
 | 2026-06-28 | Stage 2.3.1 / 2.2 prep: §4.1 public LB/results `PUBLISHED` client gate; `RoundOut` supplementary fields; cross-ref `admin_ui_status_matrix.md`. |
 | 2026-06-28 | Stage 2.2.1: GET predictions public post-deadline (no Bearer); visitor pre-deadline 403/stub; removed login prompt. |
 | 2026-06-28 | Stage 2.2: predictions GET/POST wired; privacy matrix via `shouldShowScore`; 60s poll pre-deadline. |
+| 2026-07-08 | Stage 1.17: `RoundResults` typed — `results[].points[]` with `{ match_id, base_points }` aligned to `matches[]`; `total_without_bonus3` on each row. |
+| 2026-07-08 | Stage 2.4: public contest page wired — `contestPublic` paths, `useLeaderboard`/`useRoundResults`, mappers; ETag client wiring deferred. |

@@ -432,17 +432,21 @@ export async function seedAdminSession(page: Page): Promise<void> {
 
 export function ensureLoadedContestDevState(): void {
   execSync(
-    "cd /work/football_prog && uv run python src/scripts/dev_setup.py --ensure-running-only",
+    "cd /work/football_prog && uv run python src/scripts/dev_setup.py --ensure-running-only --e2e-with-published",
     { stdio: "pipe" },
   );
 }
+
+/** E2E hybrid: rounds 1–9 PUBLISHED, round 10 ACTIVE, demo user ACCEPTED. */
+export const DEV_SETUP_E2E_HYBRID =
+  "--ensure-running-only --e2e-with-published";
 
 export function reloadLoadedContestFixture(): void {
   console.log("[E2E] reloadLoadedContestFixture — load_test_data --reset (may take 60–120s)…");
   execSync(
     "cd /work/football_prog && uv run python src/scripts/load_test_data.py --reset && " +
       "uv run python src/scripts/bootstrap_users.py && " +
-      "uv run python src/scripts/dev_setup.py --ensure-running-only",
+      `uv run python src/scripts/dev_setup.py ${DEV_SETUP_E2E_HYBRID}`,
     { stdio: "inherit", timeout: 180_000 },
   );
   console.log("[E2E] reloadLoadedContestFixture — done");
@@ -481,17 +485,16 @@ export function roundOptionLabel(
 
 export async function ensureRound10Active(contestId = 1): Promise<RoundOut> {
   ensureLoadedContestDevState();
-  let token = await supervisorToken();
-  let rounds = await getRounds(token, contestId);
+  const token = await supervisorToken();
+  const rounds = await getRounds(token, contestId);
   let round10 = rounds.find((r) => r.number === 10);
   if (!round10 || round10.status !== "ACTIVE") {
     reloadLoadedContestFixture();
-    token = await supervisorToken();
-    rounds = await getRounds(token, contestId);
-    round10 = rounds.find((r) => r.number === 10);
+    const roundsAfter = await getRounds(await supervisorToken(), contestId);
+    round10 = roundsAfter.find((r) => r.number === 10);
   }
   if (!round10 || round10.status !== "ACTIVE") {
-    throw new Error(`Round 10 not ACTIVE after reload (status=${round10?.status ?? "missing"})`);
+    throw new Error(`Round 10 not ACTIVE after hybrid reload (status=${round10?.status ?? "missing"})`);
   }
   return round10;
 }

@@ -60,8 +60,8 @@ Lightweight SWR-style hooks over the typed API client (no external SWR lib unles
 | Hook | Endpoint | Cache |
 |------|----------|-------|
 | `useRounds(contestId)` | `GET /contests/{id}/rounds` | in-memory; refetch after admin mutations — **Implemented (2.2)** → `frontend/src/hooks/useRounds.ts` |
-| `useLeaderboard(contestId, roundId?)` | `…/leaderboard` | ETag + `localStorage` seed |
-| `useRoundResults(contestId, roundId)` | `…/rounds/{rid}/results` | ETag |
+| `useLeaderboard(contestId, roundId, enabled?)` | `GET …/rounds/{rid}/leaderboard` | in-memory; ETag deferred — **Implemented (2.4)** → `frontend/src/hooks/useLeaderboard.ts` |
+| `useRoundResults(contestId, roundId, enabled?)` | `GET …/rounds/{rid}/results` | in-memory; ETag deferred — **Implemented (2.4)** → `frontend/src/hooks/useRoundResults.ts` |
 | `usePredictionsView(contestId, roundId)` | `GET …/predictions` | **never cached** (privacy) — **Implemented (2.2)** → `frontend/src/hooks/usePredictionsView.ts` |
 | `usePredictionSubmit(contestId, roundId)` | `POST …/predictions` | no cache — **Implemented (2.2)** → `frontend/src/hooks/usePredictionSubmit.ts` |
 | `useDeadline(round, deadlinePassed?)` | client clock vs `round.deadline` | 1s tick — **Implemented (2.2)** → `frontend/src/hooks/useDeadline.ts` |
@@ -157,3 +157,4 @@ Phase derivation lives in **`deriveAdminUiMode(contest, round, { deadlinePassed 
 | 2026-06-28 | Stage 2.3.4: ContestProvider refetch on id change; `useContestStartReadiness`; `contest-setup-changed` events. |
 | 2026-06-28 | Stage 2.3.5: `effectiveRoundStatus`; `useRoundMatches.onDeadlinePassed`; rounds refetch on deadline transition. |
 | 2026-06-28 | Stage 2.2: `usePredictionsView`, `usePredictionSubmit`, `useDeadline`, `useMaxScore`, `useRounds`. |
+| 2026-07-08 | Stage 2.4: `useLeaderboard`, `useRoundResults`; `contestPublic` path builders; PUBLISHED gate via `shouldFetchPublicResults`. |

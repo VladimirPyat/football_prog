@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { LeaderboardRowDetail } from "@/components/contest/LeaderboardRowDetail";
 import { MultiLineColumnHeader } from "@/components/contest/MultiLineColumnHeader";
 import { DetailModal } from "@/components/ui/DetailModal";
-import type { MockLeaderboardRow } from "@/lib/mocks/contestDisplayMock";
+import type { LeaderboardTableRow } from "@/lib/leaderboard/mapLeaderboardRow";
 import {
   adaptiveNameClass,
   COL_DIGIT2,
@@ -16,7 +16,8 @@ import {
 const DESKTOP_BP = 1024;
 
 interface LeaderboardTableProps {
-  rows: MockLeaderboardRow[];
+  rows: LeaderboardTableRow[];
+  showCountColumns?: boolean;
 }
 
 function PointsCell({
@@ -41,9 +42,9 @@ function PointsCell({
   );
 }
 
-export function LeaderboardTable({ rows }: LeaderboardTableProps) {
+export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardTableProps) {
   const [compact, setCompact] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<MockLeaderboardRow | null>(null);
+  const [selectedRow, setSelectedRow] = useState<LeaderboardTableRow | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${DESKTOP_BP - 1}px)`);
@@ -53,17 +54,22 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const handleRowClick = (row: MockLeaderboardRow) => {
+  const handleRowClick = (row: LeaderboardTableRow) => {
     if (compact) setSelectedRow(row);
   };
 
   return (
     <>
-      <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto" data-testid="leaderboard-table">
+      <div
+        className="bg-white border border-gray-200 rounded-lg overflow-x-auto"
+        data-testid="leaderboard-table"
+      >
         <table className="border-collapse text-sm w-max max-w-full">
           <thead>
             <tr className="bg-gray-50">
-              <th className={`${COL_RANK} font-medium text-gray-700 border-b sticky left-0 bg-gray-50 z-10`}>
+              <th
+                className={`${COL_RANK} font-medium text-gray-700 border-b sticky left-0 bg-gray-50 z-10`}
+              >
                 <MultiLineColumnHeader label="Место" />
               </th>
               <th
@@ -76,18 +82,22 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
                   <th className={`${COL_DIGIT2} font-medium border-b`}>
                     <MultiLineColumnHeader label="Дано прогнозов" />
                   </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b`}>
-                    <MultiLineColumnHeader label="Точный кр. счет" />
-                  </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b`}>
-                    <MultiLineColumnHeader label="Точный счет" />
-                  </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b`}>
-                    <MultiLineColumnHeader label="Разница" />
-                  </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b`}>
-                    <MultiLineColumnHeader label="Исход" />
-                  </th>
+                  {showCountColumns && (
+                    <>
+                      <th className={`${COL_DIGIT2} font-medium border-b`}>
+                        <MultiLineColumnHeader label="Точный кр. счет" />
+                      </th>
+                      <th className={`${COL_DIGIT2} font-medium border-b`}>
+                        <MultiLineColumnHeader label="Точный счет" />
+                      </th>
+                      <th className={`${COL_DIGIT2} font-medium border-b`}>
+                        <MultiLineColumnHeader label="Разница" />
+                      </th>
+                      <th className={`${COL_DIGIT2} font-medium border-b`}>
+                        <MultiLineColumnHeader label="Исход" />
+                      </th>
+                    </>
+                  )}
                   <th className={`${COL_DIGIT2} font-medium border-b bg-amber-50/80`}>
                     <MultiLineColumnHeader label="Бонус 1" />
                   </th>
@@ -136,10 +146,14 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
                 {!compact && (
                   <>
                     <PointsCell value={row.predictions_count} />
-                    <PointsCell value={row.count_exact_high} />
-                    <PointsCell value={row.count_exact} />
-                    <PointsCell value={row.count_diff} />
-                    <PointsCell value={row.count_outcome} />
+                    {showCountColumns && (
+                      <>
+                        <PointsCell value={row.count_exact_high} />
+                        <PointsCell value={row.count_exact} />
+                        <PointsCell value={row.count_diff} />
+                        <PointsCell value={row.count_outcome} />
+                      </>
+                    )}
                     <td className={`${COL_DIGIT2} bg-amber-50/50`}>{row.bonus1}</td>
                     <td className={`${COL_DIGIT2} bg-amber-50/50`}>{row.bonus2}</td>
                     <td className={`${COL_DIGIT2} bg-amber-50/50`}>{row.bonus3}</td>

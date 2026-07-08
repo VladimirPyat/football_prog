@@ -5,19 +5,14 @@ import { MultiLineColumnHeader } from "@/components/contest/MultiLineColumnHeade
 import { ResultsRowDetail } from "@/components/contest/ResultsRowDetail";
 import { TeamColumnHeader } from "@/components/predictions/TeamColumnHeader";
 import { DetailModal } from "@/components/ui/DetailModal";
-import type { MockResultsMatch, MockResultsRow } from "@/lib/mocks/contestDisplayMock";
-import {
-  adaptiveNameClass,
-  COL_DIGIT2,
-  COL_DIGIT3,
-  COL_NAME,
-} from "@/lib/table/columnStyles";
+import type { ResultsMatrixMatch, ResultsMatrixRow } from "@/lib/results/mapRoundResultsRow";
+import { adaptiveNameClass, COL_DIGIT2, COL_DIGIT3, COL_NAME } from "@/lib/table/columnStyles";
 
 const MOBILE_BP = 1024;
 
 interface ResultsMatrixProps {
-  matches: MockResultsMatch[];
-  rows: MockResultsRow[];
+  matches: ResultsMatrixMatch[];
+  rows: ResultsMatrixRow[];
   roundLabel: string;
 }
 
@@ -27,9 +22,7 @@ function MatchPointsCell({ points }: { points: number | null }) {
   }
   const positive = points > 0;
   return (
-    <td
-      className={`${COL_DIGIT2} ${positive ? "text-green-600 font-medium" : "text-gray-400"}`}
-    >
+    <td className={`${COL_DIGIT2} ${positive ? "text-green-600 font-medium" : "text-gray-400"}`}>
       {points}
     </td>
   );
@@ -37,7 +30,7 @@ function MatchPointsCell({ points }: { points: number | null }) {
 
 export function ResultsMatrix({ matches, rows, roundLabel }: ResultsMatrixProps) {
   const [compact, setCompact] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<MockResultsRow | null>(null);
+  const [selectedRow, setSelectedRow] = useState<ResultsMatrixRow | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${MOBILE_BP - 1}px)`);
@@ -47,13 +40,16 @@ export function ResultsMatrix({ matches, rows, roundLabel }: ResultsMatrixProps)
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const handleRowClick = (row: MockResultsRow) => {
+  const handleRowClick = (row: ResultsMatrixRow) => {
     if (compact) setSelectedRow(row);
   };
 
   return (
     <>
-      <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto" data-testid="results-matrix">
+      <div
+        className="bg-white border border-gray-200 rounded-lg overflow-x-auto"
+        data-testid="results-matrix"
+      >
         <table className="border-collapse text-base w-max max-w-full">
           <thead>
             <tr className="bg-gray-50">
@@ -91,8 +87,11 @@ export function ResultsMatrix({ matches, rows, roundLabel }: ResultsMatrixProps)
             <tr className="bg-gray-50 text-sm text-gray-500">
               <th className={`${COL_NAME} text-left border-b font-normal`}>{roundLabel}</th>
               {matches.map((m) => (
-                <th key={`score-${m.id}`} className="px-0.5 py-1 text-center border-b font-normal tabular-nums">
-                  {m.score1}:{m.score2}
+                <th
+                  key={`score-${m.id}`}
+                  className="px-0.5 py-1 text-center border-b font-normal tabular-nums"
+                >
+                  {m.score1 ?? "—"}:{m.score2 ?? "—"}
                 </th>
               ))}
               {!compact && <th colSpan={4} className="border-b" />}
@@ -116,7 +115,9 @@ export function ResultsMatrix({ matches, rows, roundLabel }: ResultsMatrixProps)
                 tabIndex={compact ? 0 : undefined}
                 role={compact ? "button" : undefined}
               >
-                <td className={`${COL_NAME} font-medium text-gray-900 bg-white ${adaptiveNameClass(row.user_name)}`}>
+                <td
+                  className={`${COL_NAME} font-medium text-gray-900 bg-white ${adaptiveNameClass(row.user_name)}`}
+                >
                   {row.user_name}
                 </td>
                 {row.match_points.map((pts, i) => (

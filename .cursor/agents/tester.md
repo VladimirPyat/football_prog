@@ -76,6 +76,31 @@ uv run pytest tests/ -v
 
 Or narrower paths/commands from `tester_X.md`. Capture full output — exit codes, tracebacks, assertion diffs.
 
+### Playwright E2E — browser cache (read before first E2E run)
+
+Browsers are **not** in `node_modules`. Use the **project-local** cache so agents do not re-download ~200 MB every session:
+
+| Item | Value |
+|------|-------|
+| Cache path | `frontend/.playwright-browsers/` (gitignored) |
+| One-time install | `cd frontend && npm run playwright:install` |
+| Config | `playwright.config.ts` sets `PLAYWRIGHT_BROWSERS_PATH` automatically |
+
+**Before `npm run test:e2e`:**
+
+1. Check cache exists: `test -d frontend/.playwright-browsers/chromium_headless_shell-*` (or `ls frontend/.playwright-browsers/`).
+2. If missing → run `cd frontend && npm run playwright:install` **once** (needs network; use shell `required_permissions: ["all"]`).
+3. **Do not** run bare `npx playwright install` without `PLAYWRIGHT_BROWSERS_PATH` — sandbox may download to ephemeral `/tmp/cursor-sandbox-cache/` instead.
+4. Run E2E with workspace permissions (`required_permissions: ["all"]`) so API on `:8000` and browser binaries are reachable.
+
+```bash
+# Terminal 1 — API (Playwright does not start backend)
+cd /work/football_prog && uv run uvicorn main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2 — E2E (Playwright starts UI on :3000)
+cd frontend && npm run test:e2e -- --reporter=line
+```
+
 - Track every process YOU start (uvicorn, `npm run dev`, background shells).
 - After tests/report — ALWAYS tear down:
   - Playwright `webServer` stops :3000 when `CI=1` (fresh `npm run dev`).

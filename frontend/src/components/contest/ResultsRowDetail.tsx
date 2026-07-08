@@ -1,8 +1,8 @@
-import type { MockResultsMatch, MockResultsRow } from "@/lib/mocks/contestDisplayMock";
+import type { ResultsMatrixMatch, ResultsMatrixRow } from "@/lib/results/mapRoundResultsRow";
 
 interface ResultsRowDetailProps {
-  row: MockResultsRow;
-  matches: MockResultsMatch[];
+  row: ResultsMatrixRow;
+  matches: ResultsMatrixMatch[];
 }
 
 export function ResultsRowDetail({ row, matches }: ResultsRowDetailProps) {
@@ -16,7 +16,7 @@ export function ResultsRowDetail({ row, matches }: ResultsRowDetailProps) {
               <span className="text-gray-700">
                 {m.team1} — {m.team2}{" "}
                 <span className="text-gray-400">
-                  ({m.score1}:{m.score2})
+                  ({m.score1 ?? "—"}:{m.score2 ?? "—"})
                 </span>
               </span>
               <span

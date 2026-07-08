@@ -7,7 +7,7 @@ test.describe("[E2E-PRED-BATCH]", () => {
   test("7/8 disabled, 8/8 enabled, score 0 valid, save persists", async ({ page }) => {
     await ensureE2eActiveRound(1);
     const roundId = await getActiveRoundId(1);
-    test.skip(!roundId, "No ACTIVE round — run dev_setup.py --ensure-running-only --e2e");
+    test.skip(!roundId, "No ACTIVE round — run dev_setup.py --ensure-running-only --e2e-with-published");
 
     await loginAsDemoUser(page);
     await page.goto(`/contest/1/predict/${roundId}`);

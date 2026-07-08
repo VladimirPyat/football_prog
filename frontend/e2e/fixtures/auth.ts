@@ -42,7 +42,7 @@ export async function submitLogin(page: Page): Promise<void> {
 }
 
 export async function waitForUserAuthenticatedHeader(page: Page): Promise<void> {
-  await expect(page.getByRole("link", { name: "Личный кабинет" })).toBeVisible({
+  await expect(page.getByTestId("header-user-login")).toBeVisible({
     timeout: 10_000,
   });
   await expect(page.getByRole("button", { name: "Вход" })).not.toBeVisible();

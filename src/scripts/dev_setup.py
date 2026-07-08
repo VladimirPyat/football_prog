@@ -320,7 +320,15 @@ def _finalize_manual_fixture() -> None:
     asyncio.run(finalize_dev_fixture(contest_id=DEFAULT_CONTEST_ID, profile="manual"))
 
 
-def run_full_setup(*, reset: bool, e2e: bool = False) -> None:
+def _finalize_e2e_with_published_fixture() -> None:
+    from scripts.finalize_dev_fixture import finalize_dev_fixture
+
+    asyncio.run(
+        finalize_dev_fixture(contest_id=DEFAULT_CONTEST_ID, profile="e2e_with_published")
+    )
+
+
+def run_full_setup(*, reset: bool, e2e: bool = False, e2e_with_published: bool = False) -> None:
     _run(["uv", "sync"])
     _run(["uv", "run", "alembic", "upgrade", "head"])
     loader_cmd = ["uv", "run", "python", "src/scripts/load_test_data.py"]
@@ -328,8 +336,10 @@ def run_full_setup(*, reset: bool, e2e: bool = False) -> None:
         loader_cmd.append("--reset")
     _run(loader_cmd)
     _run(["uv", "run", "python", "src/scripts/bootstrap_users.py"])
-    asyncio.run(ensure_dev_contest_running(e2e=e2e))
-    if not e2e:
+    asyncio.run(ensure_dev_contest_running(e2e=e2e and not e2e_with_published))
+    if e2e_with_published:
+        _finalize_e2e_with_published_fixture()
+    elif not e2e:
         _finalize_manual_fixture()
 
 
@@ -398,12 +408,23 @@ def main() -> None:
     parser.add_argument(
         "--ensure-running-only",
         action="store_true",
-        help="RUNNING+locked and manual dev fixture (or e2e round-10 ACTIVE with --e2e)",
+        help=(
+            "RUNNING+locked and dev fixture "
+            "(manual, --e2e, or --e2e-with-published hybrid profile)"
+        ),
     )
     parser.add_argument(
         "--e2e",
         action="store_true",
-        help="E2E profile: round 10 ACTIVE with future deadline; skip finalize fixture",
+        help="E2E legacy profile: round 10 ACTIVE with future deadline; skip finalize fixture",
+    )
+    parser.add_argument(
+        "--e2e-with-published",
+        action="store_true",
+        help=(
+            "E2E hybrid profile: rounds 1–9 PUBLISHED, round 10 ACTIVE, "
+            "demo user ACCEPTED, round 11 CLOSED"
+        ),
     )
     parser.add_argument(
         "--finalize-fixture-only",
@@ -447,14 +468,27 @@ def main() -> None:
             print(f"✅ {label}: {host}:{port} is free")
         sys.exit(0)
 
+    if args.e2e and args.e2e_with_published:
+        parser.error("--e2e and --e2e-with-published are mutually exclusive")
+
     if args.finalize_fixture_only:
-        _finalize_manual_fixture()
-        print("✅ Dev fixture finalized (manual profile)")
+        if args.e2e_with_published:
+            _finalize_e2e_with_published_fixture()
+            print("✅ Dev fixture finalized (e2e-with-published hybrid profile)")
+        else:
+            _finalize_manual_fixture()
+            print("✅ Dev fixture finalized (manual profile)")
         sys.exit(0)
 
     if args.ensure_running_only:
         asyncio.run(ensure_dev_contest_running(e2e=args.e2e))
-        if not args.e2e:
+        if args.e2e_with_published:
+            _finalize_e2e_with_published_fixture()
+            print(
+                "✅ Contest dev state ensured "
+                "(RUNNING + e2e-with-published: 1–9 PUBLISHED, 10 ACTIVE)"
+            )
+        elif not args.e2e:
             _finalize_manual_fixture()
             print("✅ Contest dev state ensured (RUNNING + manual fixture)")
         else:
@@ -474,7 +508,11 @@ def main() -> None:
         if args.minimal:
             run_minimal_setup()
         else:
-            run_full_setup(reset=not args.no_reset, e2e=args.e2e)
+            run_full_setup(
+                reset=not args.no_reset,
+                e2e=args.e2e,
+                e2e_with_published=args.e2e_with_published,
+            )
     except subprocess.CalledProcessError as exc:
         print(f"❌ Setup failed (exit {exc.returncode})", file=sys.stderr)
         sys.exit(exc.returncode or 1)

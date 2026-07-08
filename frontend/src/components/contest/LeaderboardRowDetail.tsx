@@ -1,10 +1,10 @@
-import type { MockLeaderboardRow } from "@/lib/mocks/contestDisplayMock";
+import type { LeaderboardTableRow } from "@/lib/leaderboard/mapLeaderboardRow";
 
 interface LeaderboardRowDetailProps {
-  row: MockLeaderboardRow;
+  row: LeaderboardTableRow;
 }
 
-const FIELDS: { key: keyof MockLeaderboardRow; label: string }[] = [
+const FIELDS: { key: keyof LeaderboardTableRow; label: string }[] = [
   { key: "rank", label: "Место" },
   { key: "predictions_count", label: "Дано прогнозов" },
   { key: "count_exact_high", label: "Точный кр. счёт" },
@@ -29,7 +29,9 @@ export function LeaderboardRowDetail({ row }: LeaderboardRowDetailProps) {
       ))}
       <div className="contents">
         <dt className="text-gray-500 font-medium">Всего очков</dt>
-        <dd className="text-green-700 font-bold tabular-nums text-right">{row.total_with_bonus3}</dd>
+        <dd className="text-green-700 font-bold tabular-nums text-right">
+          {row.total_with_bonus3}
+        </dd>
       </div>
     </dl>
   );

@@ -315,3 +315,11 @@
 - Verified: `uv run ruff check` on touched src files OK; `uv run pytest tests/api/test_round_deadline_auto_close_1_16.py -v` 9 passed
 - Contracts: contest_lifecycle_flow.md §3.2 (per-round ensure documented)
 - Next: coder_2.3.5_fix_deadline.md (frontend UI sync)
+
+## 2026-07-08 — Coder (1.17 results per-match points)
+- STATUS: READY_FOR_TEST
+- Scope: GET …/results populates results[].points (base_points per match), total_without_bonus3
+- Key paths: leaderboard_service.py, scoring_persistence.py, schemas/leaderboard.py
+- Verified: pytest test_round_results_points_1_17.py (6 passed); ruff/mypy on touched src files OK
+- Contracts: api_v1.yaml RoundResults, API_GUIDE.md, frontend_api_integration.md
+- Next: agent_docs/instructions/coder_2.4.md

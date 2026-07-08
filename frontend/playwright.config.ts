@@ -3,6 +3,13 @@ import path from "path";
 
 const frontendDir = path.dirname(__filename);
 
+// Project-local browser cache (gitignored). Survives agent sandbox sessions;
+// default ~/.cache/ms-playwright is often empty or inaccessible in sandbox.
+const projectBrowsersPath = path.join(frontendDir, ".playwright-browsers");
+if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = projectBrowsersPath;
+}
+
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: path.join(frontendDir, "playwright.global-setup.ts"),

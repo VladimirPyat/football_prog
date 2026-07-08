@@ -183,6 +183,61 @@ export interface CreateSupervisorResponse {
   user: UserOut;
 }
 
+export interface MatchPointsOut {
+  match_id: number;
+  base_points: number | null;
+}
+
+export interface ScoreDetailOut {
+  user_id: number;
+  user_name: string;
+  points_base: number;
+  bonus1: number;
+  bonus2: number;
+  bonus3: number;
+  total_without_bonus3: number;
+  total_with_bonus3: number;
+  correct_outcomes: number;
+  count_exact_high?: number;
+  count_exact?: number;
+  count_diff?: number;
+  count_outcome?: number;
+}
+
+export interface LeaderboardEntryOut extends ScoreDetailOut {
+  rank: number;
+  predictions_count: number;
+  exceptional_tiebreak_points: number;
+  tiebreaker_status: string | null;
+}
+
+export interface LeaderboardOut {
+  contest_id: number;
+  round_id: number | null;
+  round_number: number | null;
+  bonuses_pending?: boolean;
+  bonuses_pending_message?: string | null;
+  leaderboard: LeaderboardEntryOut[];
+}
+
+export interface RoundResultRowOut {
+  user_id: number;
+  user_name: string;
+  points: MatchPointsOut[];
+  bonus1: number;
+  bonus2: number;
+  bonus3: number | null;
+  total_without_bonus3: number;
+  total: number;
+  correct_outcomes: number;
+}
+
+export interface RoundResultsOut {
+  round_id: number;
+  matches: MatchOut[];
+  results: RoundResultRowOut[];
+}
+
 export interface ContestPatchRequest {
   name?: string;
   slug?: string | null;

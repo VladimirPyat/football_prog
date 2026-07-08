@@ -257,3 +257,56 @@
 - Instruction: agent_docs/instructions/tester_1.16_fix.md
 - Scope: 15 stale tests updated (password setup, ETag, tiebreak, LB counts, soft-delete, auto-close)
 - Verified: full pytest 383 passed / 1 skipped / 0 failed
+
+## 2026-07-08 — Tester (2.2)
+- STATUS: TEST_PASS
+- Report: agent_docs/reports/test_2.2.md
+- Unit: 153 passed; E2E: 11 passed (0 skipped)
+- Build: OK
+- Fixes: auth fixture header assertion; contest_predictions_tab pre-deadline stub; prettier drift
+- Next: instructions/coder_2.4.md
+
+## 2026-07-08 — Tester (2.2.1 re-run)
+- STATUS: TEST_PASS
+- Report: agent_docs/reports/test_2.2.1.md
+- Re-verified with full 2.2 suite; API 9/9; visitor stub + public E2E PASS
+
+## 2026-07-08 — Coder (2.4 API wiring — leaderboard & results)
+- STATUS: READY_FOR_TEST
+- Scope: replace contestDisplayMock with useLeaderboard/useRoundResults; PUBLISHED gate; existing UI preserved
+- Backend dep: coder_1.17_leaderboard_fix (results[].points)
+- Verified: npm run build, test:unit, lint/tsc/format; checklist §9
+- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.4
+- Deferred (if any): ETag caching, global «Общий» leaderboard selector
+- Next: agent_docs/instructions/tester_2.4.md
+
+## 2026-07-08 — Tester (2.4 leaderboard & results wiring)
+- STATUS: TEST_FAIL (partial — 2.4 scope green, full E2E 46/70)
+- Report: agent_docs/reports/test_2.4.md
+- API: test_round_results_points_1_17.py 6/6; B4 smoke OK
+- Unit: 163/163; Lint/TSC/Prettier/Build: OK
+- E2E 2.4 new: 4/4 (LB visitor, B4 columns, results stub, results matrix)
+- E2E full suite: 46 passed / 24 failed — round 10 ACTIVE vs CALCULATED fixture conflict; auth timeouts
+- Fixes: contest_leaderboard_stub.spec.ts (real API); results_graceful.spec.ts (new)
+- SKIP: mobile toggle, ETag unit (deferred per coder_2.4)
+- Next: fixture profile split or --ensure-running-only --e2e before full suite; re-test integration
+
+## 2026-07-08 — Tester 2.4.1 hybrid fixture (`--e2e-with-published`)
+- STATUS: FIX_IMPLEMENTED (full E2E re-run pending stable dev server)
+- Instruction: agent_docs/instructions/tester_2.4.1_fix_fixture.md
+- Backend: finalize_dev_fixture profile `e2e_with_published`; dev_setup flag `--e2e-with-published`
+- E2E: reload/ensure helpers use hybrid; old helpers in `.trash/.../adminApi.fixtureHelpers.old.ts`
+- Pytest: test_finalize_dev_fixture_1_14.py 6/6
+- Next: human re-run `npm run test:e2e` with API+UI up; update test_2.4.md verdict if green
+
+## 2026-07-08 — Tester (2.4 full verification re-run)
+- STATUS: TEST_FAIL
+- Report: agent_docs/reports/test_2.4.md
+- Tests: verification only (no new test files); executed full gate per tester_2.4.md
+- Executed: dev_setup reset + e2e profile; pytest 1.17 6/6; Vitest 163/163; lint/tsc/format/build OK; CI=1 E2E 51 passed / 19 failed (~11 min)
+- Integration: user + supervisor + RBAC suite **not green** — auth header timeout (`header-user-login`), supervisor_results/24h/create_round, prediction_privacy PRE
+- 2.4-specific E2E specs missing: leaderboard_visitor, leaderboard_mobile_toggle, results_graceful, user_full_flow
+- Unit gaps: leaderboardColumns, useLeaderboardViewMode, ETag cache tests (deferred per coder_2.4)
+- BLOCKED.md: B4 API smoke OK; no new B7
+- Teardown: API stopped; `--check-ports` exit 0
+- Next: @Coder — add 2.4 E2E specs, fix auth header + supervisor regressions; re-invoke tester

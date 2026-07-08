@@ -12,6 +12,7 @@ How to deploy the Football Predictions Contest stack on a server: API (FastAPI) 
 - [Backend `.env` (secrets)](#backend-env-secrets)
 - [Backend deployment env (non-secrets)](#backend-deployment-env-non-secrets)
 - [Frontend env (build-time)](#frontend-env-build-time)
+- [Production install — exclude dev/QA](#production-install--exclude-devqa)
 - [Database: SQLite → PostgreSQL](#database-sqlite--postgresql)
 - [First deploy checklist](#first-deploy-checklist)
 - [Running services](#running-services)
@@ -144,10 +145,14 @@ Build and run:
 
 ```bash
 cd frontend
-npm ci
+npm ci              # full deps required for `next build` (TypeScript, Tailwind, etc.)
 npm run build
+npm prune --omit=dev   # drop devDependencies after build (Playwright, Vitest, ESLint, …)
 npm run start   # listens on :3000 by default; set PORT=3000 in process manager
 ```
+
+> **Do not** run `npm run playwright:install` on the server — browsers (~800 MiB) are for local/CI E2E only.  
+> See [Production install — exclude dev/QA](#production-install--exclude-devqa).
 
 Template: [`frontend/.env.local.example`](../frontend/.env.local.example).
 
@@ -157,6 +162,64 @@ Template: [`frontend/.env.local.example`](../frontend/.env.local.example).
 - `NEXT_PUBLIC_API_URL=https://app.example.com` (no `/api` suffix if Next calls `/api/v1/...` — check `frontend/src/lib/api/endpoints.ts`; paths are absolute under `/api/v1`)
 
 Verify in browser DevTools: login and `/auth/setup` must reach the API without CORS errors.
+
+---
+
+## Production install — exclude dev/QA
+
+Production needs **API + built Next.js** only. Test runners, linters, and E2E browsers are **not** deployed.
+
+### Backend (Python)
+
+Install **runtime** dependencies only:
+
+```bash
+cd /path/to/football_prog
+uv sync --no-dev
+```
+
+This skips the `[dependency-groups] dev` packages (`pytest`, `ruff`, `mypy`, `bandit`, …). They are not in `requires-python` runtime and are **not** pulled by `uv sync --no-dev`.
+
+| Include on server | Exclude (dev/QA) |
+|-------------------|------------------|
+| `uvicorn`, FastAPI, SQLAlchemy, Alembic, … | `pytest`, `httpx` (test client), `ruff`, `mypy`, `bandit` |
+| `uv run alembic upgrade head` | `uv run pytest` |
+| `uv run python src/scripts/bootstrap_users.py` (once) | `load_test_data.py --reset` (dev fixture) |
+
+### Frontend (Node)
+
+| Phase | Command | Notes |
+|-------|---------|-------|
+| **Build** | `npm ci` then `npm run build` | Needs devDependencies (TypeScript, Tailwind, PostCSS) |
+| **Runtime** | `npm prune --omit=dev` then `npm run start` | Removes test/lint tooling from `node_modules` |
+
+**Never on production:**
+
+| Artifact | Why |
+|----------|-----|
+| `npm run playwright:install` | Downloads Chromium + headless shell (~800 MiB); only for E2E |
+| `frontend/.playwright-browsers/` | Gitignored local E2E cache — not in repo, do not create on server |
+| `npm run test:e2e` | Playwright E2E — run in CI or dev machine only |
+| `npm run test:unit` / `npm run lint` | Dev/CI gates, not runtime |
+
+`@playwright/test` lives in `devDependencies`. It is **not** installed if you `npm prune --omit=dev` after build. There is **no** `postinstall` hook that downloads browsers — they appear only after an explicit `playwright:install`.
+
+### Optional — omit from deploy artifact
+
+Not required for serving traffic (safe to exclude from tarball/Docker context to save space):
+
+- `tests/`, `frontend/e2e/`, `agent_docs/`, `docs/` (specs)
+- `.venv` from dev machine — recreate on server with `uv sync --no-dev`
+- `football.db` (SQLite dev DB)
+- `frontend/.next/` from dev — **rebuild** on server or in CI with production `NEXT_PUBLIC_*`
+
+### CI vs server (recommended split)
+
+| Step | Where |
+|------|-------|
+| `uv run pytest`, `npm run test:unit`, `npm run test:e2e` | CI or developer machine |
+| `npm run playwright:install` (once) | CI runner or dev (`frontend/.playwright-browsers/`) |
+| `uv sync --no-dev`, `npm ci` + `build` + `prune --omit=dev` | Production server or release image |
 
 ---
 
@@ -204,13 +267,13 @@ See [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md). **Do not** re-run bootstrap on eve
 
 ## First deploy checklist
 
-1. Clone repo on server; `uv sync`; `cd frontend && npm ci`
+1. Clone repo on server; `uv sync --no-dev`; configure frontend env (step 6) then build (step 7)
 2. Configure root `.env` (PostgreSQL, `JWT_SECRET_KEY`, seed passwords)
 3. Set deployment env: `FRONTEND_BASE_URL`, `CORS_ORIGINS`
 4. `uv run alembic upgrade head`
 5. `uv run python src/scripts/seed.py` + `bootstrap_users.py`
 6. Configure `frontend/.env.production` with `NEXT_PUBLIC_API_URL`
-7. `npm run build` in `frontend/`
+7. `cd frontend && npm ci && npm run build && npm prune --omit=dev`
 8. Start API + frontend (systemd/docker)
 9. Configure TLS reverse proxy
 10. Smoke test:
@@ -311,6 +374,7 @@ Dev workflow without mail: [DEV_SETUP.md — confirm participants](DEV_SETUP.md#
 | TLS | HTTPS on both app and API (or same-origin proxy) |
 | Migrations | `alembic upgrade head` on each deploy **before** restarting API |
 | Uploads | Persistent `UPLOAD_DIR` |
+| Dev/QA excluded | `uv sync --no-dev`; no Playwright install; `npm prune --omit=dev` after frontend build |
 
 ---
 
@@ -328,4 +392,4 @@ Dev workflow without mail: [DEV_SETUP.md — confirm participants](DEV_SETUP.md#
 
 ---
 
-*Last updated: deployment guide initial — URLs, CORS, PostgreSQL, invite links.*
+*Last updated: 2026-07-08 — production install excludes dev/QA (Playwright, pytest, prune devDeps).*

@@ -23,7 +23,15 @@ from tests.api.reference_compare import (  # noqa: E402
     load_expected_scores,
 )
 
-from database.models import Match, MatchStatus, Round, Score  # noqa: E402
+from database.models import (  # noqa: E402
+    ContestParticipant,
+    Match,
+    MatchStatus,
+    ParticipantStatus,
+    Round,
+    Score,
+    User,
+)
 
 
 def _run_with_db(db_url: str, *args: str) -> None:
@@ -76,6 +84,13 @@ def manual_fixture_db(isolated_db) -> str:
 def e2e_fixture_db(isolated_db) -> str:
     db_url, _, _ = isolated_db
     _run_with_db(db_url, "--ensure-running-only", "--e2e")
+    return db_url
+
+
+@pytest.fixture
+def e2e_with_published_fixture_db(isolated_db) -> str:
+    db_url, _, _ = isolated_db
+    _run_with_db(db_url, "--ensure-running-only", "--e2e-with-published")
     return db_url
 
 
@@ -174,6 +189,43 @@ async def test_script_finalize_profile_e2e(
             select(Round).where(Round.contest_id == 1, Round.number == 11)
         )
         assert round_11 is None
+
+
+@pytest.mark.asyncio
+async def test_script_finalize_profile_e2e_with_published(
+    e2e_with_published_fixture_db: str,
+    isolated_db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    _, sf, _ = isolated_db
+    rows = await _fixture_rows(sf)
+    by_num = {r["number"]: r for r in rows}
+
+    for n in range(1, 10):
+        assert by_num[n]["status"] == "PUBLISHED"
+        assert by_num[n]["score_rows"] == 10
+
+    assert by_num[10]["status"] == "ACTIVE"
+    assert by_num[10]["score_rows"] == 0
+    assert by_num[11]["status"] == "CLOSED"
+    assert by_num[11]["score_rows"] == 0
+
+    async with sf() as session:
+        round_10 = await session.scalar(
+            select(Round).where(Round.contest_id == 1, Round.number == 10)
+        )
+        assert round_10 is not None
+        assert round_10.deadline.replace(tzinfo=UTC) > datetime.now(UTC)
+
+        demo_user = await session.scalar(select(User).where(User.login == "user"))
+        assert demo_user is not None
+        part = await session.scalar(
+            select(ContestParticipant).where(
+                ContestParticipant.contest_id == 1,
+                ContestParticipant.user_id == demo_user.id,
+            )
+        )
+        assert part is not None
+        assert part.status == ParticipantStatus.ACCEPTED.value
 
 
 @pytest.mark.asyncio

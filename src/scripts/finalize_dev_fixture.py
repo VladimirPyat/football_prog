@@ -15,7 +15,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -69,6 +69,33 @@ async def _restrict_participants_to_contracted(
 ) -> None:
     """Only contracted CSV users stay ACCEPTED — bootstrap admin/demo must not add score rows."""
     allowed = await _contracted_logins()
+    await _apply_participant_allowlist(session, contest_id, allowed)
+
+
+async def _ensure_demo_user_accepted(
+    session: AsyncSession, contest_id: int, *, demo_login: str
+) -> None:
+    """Re-accept bootstrap demo login after contracted-only scoring (E2E hybrid)."""
+    user = await session.scalar(select(User).where(User.login == demo_login))
+    if user is None:
+        logger.warning("Demo login %s not found — skip ACCEPTED", demo_login)
+        return
+    part = await session.scalar(
+        select(ContestParticipant).where(
+            ContestParticipant.contest_id == contest_id,
+            ContestParticipant.user_id == user.id,
+        )
+    )
+    if part is None:
+        logger.warning("Demo participant missing for %s — skip ACCEPTED", demo_login)
+        return
+    part.status = ParticipantStatus.ACCEPTED.value
+    logger.info("Demo participant %s set ACCEPTED (e2e hybrid)", demo_login)
+
+
+async def _apply_participant_allowlist(
+    session: AsyncSession, contest_id: int, allowed: set[str]
+) -> None:
     participants = (
         await session.scalars(
             select(ContestParticipant).where(ContestParticipant.contest_id == contest_id)
@@ -174,6 +201,59 @@ async def _assert_rounds_1_9_match_expected(session: AsyncSession, contest_id: i
         raise RuntimeError(f"expected_scores mismatch ({len(mismatches)}): {sample}")
     if matched != 90:
         raise RuntimeError(f"expected 90/90 score matches, got {matched}")
+
+
+async def finalize_round_10_active_e2e(
+    session: AsyncSession,
+    contest_id: int = DEFAULT_CONTEST_ID,
+) -> None:
+    """ACTIVE round 10 with future deadline and no participant scores (E2E hybrid profile)."""
+    round_ = await _get_round_by_number(session, contest_id, 10)
+    if round_ is None:
+        raise RuntimeError("Round 10 missing")
+
+    existing = await _score_count(session, round_.id)
+    status = RoundStatus(round_.status)
+    now = datetime.now(UTC)
+
+    if status == RoundStatus.ACTIVE and existing == 0 and round_.deadline.replace(tzinfo=UTC) > now:
+        matches = (
+            await session.scalars(
+                select(Match).where(Match.round_id == round_.id).order_by(Match.id)
+            )
+        ).all()
+        if matches and all(m.date_time.replace(tzinfo=UTC) > now for m in matches):
+            logger.info("Round 10 already ACTIVE (e2e hybrid) — skip")
+            return
+
+    if existing > 0:
+        await session.execute(delete(Score).where(Score.round_id == round_.id))
+        logger.info("Cleared %s score rows from round 10", existing)
+
+    contest = await session.get(Contest, contest_id)
+    if contest is None:
+        raise RuntimeError(f"Contest {contest_id} not found")
+
+    matches = (
+        await session.scalars(
+            select(Match).where(Match.round_id == round_.id).order_by(Match.id)
+        )
+    ).all()
+    if len(matches) != 8:
+        raise RuntimeError(f"Round 10 expected 8 matches, got {len(matches)}")
+
+    base = now + timedelta(days=14)
+    for i, match in enumerate(matches):
+        match.date_time = base + timedelta(hours=i)
+        match.score1 = None
+        match.score2 = None
+        match.status = MatchStatus.SCHEDULED.value
+
+    earliest = min(m.date_time for m in matches)
+    deadline_rule_hours: int = contest.rules_json["contest_structure"]["deadline_rule_hours"]
+    round_.deadline = earliest - timedelta(hours=deadline_rule_hours)
+    round_.status = RoundStatus.ACTIVE.value
+    logger.info("Round 10 set ACTIVE with future deadline (e2e hybrid)")
 
 
 async def finalize_round_10_calculated(
@@ -287,9 +367,13 @@ async def finalize_dev_fixture(
     reference_now: datetime = REFERENCE_NOW,
     validate_expected: bool = True,
 ) -> None:
-    """Orchestrate manual dev fixture (rounds 1–9 PUBLISHED, 10 CALCULATED, 11 CLOSED)."""
-    if profile != "manual":
+    """Orchestrate dev fixture finalize (manual or e2e_with_published profile)."""
+    if profile not in ("manual", "e2e_with_published"):
         raise ValueError(f"Unknown profile: {profile!r}")
+
+    from config.settings import get_settings
+
+    demo_login = get_settings().seed_demo_user_login
 
     engine = create_engine()
     session_factory = create_session_factory(engine)
@@ -300,12 +384,19 @@ async def finalize_dev_fixture(
             await finalize_rounds_1_9_published(
                 session, contest_id, validate_expected=validate_expected
             )
-            await finalize_round_10_calculated(
-                session, contest_id, reference_now=reference_now
-            )
+            if profile == "manual":
+                await finalize_round_10_calculated(
+                    session, contest_id, reference_now=reference_now
+                )
+            else:
+                await finalize_round_10_active_e2e(session, contest_id)
             await ensure_round_11_closed(
                 session, contest_id, reference_now=reference_now
             )
+            if profile == "e2e_with_published":
+                await _ensure_demo_user_accepted(
+                    session, contest_id, demo_login=demo_login
+                )
     await engine.dispose()
     logger.info("Dev fixture finalized for contest %s (profile=%s)", contest_id, profile)
 
@@ -315,10 +406,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Finalize dev contest fixture (Stage 1.14)")
     parser.add_argument("--contest-id", type=int, default=DEFAULT_CONTEST_ID)
     parser.add_argument("--no-validate", action="store_true", help="Skip expected_scores.csv check")
+    parser.add_argument(
+        "--profile",
+        choices=("manual", "e2e_with_published"),
+        default="manual",
+        help="Fixture profile (default: manual supervisor QA)",
+    )
     args = parser.parse_args()
     asyncio.run(
         finalize_dev_fixture(
             contest_id=args.contest_id,
+            profile=args.profile,
             validate_expected=not args.no_validate,
         )
     )

@@ -34,7 +34,24 @@ class LeaderboardOut(BaseModel):
     leaderboard: list[ScoreDetailOut]
 
 
+class MatchPointsOut(BaseModel):
+    match_id: int
+    base_points: int | None
+
+
+class RoundResultRowOut(BaseModel):
+    user_id: int
+    user_name: str
+    points: list[MatchPointsOut]
+    bonus1: int
+    bonus2: int
+    bonus3: int | None = None
+    total_without_bonus3: int
+    total: int
+    correct_outcomes: int
+
+
 class RoundResultsOut(BaseModel):
     round_id: int
     matches: list[dict]
-    results: list[dict]
+    results: list[RoundResultRowOut]

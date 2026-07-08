@@ -14,13 +14,21 @@ test.describe("[E2E-CONTEST-PRED-TAB]", () => {
 
     await expect(page.getByTestId("round-selector")).toBeVisible();
     await page.getByRole("tab", { name: "Прогнозы" }).click();
-    await expect(page.getByTestId("predictions-matrix")).toBeVisible({ timeout: 15_000 });
+    // Round 10 (ACTIVE, pre-deadline): participant sees stub, not full matrix
+    await expect(page.getByTestId("predictions-pre-deadline-stub")).toBeVisible({
+      timeout: 15_000,
+    });
 
     await page.locator("#round-select").selectOption(String(round9Id));
     await expect(page.getByTestId("predictions-matrix")).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("tab", { name: "Лидерборд" }).click();
     await page.getByRole("tab", { name: "Прогнозы" }).click();
+    // Tab change resets default round to ACTIVE (10) — stub until round 9 re-selected
+    await expect(page.getByTestId("predictions-pre-deadline-stub")).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.locator("#round-select").selectOption(String(round9Id));
     await expect(page.getByTestId("predictions-matrix")).toBeVisible({ timeout: 15_000 });
   });
 });

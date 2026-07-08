@@ -17,7 +17,14 @@ One-time and day-to-day workflow for running the **Football Predictions Contest*
 | **Node.js** | ≥ 20 LTS (18+ may work) | `node --version` |
 | **npm** | ≥ 10 | `npm --version` |
 
-Optional for E2E (Stage 2.1+ tester): Playwright browsers — `cd frontend && npx playwright install chromium`
+Optional for E2E (Stage 2.1+ tester): Playwright browsers — **one-time**:
+
+```bash
+cd frontend && npm run playwright:install
+```
+
+Browsers are stored in `frontend/.playwright-browsers/` (gitignored, reused by agents).  
+`playwright.config.ts` sets `PLAYWRIGHT_BROWSERS_PATH` automatically — do **not** use bare `npx playwright install` (sandbox may download to ephemeral `/tmp/cursor-sandbox-cache/`).
 
 ---
 
@@ -274,7 +281,7 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 | `load_test_data` unique constraint | Use `--reset` or run full `dev_setup.py` |
 | Admin missing after loader | Run `bootstrap_users.py` **after** `load_test_data --reset` |
 | `user/user` login fails (401) | Re-run `dev_setup.py` — demo USER is created by `bootstrap_users.py` after loader |
-| Playwright E2E cannot find browser | `npx playwright install chromium` in `frontend/` |
+| Playwright E2E cannot find browser | `cd frontend && npm run playwright:install` (cache: `.playwright-browsers/`) |
 | Port in use | `uv run python src/scripts/dev_setup.py --check-ports`; stop process on :8000/:3000 or use another terminal's stack |
 | `--run` exits immediately | Check logs — missing `frontend/`, `node`, or `npm`; run `--check` |
 | UI not ready after `--run` | Wait up to 90s on first `npm install`; re-run `cd frontend && npm run dev` |
