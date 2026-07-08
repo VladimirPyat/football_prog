@@ -310,3 +310,11 @@
 - BLOCKED.md: B4 API smoke OK; no new B7
 - Teardown: API stopped; `--check-ports` exit 0
 - Next: @Coder — add 2.4 E2E specs, fix auth header + supervisor regressions; re-invoke tester
+
+## 2026-07-09 — Fix 2.4.1 (leaderboard UI + round tab persistence)
+- STATUS: READY_FOR_TEST
+- Scope: `?scope=total` in useLeaderboard; persist round across tabs; grouped LB headers; points_base / total_bonus_points / ИТОГО columns
+- Key paths: LeaderboardTable.tsx, mapLeaderboardRow.ts, contest page.tsx, endpoints.ts
+- Verified: Vitest mapLeaderboardRow 5/5; eslint + tsc OK
+- Prerequisite: coder 1.18 backend (same session)
+- Next: manual QA round 9 LB; tester re-run 2.4 E2E specs

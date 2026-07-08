@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { LeaderboardRowDetail } from "@/components/contest/LeaderboardRowDetail";
-import { MultiLineColumnHeader } from "@/components/contest/MultiLineColumnHeader";
 import { DetailModal } from "@/components/ui/DetailModal";
 import type { LeaderboardTableRow } from "@/lib/leaderboard/mapLeaderboardRow";
-import {
-  adaptiveNameClass,
-  COL_DIGIT2,
-  COL_DIGIT3,
-  COL_NAME,
-  COL_RANK,
-} from "@/lib/table/columnStyles";
+import { COL_DIGIT2, COL_DIGIT3, COL_NAME, COL_RANK } from "@/lib/table/columnStyles";
 
 const DESKTOP_BP = 1024;
+
+const TH_BASE =
+  "px-1 py-2 text-sm font-medium text-gray-700 border-b align-middle text-center";
+const TH_STICKY = `${TH_BASE} sticky bg-gray-50 z-10`;
+const TH_GROUP = `${TH_BASE} bg-gray-50`;
+const TH_BONUS = `${TH_BASE} bg-amber-50/80`;
+const TH_TOTAL = `${TH_BASE} bg-green-50`;
 
 interface LeaderboardTableProps {
   rows: LeaderboardTableRow[];
@@ -42,6 +42,18 @@ function PointsCell({
   );
 }
 
+function headerLabel(lines: string[]) {
+  return (
+    <span className="block leading-snug">
+      {lines.map((line) => (
+        <span key={line} className="block">
+          {line}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardTableProps) {
   const [compact, setCompact] = useState(false);
   const [selectedRow, setSelectedRow] = useState<LeaderboardTableRow | null>(null);
@@ -66,59 +78,76 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
       >
         <table className="border-collapse text-sm w-max max-w-full">
           <thead>
-            <tr className="bg-gray-50">
-              <th
-                className={`${COL_RANK} font-medium text-gray-700 border-b sticky left-0 bg-gray-50 z-10`}
-              >
-                <MultiLineColumnHeader label="Место" />
-              </th>
-              <th
-                className={`${COL_NAME} font-medium text-gray-700 border-b sticky left-8 bg-gray-50 z-10 max-w-[8.5rem]`}
-              >
-                <MultiLineColumnHeader label="Фамилия Имя" />
-              </th>
-              {!compact && (
-                <>
-                  <th className={`${COL_DIGIT2} font-medium border-b`}>
-                    <MultiLineColumnHeader label="Дано прогнозов" />
+            {!compact && showCountColumns ? (
+              <>
+                <tr className="bg-gray-50">
+                  <th rowSpan={2} className={`${TH_STICKY} left-0 ${COL_RANK}`}>
+                    {headerLabel(["Место"])}
                   </th>
-                  {showCountColumns && (
-                    <>
-                      <th className={`${COL_DIGIT2} font-medium border-b`}>
-                        <MultiLineColumnHeader label="Точный кр. счет" />
-                      </th>
-                      <th className={`${COL_DIGIT2} font-medium border-b`}>
-                        <MultiLineColumnHeader label="Точный счет" />
-                      </th>
-                      <th className={`${COL_DIGIT2} font-medium border-b`}>
-                        <MultiLineColumnHeader label="Разница" />
-                      </th>
-                      <th className={`${COL_DIGIT2} font-medium border-b`}>
-                        <MultiLineColumnHeader label="Исход" />
-                      </th>
-                    </>
-                  )}
-                  <th className={`${COL_DIGIT2} font-medium border-b bg-amber-50/80`}>
-                    <MultiLineColumnHeader label="Бонус 1" />
+                  <th
+                    rowSpan={2}
+                    className={`${TH_STICKY} left-8 ${COL_NAME} max-w-[9rem] text-left`}
+                  >
+                    {headerLabel(["Фамилия", "Имя"])}
                   </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b bg-amber-50/80`}>
-                    <MultiLineColumnHeader label="Бонус 2" />
+                  <th rowSpan={2} className={`${TH_GROUP} ${COL_DIGIT3}`}>
+                    {headerLabel(["Дано", "прогнозов"])}
                   </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b bg-amber-50/80`}>
-                    <MultiLineColumnHeader label="Бонус 3" />
+                  <th colSpan={2} className={TH_GROUP}>
+                    {headerLabel(["Точный счёт"])}
                   </th>
-                </>
-              )}
-              <th className={`${COL_DIGIT3} font-medium border-b`}>
-                <MultiLineColumnHeader label="Очки без бонуса" />
-              </th>
-              <th className={`${COL_DIGIT3} font-medium border-b`}>
-                <MultiLineColumnHeader label="Очки с бонусами" />
-              </th>
-              <th className={`${COL_DIGIT3} font-medium border-b bg-green-50`}>
-                <MultiLineColumnHeader label="Всего очков" />
-              </th>
-            </tr>
+                  <th rowSpan={2} className={`${TH_GROUP} ${COL_DIGIT2}`}>
+                    {headerLabel(["Разница"])}
+                  </th>
+                  <th rowSpan={2} className={`${TH_GROUP} ${COL_DIGIT2}`}>
+                    {headerLabel(["Исход"])}
+                  </th>
+                  <th colSpan={3} className={TH_BONUS}>
+                    {headerLabel(["Бонус"])}
+                  </th>
+                  <th rowSpan={2} className={`${TH_GROUP} ${COL_DIGIT3}`}>
+                    {headerLabel(["Всего очков", "(без бонусов)"])}
+                  </th>
+                  <th rowSpan={2} className={`${TH_GROUP} ${COL_DIGIT3}`}>
+                    {headerLabel(["Всего", "бонусных", "очков"])}
+                  </th>
+                  <th rowSpan={2} className={`${TH_TOTAL} ${COL_DIGIT3}`}>
+                    {headerLabel(["ИТОГО", "очков"])}
+                  </th>
+                </tr>
+                <tr className="bg-gray-50">
+                  <th className={`${TH_GROUP} ${COL_DIGIT2}`}>{headerLabel(["крупный"])}</th>
+                  <th className={`${TH_GROUP} ${COL_DIGIT2}`}>{headerLabel(["счёт"])}</th>
+                  <th className={`${TH_BONUS} ${COL_DIGIT2}`}>1</th>
+                  <th className={`${TH_BONUS} ${COL_DIGIT2}`}>2</th>
+                  <th className={`${TH_BONUS} ${COL_DIGIT2}`}>3</th>
+                </tr>
+              </>
+            ) : (
+              <tr className="bg-gray-50">
+                <th className={`${TH_STICKY} left-0 ${COL_RANK}`}>{headerLabel(["Место"])}</th>
+                <th className={`${TH_STICKY} left-8 ${COL_NAME} text-left`}>
+                  {headerLabel(["Фамилия", "Имя"])}
+                </th>
+                {!compact && (
+                  <>
+                    <th className={`${TH_GROUP} ${COL_DIGIT3}`}>
+                      {headerLabel(["Дано", "прогнозов"])}
+                    </th>
+                    <th className={`${TH_BONUS} ${COL_DIGIT2}`}>{headerLabel(["Бонус", "1"])}</th>
+                    <th className={`${TH_BONUS} ${COL_DIGIT2}`}>{headerLabel(["Бонус", "2"])}</th>
+                    <th className={`${TH_BONUS} ${COL_DIGIT2}`}>{headerLabel(["Бонус", "3"])}</th>
+                  </>
+                )}
+                <th className={`${TH_GROUP} ${COL_DIGIT3}`}>
+                  {headerLabel(["Всего очков", "(без бонусов)"])}
+                </th>
+                <th className={`${TH_GROUP} ${COL_DIGIT3}`}>
+                  {headerLabel(["Всего", "бонусных", "очков"])}
+                </th>
+                <th className={`${TH_TOTAL} ${COL_DIGIT3}`}>{headerLabel(["ИТОГО", "очков"])}</th>
+              </tr>
+            )}
           </thead>
           <tbody>
             {rows.map((row) => (
@@ -139,13 +168,13 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
               >
                 <td className={`${COL_RANK} text-gray-600 sticky left-0 bg-white`}>{row.rank}</td>
                 <td
-                  className={`${COL_NAME} font-medium text-gray-900 sticky left-8 bg-white ${adaptiveNameClass(row.user_name)}`}
+                  className={`${COL_NAME} font-medium text-gray-900 sticky left-8 bg-white text-sm leading-snug`}
                 >
                   {row.user_name}
                 </td>
                 {!compact && (
                   <>
-                    <PointsCell value={row.predictions_count} />
+                    <PointsCell value={row.predictions_count} digitClass={COL_DIGIT3} />
                     {showCountColumns && (
                       <>
                         <PointsCell value={row.count_exact_high} />
@@ -159,8 +188,8 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
                     <td className={`${COL_DIGIT2} bg-amber-50/50`}>{row.bonus3}</td>
                   </>
                 )}
-                <PointsCell value={row.total_without_bonus3} digitClass={COL_DIGIT3} />
-                <PointsCell value={row.total_with_bonus3} digitClass={COL_DIGIT3} />
+                <PointsCell value={row.points_base} digitClass={COL_DIGIT3} />
+                <PointsCell value={row.total_bonus_points} digitClass={COL_DIGIT3} />
                 <PointsCell value={row.total_with_bonus3} highlight digitClass={COL_DIGIT3} />
               </tr>
             ))}

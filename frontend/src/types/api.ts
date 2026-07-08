@@ -196,6 +196,7 @@ export interface ScoreDetailOut {
   bonus2: number;
   bonus3: number;
   total_without_bonus3: number;
+  total_bonus_points?: number;
   total_with_bonus3: number;
   correct_outcomes: number;
   count_exact_high?: number;

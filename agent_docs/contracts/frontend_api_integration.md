@@ -243,7 +243,7 @@ const next = await res.json(); saveEtag(url, res.headers.get('ETag')); return ne
 | GET | `/api/v1/contests/{id}/rounds` | public |
 | GET | `/api/v1/contests/{id}/rounds/{rid}/predictions` | public post-deadline; USER+ pre-deadline (privacy) |
 | POST | `/api/v1/contests/{id}/rounds/{rid}/predictions` | USER+ |
-| GET | `/api/v1/contests/{id}/rounds/{rid}/leaderboard` | public (ETag) |
+| GET | `/api/v1/contests/{id}/rounds/{rid}/leaderboard` | public (ETag); public contest tab uses `?scope=total` |
 | GET | `/api/v1/contests/{id}/rounds/{rid}/results` | public (ETag) |
 | GET | `/api/v1/contests/{id}/leaderboard` | public (ETag) |
 

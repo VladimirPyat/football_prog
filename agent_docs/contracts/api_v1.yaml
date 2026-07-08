@@ -533,6 +533,12 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/contest_id' }
         - { name: id, in: path, required: true, schema: { type: integer } }
+        - name: scope
+          in: query
+          schema: { type: string, enum: [round, total], default: round }
+          description: >
+            round — scores for this tour only (supervisor preview default).
+            total — cumulative standings through selected round number (public LB tab).
       responses:
         '200':
           headers:
@@ -1159,8 +1165,9 @@ components:
         bonus1: { type: integer }
         bonus2: { type: integer }
         bonus3: { type: integer }
-        total_without_bonus3: { type: integer }
-        total_with_bonus3: { type: integer }
+        total_without_bonus3: { type: integer, description: Base + bonus1 + bonus2 }
+        total_bonus_points: { type: integer, description: Sum of bonus1 + bonus2 + bonus3 }
+        total_with_bonus3: { type: integer, description: Grand total including all bonuses }
         correct_outcomes: { type: integer }
         count_exact_high: { type: integer, minimum: 0 }
         count_exact: { type: integer, minimum: 0 }

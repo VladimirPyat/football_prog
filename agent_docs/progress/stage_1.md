@@ -323,3 +323,10 @@
 - Verified: pytest test_round_results_points_1_17.py (6 passed); ruff/mypy on touched src files OK
 - Contracts: api_v1.yaml RoundResults, API_GUIDE.md, frontend_api_integration.md
 - Next: agent_docs/instructions/coder_2.4.md
+
+## 2026-07-09 — Coder (1.18 leaderboard cumulative + predictions_count + total_bonus_points)
+- STATUS: READY_FOR_TEST
+- Scope: `scope=round|total` on round leaderboard; predictions_count from DB; `total_bonus_points` field
+- Key paths: leaderboard_service.py, schemas/leaderboard.py, contest_ops.py, api_v1.yaml
+- Verified: pytest test_leaderboard_cumulative_1_18.py 5/5; ruff on touched src files OK
+- Next: fix_2.4.1.md (frontend)

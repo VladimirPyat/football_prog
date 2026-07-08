@@ -11,13 +11,16 @@ export interface LeaderboardTableRow {
   bonus1: number;
   bonus2: number;
   bonus3: number;
-  total_without_bonus3: number;
+  points_base: number;
+  total_bonus_points: number;
   total_with_bonus3: number;
 }
 
 const COUNT_FIELDS = ["count_exact_high", "count_exact", "count_diff", "count_outcome"] as const;
 
 export function mapLeaderboardRow(row: LeaderboardEntryOut): LeaderboardTableRow {
+  const totalBonus =
+    row.total_bonus_points ?? row.bonus1 + row.bonus2 + row.bonus3;
   return {
     rank: row.rank,
     user_name: row.user_name,
@@ -29,7 +32,8 @@ export function mapLeaderboardRow(row: LeaderboardEntryOut): LeaderboardTableRow
     bonus1: row.bonus1,
     bonus2: row.bonus2,
     bonus3: row.bonus3,
-    total_without_bonus3: row.total_without_bonus3,
+    points_base: row.points_base,
+    total_bonus_points: totalBonus,
     total_with_bonus3: row.total_with_bonus3,
   };
 }

@@ -14,8 +14,8 @@ const FIELDS: { key: keyof LeaderboardTableRow; label: string }[] = [
   { key: "bonus1", label: "Бонус 1" },
   { key: "bonus2", label: "Бонус 2" },
   { key: "bonus3", label: "Бонус 3" },
-  { key: "total_without_bonus3", label: "Очки без бонуса" },
-  { key: "total_with_bonus3", label: "Очки с бонусами" },
+  { key: "points_base", label: "Всего очков (без бонусов)" },
+  { key: "total_bonus_points", label: "Всего бонусных очков" },
 ];
 
 export function LeaderboardRowDetail({ row }: LeaderboardRowDetailProps) {
@@ -28,7 +28,7 @@ export function LeaderboardRowDetail({ row }: LeaderboardRowDetailProps) {
         </div>
       ))}
       <div className="contents">
-        <dt className="text-gray-500 font-medium">Всего очков</dt>
+        <dt className="text-gray-500 font-medium">ИТОГО очков</dt>
         <dd className="text-green-700 font-bold tabular-nums text-right">
           {row.total_with_bonus3}
         </dd>

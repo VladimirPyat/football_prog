@@ -25,8 +25,11 @@ async def get_round_leaderboard_response(
     round_id: int,
     *,
     viewer_role: str | None = None,
+    scope: str = "round",
 ) -> LeaderboardOut:
-    data = await get_round_leaderboard(session, contest_id, round_id, viewer_role=viewer_role)
+    data = await get_round_leaderboard(
+        session, contest_id, round_id, viewer_role=viewer_role, scope=scope
+    )
     return LeaderboardOut.model_validate(data)
 
 

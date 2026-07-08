@@ -23,7 +23,7 @@ export function useLeaderboard(contestId: number, roundId: number | null, enable
     setNotAvailable(false);
     try {
       const payload = await apiGet<LeaderboardOut>(
-        contestPublic.roundLeaderboard(contestId, roundId),
+        contestPublic.roundLeaderboard(contestId, roundId, "total"),
         false,
       );
       setData(payload);

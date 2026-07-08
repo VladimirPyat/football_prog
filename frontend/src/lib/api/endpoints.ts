@@ -29,8 +29,8 @@ export const contests = {
 
 export const contestPublic = {
   leaderboard: (contestId: number) => `/api/v1/contests/${contestId}/leaderboard`,
-  roundLeaderboard: (contestId: number, roundId: number) =>
-    `/api/v1/contests/${contestId}/rounds/${roundId}/leaderboard`,
+  roundLeaderboard: (contestId: number, roundId: number, scope: "round" | "total" = "round") =>
+    `/api/v1/contests/${contestId}/rounds/${roundId}/leaderboard?scope=${scope}`,
   roundResults: (contestId: number, roundId: number) =>
     `/api/v1/contests/${contestId}/rounds/${roundId}/results`,
 };

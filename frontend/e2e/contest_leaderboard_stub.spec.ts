@@ -39,8 +39,8 @@ test.describe("[E2E-LB-B4-COLUMNS]", () => {
 
     const table = page.getByTestId("leaderboard-table");
     await expect(table).toBeVisible({ timeout: 15_000 });
-    for (const label of ["Точный", "Разница", "Исход"]) {
-      await expect(table.getByText(label, { exact: true }).first()).toBeVisible();
-    }
+    await expect(table.getByText("Точный", { exact: true }).first()).toBeVisible();
+    await expect(table.getByText("ИТОГО", { exact: true }).first()).toBeVisible();
+    await expect(table.getByText("Ларин").first()).toBeVisible({ timeout: 15_000 });
   });
 });

@@ -13,7 +13,8 @@ const baseEntry: LeaderboardEntryOut = {
   bonus1: 2,
   bonus2: 3,
   bonus3: 5,
-  total_without_bonus3: 40,
+  total_without_bonus3: 45,
+  total_bonus_points: 10,
   total_with_bonus3: 50,
   correct_outcomes: 6,
   count_exact_high: 1,
@@ -40,9 +41,18 @@ describe("mapLeaderboardRow", () => {
       bonus1: 2,
       bonus2: 3,
       bonus3: 5,
-      total_without_bonus3: 40,
+      points_base: 40,
+      total_bonus_points: 10,
       total_with_bonus3: 50,
     });
+  });
+
+  it("derives total_bonus_points when API field is missing", () => {
+    const legacy: LeaderboardEntryOut = {
+      ...baseEntry,
+      total_bonus_points: undefined,
+    };
+    expect(mapLeaderboardRow(legacy).total_bonus_points).toBe(10);
   });
 
   it("defaults missing count_* fields to zero", () => {

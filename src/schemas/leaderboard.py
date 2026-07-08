@@ -13,6 +13,7 @@ class ScoreDetailOut(BaseModel):
     bonus2: int
     bonus3: int
     total_without_bonus3: int
+    total_bonus_points: int
     total_with_bonus3: int
     correct_outcomes: int
     rank: int

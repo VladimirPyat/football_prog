@@ -11,7 +11,16 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import ContestRuleError, NotFoundError
-from database.models import ContestParticipant, Match, Round, RoundStatus, Score, Team, User
+from database.models import (
+    ContestParticipant,
+    Match,
+    Prediction,
+    Round,
+    RoundStatus,
+    Score,
+    Team,
+    User,
+)
 from scoring.standings import build_standings
 from scoring.types import UserRoundScore
 from services.round_auto_close_service import ensure_round_closed_if_expired
@@ -21,6 +30,7 @@ from services.scoring_persistence import compute_round_user_scores
 logger = logging.getLogger(__name__)
 
 _STAFF_ROLES: frozenset[str] = frozenset({"SUPERVISOR", "ADMIN"})
+LeaderboardScope = frozenset({"round", "total"})
 
 
 def _allowed_round_statuses(viewer_role: str | None) -> set[RoundStatus]:
@@ -85,8 +95,130 @@ def _score_to_user_round(score: Score) -> UserRoundScore:
     )
 
 
+async def _prediction_counts(
+    session: AsyncSession, contest_id: int, round_ids: list[int]
+) -> dict[int, int]:
+    if not round_ids:
+        return {}
+    rows = await session.execute(
+        select(Prediction.user_id, func.count())
+        .join(Round, Prediction.round_id == Round.id)
+        .where(Round.contest_id == contest_id, Prediction.round_id.in_(round_ids))
+        .group_by(Prediction.user_id)
+    )
+    return {int(user_id): int(count) for user_id, count in rows.all()}
+
+
+def _total_bonus_points(bonus1: int, bonus2: int, bonus3: int) -> int:
+    return bonus1 + bonus2 + bonus3
+
+
+def _build_leaderboard_rows(
+    scores: list[Score],
+    names: dict[int, str],
+    overrides: dict[int, int],
+    prediction_counts: dict[int, int],
+    *,
+    aggregate: bool,
+    context: str,
+) -> list[dict]:
+    per_user: dict[int, list[UserRoundScore]] = {}
+    for s in scores:
+        per_user.setdefault(s.user_id, []).append(_score_to_user_round(s))
+
+    standings = build_standings(per_user, overrides)
+    rows: list[dict] = []
+    for row in standings:
+        uid = row.user_id
+        user_scores = [s for s in scores if s.user_id == uid]
+        if aggregate:
+            total_base = sum(s.points_exact + s.points_diff + s.points_outcome for s in user_scores)
+            total_b1 = sum(s.bonus1 for s in user_scores)
+            total_b2 = sum(s.bonus2 for s in user_scores)
+            total_b3 = sum(s.bonus3 for s in user_scores)
+            total_wo_b3 = sum(s.total_without_bonus3 for s in user_scores)
+            total_w_b3 = sum(s.total_with_bonus3 for s in user_scores)
+            total_co = sum(s.correct_outcomes for s in user_scores)
+            rows.append(
+                {
+                    "user_id": uid,
+                    "user_name": names.get(uid, str(uid)),
+                    "points_base": total_base,
+                    "bonus1": total_b1,
+                    "bonus2": total_b2,
+                    "bonus3": total_b3,
+                    "total_bonus_points": _total_bonus_points(total_b1, total_b2, total_b3),
+                    "total_without_bonus3": total_wo_b3,
+                    "total_with_bonus3": total_w_b3,
+                    "correct_outcomes": total_co,
+                    "rank": row.rank,
+                    "predictions_count": prediction_counts.get(uid, 0),
+                    "exceptional_tiebreak_points": _tiebreak_points(uid, overrides, context=context),
+                    "tiebreaker_status": row.tiebreaker_status,
+                    "count_exact_high": row.exact_high_count,
+                    "count_exact": row.exact_count,
+                    "count_diff": row.diff_count,
+                    "count_outcome": row.outcome_count,
+                }
+            )
+        else:
+            sr = user_scores[0] if user_scores else None
+            b1 = sr.bonus1 if sr else 0
+            b2 = sr.bonus2 if sr else 0
+            b3 = sr.bonus3 if sr else 0
+            rows.append(
+                {
+                    "user_id": uid,
+                    "user_name": names.get(uid, str(uid)),
+                    "points_base": sr.points_exact + sr.points_diff + sr.points_outcome if sr else 0,
+                    "bonus1": b1,
+                    "bonus2": b2,
+                    "bonus3": b3,
+                    "total_bonus_points": _total_bonus_points(b1, b2, b3),
+                    "total_without_bonus3": sr.total_without_bonus3 if sr else 0,
+                    "total_with_bonus3": sr.total_with_bonus3 if sr else 0,
+                    "correct_outcomes": sr.correct_outcomes if sr else 0,
+                    "rank": row.rank,
+                    "predictions_count": prediction_counts.get(uid, 0),
+                    "exceptional_tiebreak_points": _tiebreak_points(uid, overrides, context=context),
+                    "tiebreaker_status": row.tiebreaker_status,
+                    "count_exact_high": sr.count_exact_high if sr else 0,
+                    "count_exact": sr.count_exact if sr else 0,
+                    "count_diff": sr.count_diff if sr else 0,
+                    "count_outcome": sr.count_outcome if sr else 0,
+                }
+            )
+    return rows
+
+
+async def _rounds_for_leaderboard_scope(
+    session: AsyncSession,
+    contest_id: int,
+    selected_round: Round,
+    *,
+    scope: str,
+    viewer_role: str | None,
+) -> list[Round]:
+    allowed = _allowed_round_statuses(viewer_role)
+    allowed_values = {s.value for s in allowed}
+    stmt = select(Round).where(
+        Round.contest_id == contest_id,
+        Round.status.in_(allowed_values),
+    )
+    if scope == "total":
+        stmt = stmt.where(Round.number <= selected_round.number)
+    else:
+        stmt = stmt.where(Round.id == selected_round.id)
+    return list((await session.scalars(stmt.order_by(Round.number))).all())
+
+
 async def get_round_leaderboard(
-    session: AsyncSession, contest_id: int, round_id: int, *, viewer_role: str | None = None
+    session: AsyncSession,
+    contest_id: int,
+    round_id: int,
+    *,
+    viewer_role: str | None = None,
+    scope: str = "round",
 ) -> dict:
     round_ = await ensure_round_closed_if_expired(session, round_id)
     if round_.contest_id != contest_id:
@@ -94,45 +226,28 @@ async def get_round_leaderboard(
 
     _assert_round_visible(round_, viewer_role)
 
+    if scope not in LeaderboardScope:
+        raise ContestRuleError(f"Неизвестный scope: {scope}", code="VALIDATION_ERROR")
+
+    counted_rounds = await _rounds_for_leaderboard_scope(
+        session, contest_id, round_, scope=scope, viewer_role=viewer_role
+    )
+    round_ids = [r.id for r in counted_rounds]
     scores = (
-        await session.scalars(select(Score).where(Score.round_id == round_id))
-    ).all()
+        await session.scalars(select(Score).where(Score.round_id.in_(round_ids)))
+    ).all() if round_ids else []
     names = await _user_name_map(session)
     overrides = await _manual_overrides(session, contest_id)
+    pred_counts = await _prediction_counts(session, contest_id, round_ids)
 
-    per_user: dict[int, list[UserRoundScore]] = {}
-    for s in scores:
-        per_user.setdefault(s.user_id, []).append(_score_to_user_round(s))
-
-    standings = build_standings(per_user, overrides)
-    rows = []
-    for row in standings:
-        uid = row.user_id
-        score_rows = [s for s in scores if s.user_id == uid]
-        sr = score_rows[0] if score_rows else None
-        rows.append(
-            {
-                "user_id": uid,
-                "user_name": names.get(uid, str(uid)),
-                "points_base": sr.points_exact + sr.points_diff + sr.points_outcome if sr else 0,
-                "bonus1": sr.bonus1 if sr else 0,
-                "bonus2": sr.bonus2 if sr else 0,
-                "bonus3": sr.bonus3 if sr else 0,
-                "total_without_bonus3": sr.total_without_bonus3 if sr else 0,
-                "total_with_bonus3": sr.total_with_bonus3 if sr else 0,
-                "correct_outcomes": sr.correct_outcomes if sr else 0,
-                "rank": row.rank,
-                "predictions_count": row.total_predictions,
-                "exceptional_tiebreak_points": _tiebreak_points(
-                    uid, overrides, context=f"round_leaderboard round={round_id}"
-                ),
-                "tiebreaker_status": row.tiebreaker_status,
-                "count_exact_high": sr.count_exact_high if sr else 0,
-                "count_exact": sr.count_exact if sr else 0,
-                "count_diff": sr.count_diff if sr else 0,
-                "count_outcome": sr.count_outcome if sr else 0,
-            }
-        )
+    rows = _build_leaderboard_rows(
+        list(scores),
+        names,
+        overrides,
+        pred_counts,
+        aggregate=scope == "total",
+        context=f"round_leaderboard round={round_id} scope={scope}",
+    )
 
     pending, pending_message = await origin_round_bonuses_pending(session, round_id)
 
@@ -147,58 +262,30 @@ async def get_round_leaderboard(
 
 
 async def get_global_leaderboard(session: AsyncSession, contest_id: int) -> dict:
-    scores = (
+    rounds = (
         await session.scalars(
-            select(Score)
-            .join(Round)
-            .where(
+            select(Round).where(
                 Round.contest_id == contest_id,
-                Round.status == RoundStatus.PUBLISHED,  # aggregate PUBLISHED only
+                Round.status == RoundStatus.PUBLISHED.value,
             )
         )
     ).all()
+    round_ids = [r.id for r in rounds]
+    scores = (
+        await session.scalars(select(Score).where(Score.round_id.in_(round_ids)))
+    ).all() if round_ids else []
     names = await _user_name_map(session)
     overrides = await _manual_overrides(session, contest_id)
+    pred_counts = await _prediction_counts(session, contest_id, round_ids)
 
-    per_user: dict[int, list[UserRoundScore]] = {}
-    for s in scores:
-        per_user.setdefault(s.user_id, []).append(_score_to_user_round(s))
-
-    standings = build_standings(per_user, overrides)
-    rows = []
-    for row in standings:
-        uid = row.user_id
-        user_scores = [s for s in scores if s.user_id == uid]
-        total_base = sum(s.points_exact + s.points_diff + s.points_outcome for s in user_scores)
-        total_b1 = sum(s.bonus1 for s in user_scores)
-        total_b2 = sum(s.bonus2 for s in user_scores)
-        total_b3 = sum(s.bonus3 for s in user_scores)
-        total_wo_b3 = sum(s.total_without_bonus3 for s in user_scores)
-        total_w_b3 = sum(s.total_with_bonus3 for s in user_scores)
-        total_co = sum(s.correct_outcomes for s in user_scores)
-        rows.append(
-            {
-                "user_id": uid,
-                "user_name": names.get(uid, str(uid)),
-                "points_base": total_base,
-                "bonus1": total_b1,
-                "bonus2": total_b2,
-                "bonus3": total_b3,
-                "total_without_bonus3": total_wo_b3,
-                "total_with_bonus3": total_w_b3,
-                "correct_outcomes": total_co,
-                "rank": row.rank,
-                "predictions_count": row.total_predictions,
-                "exceptional_tiebreak_points": _tiebreak_points(
-                    uid, overrides, context=f"global_leaderboard contest={contest_id}"
-                ),
-                "tiebreaker_status": row.tiebreaker_status,
-                "count_exact_high": row.exact_high_count,
-                "count_exact": row.exact_count,
-                "count_diff": row.diff_count,
-                "count_outcome": row.outcome_count,
-            }
-        )
+    rows = _build_leaderboard_rows(
+        list(scores),
+        names,
+        overrides,
+        pred_counts,
+        aggregate=True,
+        context=f"global_leaderboard contest={contest_id}",
+    )
 
     return {
         "contest_id": contest_id,
@@ -297,27 +384,33 @@ async def get_round_results(
 
 
 async def compute_etag(
-    session: AsyncSession, *, contest_id: int, round_id: int | None = None
+    session: AsyncSession,
+    *,
+    contest_id: int,
+    round_id: int | None = None,
+    scope: str = "round",
 ) -> str:
     """Content hash for cache ETag based on score/version state."""
+    contest_max_score_id = await session.scalar(
+        select(func.max(Score.id))
+        .join(Round, Score.round_id == Round.id)
+        .where(Round.contest_id == contest_id)
+    )
     if round_id is not None:
-        max_score_id = await session.scalar(
-            select(func.max(Score.id)).where(Score.round_id == round_id)
-        )
         round_ = await session.get(Round, round_id)
         payload = {
             "contest_id": contest_id,
             "round_id": round_id,
+            "scope": scope,
             "status": round_.status if round_ else None,
-            "max_score_id": max_score_id,
+            "max_score_id": contest_max_score_id,
         }
     else:
-        max_score_id = await session.scalar(
-            select(func.max(Score.id))
-            .join(Round)
-            .where(Round.contest_id == contest_id)
-        )
-        payload = {"contest_id": contest_id, "global": True, "max_score_id": max_score_id}
+        payload = {
+            "contest_id": contest_id,
+            "global": True,
+            "max_score_id": contest_max_score_id,
+        }
 
     raw = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]

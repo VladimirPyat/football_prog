@@ -65,16 +65,19 @@ export default function ContestPage() {
   }, [contestId, setContestId]);
 
   useEffect(() => {
-    if (visibleRounds.length > 0 && selectedRoundId == null) {
+    if (visibleRounds.length === 0) return;
+    if (selectedRoundId == null) {
+      setSelectedRoundId(pickDefaultRound(visibleRounds, tab));
+      return;
+    }
+    const stillVisible = visibleRounds.some((r) => r.id === selectedRoundId);
+    if (!stillVisible) {
       setSelectedRoundId(pickDefaultRound(visibleRounds, tab));
     }
   }, [visibleRounds, selectedRoundId, tab]);
 
   const handleTabChange = (newTab: PublicTab) => {
     setTab(newTab);
-    if (visibleRounds.length > 0) {
-      setSelectedRoundId(pickDefaultRound(visibleRounds, newTab));
-    }
   };
 
   const effectiveRoundId = useMemo(() => {

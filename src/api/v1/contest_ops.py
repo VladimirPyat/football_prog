@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select
 
 from api.deps import (
@@ -129,11 +129,16 @@ async def round_leaderboard(
     response: Response,
     _contest: ContestContext,
     viewer: OptionalUser,
+    scope: Annotated[str, Query(pattern="^(round|total)$")] = "round",
 ) -> LeaderboardOut:
     """Таблица лидеров тура (публичный, с кэшированием)."""
     viewer_role = viewer.role if viewer else None
-    out = await get_round_leaderboard_response(session, contest_id, round_id, viewer_role=viewer_role)
-    etag = await compute_etag(session, contest_id=contest_id, round_id=round_id)
+    out = await get_round_leaderboard_response(
+        session, contest_id, round_id, viewer_role=viewer_role, scope=scope
+    )
+    etag = await compute_etag(
+        session, contest_id=contest_id, round_id=round_id, scope=scope
+    )
     for k, v in cache_control_header().items():
         response.headers[k] = v
     response.headers["ETag"] = etag
