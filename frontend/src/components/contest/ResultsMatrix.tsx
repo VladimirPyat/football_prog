@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MultiLineColumnHeader } from "@/components/contest/MultiLineColumnHeader";
 import { ResultsRowDetail } from "@/components/contest/ResultsRowDetail";
 import { TeamColumnHeader } from "@/components/predictions/TeamColumnHeader";
 import { DetailModal } from "@/components/ui/DetailModal";
 import type { ResultsMatrixMatch, ResultsMatrixRow } from "@/lib/results/mapRoundResultsRow";
 import { adaptiveNameClass, COL_DIGIT2, COL_DIGIT3, COL_NAME } from "@/lib/table/columnStyles";
+import { headerLabel } from "@/lib/table/headerLabel";
+import { TH_BONUS, TH_GROUP, TH_STICKY, TH_TOTAL } from "@/lib/table/tableHeaderStyles";
 
 const MOBILE_BP = 1024;
 
@@ -24,6 +25,18 @@ function MatchPointsCell({ points }: { points: number | null }) {
   return (
     <td className={`${COL_DIGIT2} ${positive ? "text-green-600 font-medium" : "text-gray-400"}`}>
       {points}
+    </td>
+  );
+}
+
+function TotalCell({ value, highlight }: { value: number | string; highlight?: boolean }) {
+  return (
+    <td
+      className={`${COL_DIGIT3} ${
+        highlight ? "bg-green-50 font-bold text-green-700" : "text-gray-700"
+      }`}
+    >
+      {value}
     </td>
   );
 }
@@ -50,46 +63,46 @@ export function ResultsMatrix({ matches, rows, roundLabel }: ResultsMatrixProps)
         className="bg-white border border-gray-200 rounded-lg overflow-x-auto"
         data-testid="results-matrix"
       >
-        <table className="border-collapse text-base w-max max-w-full">
+        <table className="border-collapse text-sm w-max max-w-full">
           <thead>
             <tr className="bg-gray-50">
-              <th className={`${COL_NAME} font-medium text-gray-700 border-b text-sm`}>
-                <MultiLineColumnHeader label="Счет" />
+              <th className={`${TH_STICKY} left-0 ${COL_NAME} text-left`}>
+                {headerLabel(["Счёт"])}
               </th>
               {matches.map((m) => (
                 <th
                   key={m.id}
-                  className="px-0.5 py-1.5 text-center font-medium text-gray-700 border-b w-10 min-w-[2.5rem] max-w-[2.5rem]"
+                  className={`${TH_GROUP} w-[3.25rem] min-w-[3.25rem] max-w-[3.5rem] px-0.5 py-1.5`}
                 >
-                  <TeamColumnHeader team1={m.team1} team2={m.team2} size="normal" />
+                  <TeamColumnHeader
+                    team1={m.team1}
+                    team2={m.team2}
+                    team1Short={m.team1_short}
+                    team2Short={m.team2_short}
+                    size="normal"
+                  />
                 </th>
               ))}
               {!compact && (
                 <>
-                  <th className={`${COL_DIGIT2} font-medium border-b bg-amber-50/80`}>
-                    <MultiLineColumnHeader label="Бонус 1" />
+                  <th className={`${TH_BONUS} ${COL_DIGIT2}`}>{headerLabel(["Бонус", "1"])}</th>
+                  <th className={`${TH_BONUS} ${COL_DIGIT2}`}>{headerLabel(["Бонус", "2"])}</th>
+                  <th className={`${TH_GROUP} ${COL_DIGIT3}`}>
+                    {headerLabel(["Итого", "без бон."])}
                   </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b bg-amber-50/80`}>
-                    <MultiLineColumnHeader label="Бонус 2" />
-                  </th>
-                  <th className={`${COL_DIGIT3} font-medium border-b`}>
-                    <MultiLineColumnHeader label="Итого без бон." />
-                  </th>
-                  <th className={`${COL_DIGIT2} font-medium border-b bg-amber-50/80`}>
-                    <MultiLineColumnHeader label="Бонус 3" />
-                  </th>
+                  <th className={`${TH_BONUS} ${COL_DIGIT2}`}>{headerLabel(["Бонус", "3"])}</th>
                 </>
               )}
-              <th className={`${COL_DIGIT3} font-medium border-b bg-green-50`}>
-                <MultiLineColumnHeader label="ИТОГО" />
-              </th>
+              <th className={`${TH_TOTAL} ${COL_DIGIT3}`}>{headerLabel(["ИТОГО"])}</th>
             </tr>
             <tr className="bg-gray-50 text-sm text-gray-500">
-              <th className={`${COL_NAME} text-left border-b font-normal`}>{roundLabel}</th>
+              <th className={`${TH_STICKY} left-0 ${COL_NAME} text-left border-b font-normal`}>
+                {roundLabel}
+              </th>
               {matches.map((m) => (
                 <th
                   key={`score-${m.id}`}
-                  className="px-0.5 py-1 text-center border-b font-normal tabular-nums"
+                  className={`${COL_DIGIT2} border-b font-normal text-gray-500`}
                 >
                   {m.score1 ?? "—"}:{m.score2 ?? "—"}
                 </th>
@@ -116,7 +129,7 @@ export function ResultsMatrix({ matches, rows, roundLabel }: ResultsMatrixProps)
                 role={compact ? "button" : undefined}
               >
                 <td
-                  className={`${COL_NAME} font-medium text-gray-900 bg-white ${adaptiveNameClass(row.user_name)}`}
+                  className={`${COL_NAME} font-medium text-gray-900 bg-white sticky left-0 ${adaptiveNameClass(row.user_name)}`}
                 >
                   {row.user_name}
                 </td>
@@ -125,19 +138,19 @@ export function ResultsMatrix({ matches, rows, roundLabel }: ResultsMatrixProps)
                 ))}
                 {!compact && (
                   <>
-                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-600`}>
+                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-700`}>
                       {row.bonus1 ?? "—"}
                     </td>
-                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-600`}>
+                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-700`}>
                       {row.bonus2 ?? "—"}
                     </td>
-                    <td className={COL_DIGIT3}>{row.total_without_bonus}</td>
-                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-600`}>
+                    <TotalCell value={row.total_without_bonus} />
+                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-700`}>
                       {row.bonus3 ?? "—"}
                     </td>
                   </>
                 )}
-                <td className={`${COL_DIGIT3} bg-green-50 text-green-700`}>{row.total}</td>
+                <TotalCell value={row.total} highlight />
               </tr>
             ))}
           </tbody>

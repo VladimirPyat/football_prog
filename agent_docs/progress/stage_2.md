@@ -318,3 +318,25 @@
 - Verified: Vitest mapLeaderboardRow 5/5; eslint + tsc OK
 - Prerequisite: coder 1.18 backend (same session)
 - Next: manual QA round 9 LB; tester re-run 2.4 E2E specs
+
+## 2026-07-09 — Fix 2.5 (E2E QA batch — frontend)
+- STATUS: READY_FOR_TEST
+- Scope: odd teams hint; hide temp password in invite modal; short names in matrices; ResultsMatrix in supervisor preview
+- Key paths: ContestParametersForm, ParticipantInviteModal, TeamColumnHeader, RoundResultsPreview, ResultsEntryPanel
+- Verified: vitest admin.test.ts 16/16; eslint + tsc OK
+- Prerequisite: fix 1.20 backend (team1_short/team2_short)
+- Next: manual QA; E2E supervisor_results_preview updated
+
+## 2026-07-10 — Fix 2.5.1 (admin chrome + round builder defaults)
+- STATUS: READY_FOR_TEST
+- Scope: hide header contest picker on /admin; admin nav tabs-first layout; prefill match datetime on add
+- Key paths: AppShell.tsx, AdminTopNav.tsx, RoundBuilderForm.tsx, roundBuilderDefaults.ts
+- Verified: vitest roundBuilderDefaults 3/3; eslint + tsc OK
+
+## 2026-07-10 — Fix 2.5.2 (leaderboard & results table styling)
+- STATUS: VERIFIED
+- Scope: uniform header typography; widen count/bonus/total columns; «Сумма очков» grouped header; ResultsMatrix harmonized with Leaderboard
+- Key paths: LeaderboardTable.tsx, ResultsMatrix.tsx, columnStyles.ts, headerLabel.tsx, tableHeaderStyles.ts
+- Verified: eslint + tsc + test:unit OK
+- Report: agent_docs/reports/bug_2.5.2.md
+- Instruction: agent_docs/instructions/fix_2.5.2.md

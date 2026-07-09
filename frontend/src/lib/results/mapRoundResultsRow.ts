@@ -4,6 +4,8 @@ export interface ResultsMatrixMatch {
   id: number;
   team1: string;
   team2: string;
+  team1_short?: string;
+  team2_short?: string;
   score1: number | null;
   score2: number | null;
 }
@@ -23,6 +25,8 @@ export function mapResultsMatrixMatch(match: MatchOut): ResultsMatrixMatch {
     id: match.id,
     team1: match.team1,
     team2: match.team2,
+    team1_short: match.team1_short,
+    team2_short: match.team2_short,
     score1: match.score1,
     score2: match.score2,
   };

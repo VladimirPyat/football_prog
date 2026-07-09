@@ -20,16 +20,9 @@ from database.models import (
 from schemas.predictions import RoundPredictionsView
 from services.prediction_service import visible_predictions
 from services.round_auto_close_service import ensure_round_closed_if_expired
+from services.team_display import match_team_fields
 
 logger = logging.getLogger(__name__)
-
-
-def _team_display_name(teams: dict[int, Team], team_id: int) -> str:
-    team = teams.get(team_id)
-    if team is None:
-        logger.warning("team name missing team_id=%s — using id as fallback", team_id)
-        return str(team_id)
-    return team.name
 
 
 async def build_round_predictions_view(
@@ -71,8 +64,7 @@ async def build_round_predictions_view(
                 "id": m.id,
                 "team1_id": m.team1_id,
                 "team2_id": m.team2_id,
-                "team1": _team_display_name(teams, m.team1_id),
-                "team2": _team_display_name(teams, m.team2_id),
+                **match_team_fields(teams, m.team1_id, m.team2_id),
                 "date_time": m.date_time.isoformat(),
                 "score1": m.score1,
                 "score2": m.score2,

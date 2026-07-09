@@ -11,7 +11,6 @@ import { useContest } from "@/hooks/useContest";
 import { useToast } from "@/hooks/useToast";
 import type { ContestOut } from "@/types/api";
 import { AppError } from "@/lib/api/client";
-import { formatDateRu } from "@/lib/admin/format";
 
 const TABS = [
   { id: "settings", label: "Настройки", href: "/admin/settings/parameters" },
@@ -32,7 +31,6 @@ function resolveActiveTab(pathname: string): AdminTabId {
 export function AdminTopNav() {
   const pathname = usePathname();
   const activeTab = resolveActiveTab(pathname);
-  const today = formatDateRu(new Date().toISOString());
   const [showCreate, setShowCreate] = useState(false);
   const { setContestId } = useContest();
   const { showSuccess, showError } = useToast();
@@ -57,25 +55,7 @@ export function AdminTopNav() {
   return (
     <>
       <nav className="bg-white border border-gray-200 rounded-lg mb-6">
-        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-4">
-            <Link href="/admin" className="font-bold text-gray-900 hover:text-blue-600">
-              SportPrognosis
-            </Link>
-            <span className="text-sm text-gray-500">Сегодня {today}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ContestPicker adminMode />
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="text-sm text-white bg-blue-600 px-3 py-1.5 rounded hover:bg-blue-700"
-            >
-              + Новый конкурс
-            </button>
-          </div>
-        </div>
-        <div className="border-t border-gray-200 px-4 flex flex-wrap gap-1">
+        <div className="border-b border-gray-200 px-4 flex flex-wrap gap-1">
           {TABS.map((tab) => (
             <Link
               key={tab.id}
@@ -89,6 +69,16 @@ export function AdminTopNav() {
               {tab.label}
             </Link>
           ))}
+        </div>
+        <div className="px-4 py-3 flex flex-wrap items-center justify-end gap-3">
+          <ContestPicker adminMode />
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="text-sm text-white bg-blue-600 px-3 py-1.5 rounded hover:bg-blue-700"
+          >
+            + Новый конкурс
+          </button>
         </div>
       </nav>
       <CreateContestForm

@@ -135,6 +135,8 @@ export interface MatchOut {
   team2_id?: number;
   team1: string;
   team2: string;
+  team1_short?: string;
+  team2_short?: string;
   date_time: string;
   score1: number | null;
   score2: number | null;

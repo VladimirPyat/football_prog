@@ -11,7 +11,7 @@ import {
 import { roundStatusHint } from "@/lib/admin/format";
 import type { ContestOut, MatchOut, RoundOut } from "@/types/api";
 import { MatchResultRow } from "@/components/admin/MatchResultRow";
-import { RoundLeaderboardPreview } from "@/components/admin/RoundLeaderboardPreview";
+import { RoundResultsPreview } from "@/components/admin/RoundResultsPreview";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { apiGet } from "@/lib/api/client";
@@ -71,7 +71,6 @@ export function ResultsEntryPanel({
   const [voidId, setVoidId] = useState<number | null>(null);
   const [working, setWorking] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [publishedStubOpen, setPublishedStubOpen] = useState(false);
   const [bonusesPendingMessage, setBonusesPendingMessage] = useState<string | null>(null);
 
   const eligibleRounds = rounds.filter(
@@ -259,7 +258,7 @@ export function ResultsEntryPanel({
             {selectedRound.status === "PUBLISHED" && (
               <button
                 type="button"
-                onClick={() => setPublishedStubOpen(true)}
+                onClick={() => setPreviewOpen(true)}
                 className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
               >
                 Результаты участников
@@ -276,7 +275,7 @@ export function ResultsEntryPanel({
           aria-modal="true"
           aria-labelledby="lb-preview-title"
         >
-          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full max-h-[80vh] overflow-y-auto p-6 space-y-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
             <div className="flex justify-between items-center">
               <h3 id="lb-preview-title" className="text-lg font-semibold">
                 Результаты участников — тур {selectedRound.number}
@@ -290,7 +289,12 @@ export function ResultsEntryPanel({
                 ×
               </button>
             </div>
-            <RoundLeaderboardPreview contestId={contest.id} roundId={selectedRound.id} />
+            <RoundResultsPreview
+              contestId={contest.id}
+              roundId={selectedRound.id}
+              roundNumber={selectedRound.number}
+              preview={selectedRound.status === "CALCULATED"}
+            />
             <button
               type="button"
               onClick={() => setPreviewOpen(false)}
@@ -301,15 +305,6 @@ export function ResultsEntryPanel({
           </div>
         </div>
       )}
-
-      <ConfirmDialog
-        open={publishedStubOpen}
-        title="Результаты участников"
-        message="Полная матрица прогнозов — в следующих версиях."
-        confirmLabel="Закрыть"
-        onConfirm={() => setPublishedStubOpen(false)}
-        onCancel={() => setPublishedStubOpen(false)}
-      />
 
       <ConfirmDialog
         open={voidId !== null}

@@ -1068,7 +1068,7 @@ components:
       properties:
         user_id: { type: integer }
         login: { type: string }
-        temp_password: { type: string }
+        temp_password: { type: string, description: 'Always returned; login blocked when enforce_password_setup=true — use setup_url' }
         status: { type: string, enum: [PENDING, ACCEPTED] }
         setup_url: { type: string, description: '{FRONTEND_BASE_URL}/auth/setup?token=…' }
     ExceptionalTiebreakRequest:
@@ -1123,8 +1123,10 @@ components:
       type: object
       properties:
         id: { type: integer }
-        team1: { type: string }
-        team2: { type: string }
+        team1: { type: string, description: Full team name }
+        team2: { type: string, description: Full team name }
+        team1_short: { type: string, description: Configured abbreviation (≤4 chars) }
+        team2_short: { type: string, description: Configured abbreviation (≤4 chars) }
         date_time: { type: string, format: date-time }
         score1: { type: integer, nullable: true }
         score2: { type: integer, nullable: true }

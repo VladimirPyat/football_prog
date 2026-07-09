@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from database.base import Base
 from database.models import Contest, ContestLifecycleStatus, Team, User
-from core.exceptions import ContestLockedError
+from core.exceptions import ContestLockedError, ValidationError
 from services.contest_setup_service import (
     add_participant,
     create_contest,
@@ -16,6 +16,7 @@ from services.contest_setup_service import (
     list_participants,
     list_teams,
     update_contest,
+    validate_contest_structure,
 )
 from services.round_service import transition_round
 from database.models import Round, RoundStatus
@@ -44,7 +45,12 @@ async def test_create_contest_draft_and_patch_rules(session: AsyncSession) -> No
     patched = await update_contest(
         session,
         contest.id,
-        {"total_teams": 20, "rules_json": contest.rules_json},
+        {
+            "total_teams": 20,
+            "matches_per_round": 10,
+            "total_rounds": 38,
+            "rules_json": contest.rules_json,
+        },
     )
     await session.commit()
     assert patched.total_teams == 20
@@ -98,3 +104,49 @@ async def test_locked_contest_blocks_setup_mutations(session: AsyncSession) -> N
         await update_contest(session, contest.id, {"name": "Nope"})
     with pytest.raises(ContestLockedError):
         await create_team(session, contest.id, "Extra", "E")
+
+
+def test_validate_contest_structure_round_robin_odd_teams() -> None:
+    with pytest.raises(ValidationError, match="чётное"):
+        validate_contest_structure(
+            total_teams=15,
+            matches_per_round=7,
+            total_rounds=28,
+            is_round_robin=True,
+        )
+
+
+def test_validate_contest_structure_round_robin_valid() -> None:
+    validate_contest_structure(
+        total_teams=16,
+        matches_per_round=8,
+        total_rounds=30,
+        is_round_robin=True,
+    )
+
+
+def test_validate_contest_structure_arbitrary_odd_teams() -> None:
+    validate_contest_structure(
+        total_teams=15,
+        matches_per_round=7,
+        total_rounds=10,
+        is_round_robin=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_contest_rejects_odd_round_robin(session: AsyncSession) -> None:
+    contest = await create_contest(session, "Odd RR")
+    await session.flush()
+
+    with pytest.raises(ValidationError, match="чётное"):
+        await update_contest(
+            session,
+            contest.id,
+            {
+                "total_teams": 15,
+                "matches_per_round": 7,
+                "total_rounds": 28,
+                "is_round_robin": True,
+            },
+        )

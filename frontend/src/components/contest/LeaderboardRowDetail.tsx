@@ -7,8 +7,8 @@ interface LeaderboardRowDetailProps {
 const FIELDS: { key: keyof LeaderboardTableRow; label: string }[] = [
   { key: "rank", label: "Место" },
   { key: "predictions_count", label: "Дано прогнозов" },
-  { key: "count_exact_high", label: "Точный кр. счёт" },
-  { key: "count_exact", label: "Точный счёт" },
+  { key: "count_exact_high", label: "крупный" },
+  { key: "count_exact", label: "—" },
   { key: "count_diff", label: "Разница" },
   { key: "count_outcome", label: "Исход" },
   { key: "bonus1", label: "Бонус 1" },

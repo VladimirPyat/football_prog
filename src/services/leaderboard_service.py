@@ -26,6 +26,7 @@ from scoring.types import UserRoundScore
 from services.round_auto_close_service import ensure_round_closed_if_expired
 from services.round_scoring_pending import origin_round_bonuses_pending
 from services.scoring_persistence import compute_round_user_scores
+from services.team_display import match_team_fields
 
 logger = logging.getLogger(__name__)
 
@@ -316,14 +317,11 @@ async def get_round_results(
     match_out: list[dict] = []
     match_ids: list[int] = []
     for m in matches:
-        t1 = teams.get(m.team1_id)
-        t2 = teams.get(m.team2_id)
         match_ids.append(m.id)
         match_out.append(
             {
                 "id": m.id,
-                "team1": t1.name if t1 else str(m.team1_id),
-                "team2": t2.name if t2 else str(m.team2_id),
+                **match_team_fields(teams, m.team1_id, m.team2_id),
                 "date_time": m.date_time.isoformat(),
                 "score1": m.score1,
                 "score2": m.score2,

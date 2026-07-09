@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isSupervisorOrAbove } from "@/lib/auth/guards";
 import { LoginModal } from "@/components/layout/LoginModal";
@@ -16,10 +17,12 @@ interface AppShellProps {
 }
 
 function AppShellInner({ children }: AppShellProps) {
+  const pathname = usePathname();
   const { isAuthenticated, user, logout } = useAuth();
   const [loginOpen, setLoginOpen] = useState(false);
   const isStaff = isSupervisorOrAbove(user?.role ?? null);
   const isUser = isAuthenticated && user?.role === "USER";
+  const showHeaderContestPicker = isStaff && !pathname.startsWith("/admin");
 
   const mainContent = isUser ? <UserSidebarLayout>{children}</UserSidebarLayout> : children;
 
@@ -37,7 +40,7 @@ function AppShellInner({ children }: AppShellProps) {
             </div>
           </div>
           <div className="flex items-center gap-4 shrink-0">
-            {isAuthenticated && isStaff && <ContestPicker />}
+            {isAuthenticated && showHeaderContestPicker && <ContestPicker />}
             {isAuthenticated ? (
               <>
                 {isStaff ? (

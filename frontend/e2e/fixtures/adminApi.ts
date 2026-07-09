@@ -547,7 +547,7 @@ export async function selectRoundByNumber(
 }
 
 export async function selectContestInPicker(page: Page, contestName: string): Promise<void> {
-  const picker = page.locator("header").getByLabel("Выбор конкурса");
+  const picker = page.getByTestId("contest-picker");
   await picker.waitFor();
   const options = picker.locator("option");
   const count = await options.count();

@@ -49,7 +49,13 @@ export function PredictionsMatrix({
                 key={m.id}
                 className="px-1 py-1.5 text-center font-medium text-gray-700 border-b min-w-[4.5rem]"
               >
-                <TeamColumnHeader team1={m.team1} team2={m.team2} size="normal" />
+                <TeamColumnHeader
+                  team1={m.team1}
+                  team2={m.team2}
+                  team1Short={m.team1_short}
+                  team2Short={m.team2_short}
+                  size="normal"
+                />
               </th>
             ))}
           </tr>

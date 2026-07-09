@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { fromDatetimeLocal, toDatetimeLocal } from "@/lib/admin/format";
+import { nextMatchDateTime } from "@/lib/admin/roundBuilderDefaults";
 import { roundBuilderSchema } from "@/lib/validation/admin";
 import type { TeamOut } from "@/types/api";
 
@@ -86,6 +87,13 @@ export function RoundBuilderForm({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const addMatch = () => {
+    setMatches((prev) => [
+      ...prev,
+      { ...emptyMatch(), date_time: nextMatchDateTime(prev, deadline) },
+    ]);
   };
 
   const isEditing = !!initialValues;
@@ -196,7 +204,7 @@ export function RoundBuilderForm({
         {matches.length < matchesPerRound && (
           <button
             type="button"
-            onClick={() => setMatches((prev) => [...prev, emptyMatch()])}
+            onClick={addMatch}
             disabled={disabled}
             className="text-sm text-blue-600 hover:underline"
           >

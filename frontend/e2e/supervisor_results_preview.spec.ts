@@ -54,7 +54,7 @@ test.describe("[E2E-UI-RESULTS-PREVIEW-CALC]", () => {
 
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByText(/Результаты участников — тур 10/)).toBeVisible();
-    await expect(page.getByText("Таблица тура")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("results-matrix")).toBeVisible({ timeout: 15_000 });
   });
 
   test("CLOSED round 11 — preview control disabled with title hint", async ({ page }) => {

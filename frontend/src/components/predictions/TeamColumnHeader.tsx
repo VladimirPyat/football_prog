@@ -5,11 +5,19 @@ import { formatTeamPairStacked } from "@/lib/teams/formatTeamPair";
 interface TeamColumnHeaderProps {
   team1: string;
   team2: string;
+  team1Short?: string;
+  team2Short?: string;
   size?: "compact" | "normal";
 }
 
-export function TeamColumnHeader({ team1, team2, size = "compact" }: TeamColumnHeaderProps) {
-  const { home, away } = formatTeamPairStacked(team1, team2);
+export function TeamColumnHeader({
+  team1,
+  team2,
+  team1Short,
+  team2Short,
+  size = "compact",
+}: TeamColumnHeaderProps) {
+  const { home, away } = formatTeamPairStacked(team1, team2, team1Short, team2Short);
   const textClass = size === "normal" ? "text-sm" : "text-[10px]";
 
   return (

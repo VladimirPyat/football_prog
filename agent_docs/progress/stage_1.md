@@ -330,3 +330,11 @@
 - Key paths: leaderboard_service.py, schemas/leaderboard.py, contest_ops.py, api_v1.yaml
 - Verified: pytest test_leaderboard_cumulative_1_18.py 5/5; ruff on touched src files OK
 - Next: fix_2.4.1.md (frontend)
+
+## 2026-07-09 — Fix 1.20 (E2E QA batch — backend)
+- STATUS: READY_FOR_TEST
+- Scope: validate_contest_structure (even teams in round-robin); team1_short/team2_short in predictions + results API
+- Key paths: contest_setup_service.py, services/team_display.py, api/handlers/predictions.py, leaderboard_service.py
+- Verified: pytest test_fix_1_20_all_e2e.py 3/3; unit test_contest_setup_1_4.py extended
+- Contracts: api_v1.yaml MatchOut + ParticipantInviteOut note
+- Next: fix_2.5_all_e2e.md frontend (shipped same day)

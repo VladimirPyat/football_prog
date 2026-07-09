@@ -5,15 +5,10 @@ import { LeaderboardRowDetail } from "@/components/contest/LeaderboardRowDetail"
 import { DetailModal } from "@/components/ui/DetailModal";
 import type { LeaderboardTableRow } from "@/lib/leaderboard/mapLeaderboardRow";
 import { COL_DIGIT2, COL_DIGIT3, COL_NAME, COL_RANK } from "@/lib/table/columnStyles";
+import { headerLabel } from "@/lib/table/headerLabel";
+import { TH_BONUS, TH_GROUP, TH_STICKY, TH_TOTAL } from "@/lib/table/tableHeaderStyles";
 
 const DESKTOP_BP = 1024;
-
-const TH_BASE =
-  "px-1 py-2 text-sm font-medium text-gray-700 border-b align-middle text-center";
-const TH_STICKY = `${TH_BASE} sticky bg-gray-50 z-10`;
-const TH_GROUP = `${TH_BASE} bg-gray-50`;
-const TH_BONUS = `${TH_BASE} bg-amber-50/80`;
-const TH_TOTAL = `${TH_BASE} bg-green-50`;
 
 interface LeaderboardTableProps {
   rows: LeaderboardTableRow[];
@@ -39,18 +34,6 @@ function PointsCell({
     >
       {value}
     </td>
-  );
-}
-
-function headerLabel(lines: string[]) {
-  return (
-    <span className="block leading-snug">
-      {lines.map((line) => (
-        <span key={line} className="block">
-          {line}
-        </span>
-      ))}
-    </span>
   );
 }
 
@@ -86,7 +69,7 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
                   </th>
                   <th
                     rowSpan={2}
-                    className={`${TH_STICKY} left-8 ${COL_NAME} max-w-[9rem] text-left`}
+                    className={`${TH_STICKY} left-8 ${COL_NAME} text-left`}
                   >
                     {headerLabel(["Фамилия", "Имя"])}
                   </th>
@@ -105,11 +88,8 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
                   <th colSpan={3} className={TH_BONUS}>
                     {headerLabel(["Бонус"])}
                   </th>
-                  <th rowSpan={2} className={`${TH_GROUP} ${COL_DIGIT3}`}>
-                    {headerLabel(["Всего очков", "(без бонусов)"])}
-                  </th>
-                  <th rowSpan={2} className={`${TH_GROUP} ${COL_DIGIT3}`}>
-                    {headerLabel(["Всего", "бонусных", "очков"])}
+                  <th colSpan={2} className={TH_GROUP}>
+                    {headerLabel(["Сумма очков"])}
                   </th>
                   <th rowSpan={2} className={`${TH_TOTAL} ${COL_DIGIT3}`}>
                     {headerLabel(["ИТОГО", "очков"])}
@@ -117,10 +97,12 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
                 </tr>
                 <tr className="bg-gray-50">
                   <th className={`${TH_GROUP} ${COL_DIGIT2}`}>{headerLabel(["крупный"])}</th>
-                  <th className={`${TH_GROUP} ${COL_DIGIT2}`}>{headerLabel(["счёт"])}</th>
+                  <th className={`${TH_GROUP} ${COL_DIGIT2}`}>—</th>
                   <th className={`${TH_BONUS} ${COL_DIGIT2}`}>1</th>
                   <th className={`${TH_BONUS} ${COL_DIGIT2}`}>2</th>
                   <th className={`${TH_BONUS} ${COL_DIGIT2}`}>3</th>
+                  <th className={`${TH_GROUP} ${COL_DIGIT3}`}>{headerLabel(["без бонусов"])}</th>
+                  <th className={`${TH_GROUP} ${COL_DIGIT3}`}>{headerLabel(["бонусы"])}</th>
                 </tr>
               </>
             ) : (
@@ -139,12 +121,8 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
                     <th className={`${TH_BONUS} ${COL_DIGIT2}`}>{headerLabel(["Бонус", "3"])}</th>
                   </>
                 )}
-                <th className={`${TH_GROUP} ${COL_DIGIT3}`}>
-                  {headerLabel(["Всего очков", "(без бонусов)"])}
-                </th>
-                <th className={`${TH_GROUP} ${COL_DIGIT3}`}>
-                  {headerLabel(["Всего", "бонусных", "очков"])}
-                </th>
+                <th className={`${TH_GROUP} ${COL_DIGIT3}`}>{headerLabel(["без бонусов"])}</th>
+                <th className={`${TH_GROUP} ${COL_DIGIT3}`}>{headerLabel(["бонусы"])}</th>
                 <th className={`${TH_TOTAL} ${COL_DIGIT3}`}>{headerLabel(["ИТОГО", "очков"])}</th>
               </tr>
             )}
@@ -168,7 +146,7 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
               >
                 <td className={`${COL_RANK} text-gray-600 sticky left-0 bg-white`}>{row.rank}</td>
                 <td
-                  className={`${COL_NAME} font-medium text-gray-900 sticky left-8 bg-white text-sm leading-snug`}
+                  className={`${COL_NAME} font-medium text-gray-900 sticky left-8 bg-white leading-snug`}
                 >
                   {row.user_name}
                 </td>
@@ -183,9 +161,9 @@ export function LeaderboardTable({ rows, showCountColumns = true }: LeaderboardT
                         <PointsCell value={row.count_outcome} />
                       </>
                     )}
-                    <td className={`${COL_DIGIT2} bg-amber-50/50`}>{row.bonus1}</td>
-                    <td className={`${COL_DIGIT2} bg-amber-50/50`}>{row.bonus2}</td>
-                    <td className={`${COL_DIGIT2} bg-amber-50/50`}>{row.bonus3}</td>
+                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-700`}>{row.bonus1}</td>
+                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-700`}>{row.bonus2}</td>
+                    <td className={`${COL_DIGIT2} bg-amber-50/50 text-gray-700`}>{row.bonus3}</td>
                   </>
                 )}
                 <PointsCell value={row.points_base} digitClass={COL_DIGIT3} />

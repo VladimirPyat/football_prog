@@ -77,6 +77,20 @@ describe("[UNIT-ROUND-ROBIN-DERIVE] deriveRoundRobinStructure", () => {
     });
   });
 
+  it("returns null for odd team count", () => {
+    expect(deriveRoundRobinStructure(15)).toBeNull();
+  });
+
+  it("rejects round-robin with odd total_teams", () => {
+    const result = contestParametersSchema.safeParse({
+      total_teams: 15,
+      matches_per_round: 7,
+      total_rounds: 28,
+      is_round_robin: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("computes matches and rounds for 16 teams", () => {
     expect(deriveRoundRobinStructure(16)).toEqual({
       matches_per_round: 8,

@@ -47,6 +47,37 @@ def _login_from_email(email: str) -> str:
     return re.sub(r"[^a-z0-9_]", "_", local)[:32]
 
 
+def validate_contest_structure(
+    *,
+    total_teams: int,
+    matches_per_round: int,
+    total_rounds: int,
+    is_round_robin: bool,
+) -> None:
+    """Validate contest structure fields before persist."""
+    if total_teams < 1:
+        raise ValidationError("Число команд должно быть положительным")
+    if matches_per_round < 1:
+        raise ValidationError("Матчей в туре должно быть положительным")
+    if total_rounds < 1:
+        raise ValidationError("Число туров должно быть положительным")
+
+    if not is_round_robin:
+        return
+
+    if total_teams % 2 != 0:
+        raise ValidationError(
+            "Для круговой системы нужно чётное число команд (≥ 2) "
+            "или отключите круговую систему"
+        )
+    expected_matches = total_teams // 2
+    if matches_per_round != expected_matches:
+        raise ValidationError("Матчей в туре должно быть = команды / 2")
+    expected_rounds = (total_teams - 1) * 2
+    if total_rounds != expected_rounds:
+        raise ValidationError("Число туров должно быть = (команды − 1) × 2")
+
+
 async def create_contest(
     session: AsyncSession,
     name: str,
@@ -88,6 +119,13 @@ async def create_contest(
             rules_json=rules_json,
         )
 
+    validate_contest_structure(
+        total_teams=contest.total_teams,
+        matches_per_round=contest.matches_per_round,
+        total_rounds=contest.total_rounds,
+        is_round_robin=contest.is_round_robin,
+    )
+
     session.add(contest)
     await session.flush()
     return contest
@@ -109,6 +147,13 @@ async def update_contest(
     ):
         if field in patch and patch[field] is not None:
             setattr(contest, field, patch[field])
+
+    validate_contest_structure(
+        total_teams=contest.total_teams,
+        matches_per_round=contest.matches_per_round,
+        total_rounds=contest.total_rounds,
+        is_round_robin=contest.is_round_robin,
+    )
     return contest
 
 

@@ -16,15 +16,26 @@ export function formatTeamPairShort(team1: string, team2: string): string {
   return `${shortenTeamLabel(team1)}-${shortenTeamLabel(team2)}`;
 }
 
+/** Prefer configured short name; fall back to heuristic truncation. */
+export function displayTeamShort(fullName: string, shortName?: string, maxLen = 4): string {
+  if (shortName?.trim()) return shortName.trim();
+  return shortenTeamLabel(fullName, maxLen);
+}
+
 export interface StackedTeamLabels {
   home: string;
   away: string;
 }
 
 /** Stacked home/away labels for narrow matrix columns. */
-export function formatTeamPairStacked(team1: string, team2: string): StackedTeamLabels {
+export function formatTeamPairStacked(
+  team1: string,
+  team2: string,
+  team1Short?: string,
+  team2Short?: string,
+): StackedTeamLabels {
   return {
-    home: shortenTeamLabel(team1, 3),
-    away: shortenTeamLabel(team2, 3),
+    home: displayTeamShort(team1, team1Short, 3),
+    away: displayTeamShort(team2, team2Short, 3),
   };
 }

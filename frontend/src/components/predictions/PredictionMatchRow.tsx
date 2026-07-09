@@ -2,7 +2,7 @@
 
 import { formatDateTimeRu } from "@/lib/datetime/formatApiDateTime";
 import { ScoreInput } from "@/components/predictions/ScoreInput";
-import { shortenTeamLabel } from "@/lib/teams/formatTeamPair";
+import { displayTeamShort } from "@/lib/teams/formatTeamPair";
 import type { MatchOut } from "@/types/api";
 
 interface PredictionMatchRowProps {
@@ -24,8 +24,8 @@ export function PredictionMatchRow({
   onScore1Change,
   onScore2Change,
 }: PredictionMatchRowProps) {
-  const homeShort = shortenTeamLabel(match.team1, 4);
-  const awayShort = shortenTeamLabel(match.team2, 4);
+  const homeShort = displayTeamShort(match.team1, match.team1_short, 4);
+  const awayShort = displayTeamShort(match.team2, match.team2_short, 4);
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4 py-3 border-b border-gray-100 last:border-0">

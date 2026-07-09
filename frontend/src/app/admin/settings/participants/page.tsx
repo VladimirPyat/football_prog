@@ -72,7 +72,6 @@ export default function AdminSettingsParticipantsPage() {
         <ParticipantInviteModal
           open
           login={inviteModal.login}
-          tempPassword={inviteModal.temp_password}
           setupUrl={inviteModal.setup_url}
           onClose={() => setInviteModal(null)}
         />

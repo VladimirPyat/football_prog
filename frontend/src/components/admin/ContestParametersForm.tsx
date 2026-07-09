@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { contestParametersSchema, deriveRoundRobinStructure } from "@/lib/validation/admin";
+import {
+  contestParametersSchema,
+  deriveRoundRobinStructure,
+  isRoundRobinTeamCountValid,
+  ROUND_ROBIN_ODD_TEAMS_MSG,
+} from "@/lib/validation/admin";
 import type { ZodIssue } from "zod";
 import type { ContestOut } from "@/types/api";
 import { RulesEditorPanel } from "@/components/admin/RulesEditorPanel";
@@ -73,11 +78,14 @@ export function ContestParametersForm({
   }, [contest.id]);
 
   const derivedReadonly = readonly || isRoundRobin;
+  const roundRobinStructureInvalid = isRoundRobin && !isRoundRobinTeamCountValid(totalTeams);
 
   const applyRoundRobinDerived = (teams: number) => {
     const derived = deriveRoundRobinStructure(teams);
-    setMatchesPerRound(derived.matches_per_round);
-    setTotalRounds(derived.total_rounds);
+    if (derived) {
+      setMatchesPerRound(derived.matches_per_round);
+      setTotalRounds(derived.total_rounds);
+    }
   };
 
   const handleTotalTeamsChange = (value: number) => {
@@ -201,12 +209,16 @@ export function ContestParametersForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Матчей в туре</label>
             <input
               type="number"
-              value={matchesPerRound}
+              value={roundRobinStructureInvalid ? "" : matchesPerRound}
               onChange={(e) => setMatchesPerRound(Number(e.target.value))}
               disabled={derivedReadonly}
               readOnly={isRoundRobin && !readonly}
+              placeholder={roundRobinStructureInvalid ? "—" : undefined}
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
             />
+            {roundRobinStructureInvalid && (
+              <p className="text-sm text-amber-700 mt-1">{ROUND_ROBIN_ODD_TEAMS_MSG}</p>
+            )}
             {errors.matches_per_round && (
               <p className="text-sm text-red-600">{errors.matches_per_round}</p>
             )}
@@ -215,10 +227,11 @@ export function ContestParametersForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Туров</label>
             <input
               type="number"
-              value={totalRounds}
+              value={roundRobinStructureInvalid ? "" : totalRounds}
               onChange={(e) => setTotalRounds(Number(e.target.value))}
               disabled={derivedReadonly}
               readOnly={isRoundRobin && !readonly}
+              placeholder={roundRobinStructureInvalid ? "—" : undefined}
               className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
             />
             {errors.total_rounds && <p className="text-sm text-red-600">{errors.total_rounds}</p>}
@@ -240,6 +253,7 @@ export function ContestParametersForm({
         <div className="text-sm text-gray-600 max-w-2xl space-y-1">
           <p>По умолчанию (галочка снята): круговая система — каждая пара играет дома и в гости.</p>
           <ul className="list-disc list-inside pl-1 space-y-0.5">
+            <li>число команд должно быть чётным</li>
             <li>матчей в туре = число команд ÷ 2</li>
             <li>число туров = (число команд − 1) × 2</li>
           </ul>

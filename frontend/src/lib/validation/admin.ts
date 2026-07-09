@@ -8,10 +8,20 @@ export const createContestSchema = z.object({
 });
 
 /** Round-robin home/away: matches per round and total rounds from team count. */
+export const ROUND_ROBIN_ODD_TEAMS_MSG =
+  "Для круговой системы нужно чётное число команд, либо включите «Произвольное количество»";
+
+export function isRoundRobinTeamCountValid(totalTeams: number): boolean {
+  return Number.isInteger(totalTeams) && totalTeams >= 2 && totalTeams % 2 === 0;
+}
+
 export function deriveRoundRobinStructure(totalTeams: number): {
   matches_per_round: number;
   total_rounds: number;
-} {
+} | null {
+  if (!isRoundRobinTeamCountValid(totalTeams)) {
+    return null;
+  }
   return {
     matches_per_round: totalTeams / 2,
     total_rounds: (totalTeams - 1) * 2,
@@ -27,6 +37,14 @@ export const contestParametersSchema = z
   })
   .superRefine((d, ctx) => {
     if (d.is_round_robin) {
+      if (!isRoundRobinTeamCountValid(d.total_teams)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["total_teams"],
+          message: ROUND_ROBIN_ODD_TEAMS_MSG,
+        });
+        return;
+      }
       if (d.matches_per_round !== d.total_teams / 2) {
         ctx.addIssue({
           code: "custom",
