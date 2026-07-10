@@ -4,8 +4,8 @@ import {
   ADMIN_LOGIN,
   ADMIN_PASSWORD,
   API_BASE,
-  DEMO_USER_LOGIN,
-  DEMO_USER_PASSWORD,
+  CONTRACTED_E2E_USER_LOGIN,
+  CONTRACTED_E2E_USER_PASSWORD,
   SUPERVISOR_LOGIN,
   SUPERVISOR_PASSWORD,
   TOKEN_KEY,
@@ -76,8 +76,18 @@ export async function loginWithCredentials(
   }
 }
 
+export async function loginAsContractedUser(page: Page): Promise<void> {
+  await loginWithCredentials(
+    page,
+    CONTRACTED_E2E_USER_LOGIN,
+    CONTRACTED_E2E_USER_PASSWORD,
+    "USER",
+  );
+}
+
+/** @deprecated Use loginAsContractedUser for loaded fixture; loginAsUser for provisioned E2E user. */
 export async function loginAsDemoUser(page: Page): Promise<void> {
-  await loginWithCredentials(page, DEMO_USER_LOGIN, DEMO_USER_PASSWORD, "USER");
+  await loginAsContractedUser(page);
 }
 
 export async function loginAsUser(page: Page): Promise<void> {

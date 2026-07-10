@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     seed_admin_password_hash: str | None = None
     seed_supervisor_password: str | None = None
     seed_supervisor_password_hash: str | None = None
-    seed_demo_user_password: str | None = "user"
 
     # ── Bootstrap identities (non-secret; override rarely) ───────────────────
     seed_admin_login: str = "admin"
@@ -41,9 +40,6 @@ class Settings(BaseSettings):
     seed_supervisor_login: str = "supervisor"
     seed_supervisor_first_name: str = "Supervisor"
     seed_supervisor_last_name: str = "User"
-    seed_demo_user_login: str = "user"
-    seed_demo_user_first_name: str = "Demo"
-    seed_demo_user_last_name: str = "User"
 
     # ── JWT (non-secret parameters) ──────────────────────────────────────────
     jwt_algorithm: str = "HS256"
@@ -77,6 +73,7 @@ class Settings(BaseSettings):
     log_archive_dir: Path = PROJECT_ROOT / "logs" / "archive"
     log_archive_max_bytes: int = 5_242_880  # 5 MiB
     log_archive_interval_days: int = 7
+    auth_log_file: Path = PROJECT_ROOT / "logs" / "auth.log"
 
     # ── Datetime (API / DB) ───────────────────────────────────────────────────
     # All TIMESTAMPTZ values are stored and compared in this zone (UTC only today).

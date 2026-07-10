@@ -6,11 +6,13 @@ Append-only notes for ideas not yet scheduled in a stage. When an item lands in 
 
 ## Logging & observability
 
-### Auth audit log (`auth.log`) — **Open**
+### Auth audit log (`auth.log`) — **Done (todo_backend_fix)**
 
 **Goal:** Record successful and failed login attempts separately from the main application log.
 
-**Why deferred:** Current auth uses plain `HTTPException(401)` in `src/api/v1/auth.py` with no `logger` calls (Stage 1.5 policy: no passwords in logs). Adding ad-hoc `logger.warning` in the handler works but couples auth to logging.
+**Implemented:** `AuthAuditMiddleware` on `POST /api/v1/auth/login` → `logs/auth.log` (see `src/core/auth_audit.py`, `config/settings.py` `auth_log_file`).
+
+**Why deferred (original):** Current auth uses plain `HTTPException(401)` in `src/api/v1/auth.py` with no `logger` calls (Stage 1.5 policy: no passwords in logs). Adding ad-hoc `logger.warning` in the handler works but couples auth to logging.
 
 **Preferred direction (later):**
 - Dedicated file e.g. `logs/auth.log` or `auth.log` next to `app.log`
@@ -32,7 +34,7 @@ Demo USER `user/user` seeded in `bootstrap_users.py` after loader. Loader CSV us
 
 ## Stage 2 — Frontend cleanup
 
-### Remove demo user from bootstrap after 2.3 invite UI — **Open**
+### Remove demo user from bootstrap after 2.3 invite UI — **Done (todo_backend_fix)**
 
 **When:** Sub-stage **2.3** delivers supervisor participant invite UI (`POST …/participants`).
 
@@ -40,7 +42,7 @@ Demo USER `user/user` seeded in `bootstrap_users.py` after loader. Loader CSV us
 
 **Tracked in:** `bootstrap_users.py` TEMPORARY comment; `coder_2.1.1.md` §3.1.
 
-### CONTEST_LOCKED vs invite E2E on dev_setup contest — **Open (documented for 2.3 tester)**
+### CONTEST_LOCKED vs invite E2E on dev_setup contest — **Closed (documented)**
 
 After `dev_setup.py`, contest `id=1` is **RUNNING** and **`is_locked=true`**. Supervisor invite (`POST …/participants`) returns `403` with code `CONTEST_LOCKED`.
 
@@ -54,7 +56,7 @@ After `dev_setup.py`, contest `id=1` is **RUNNING** and **`is_locked=true`**. Su
 
 ## Infrastructure
 
-### Docker Compose one-command stack — **Open (Stage 3)**
+### Docker Compose one-command stack — **Deferred (Stage 3 / deploy)**
 
 Replace manual `dev_setup.py --run` with compose services for API, UI, and optional cron sidecar for `archive_logs.py`.
 
@@ -62,7 +64,7 @@ Replace manual `dev_setup.py --run` with compose services for API, UI, and optio
 
 ## Stage 2 — Supervisor rounds UX
 
-### Backend: block ACTIVE round structure edits — **Open**
+### Backend: block ACTIVE round structure edits — **Done (todo_backend_fix)**
 
 **When:** After frontend policy (2026-06-27) forbids team changes on ACTIVE tours in UI.
 
@@ -74,7 +76,7 @@ Replace manual `dev_setup.py --run` with compose services for API, UI, and optio
 
 ## Stage 2 — QA / supervisor setup
 
-### «Создать по образцу» — frontend wizard (phase 1, no new API) — **Open**
+### «Создать по образцу» — frontend wizard (phase 1, no new API) — **Deferred**
 
 **Goal:** Speed up manual QA (e.g. [SUPERVISOR_TESTING_SCENARIOS.md §11](../../manuals/SUPERVISOR_TESTING_SCENARIOS.md#11-кросс-проверка-организатора-и-участников-end-to-end)) when the same contest setup is created and deleted many times — avoid re-entering parameters, teams, and invite rows by hand.
 
@@ -102,4 +104,12 @@ Replace manual `dev_setup.py --run` with compose services for API, UI, and optio
 
 ---
 
-*Last updated: 2026-07-02 — contest clone wizard (frontend phase 1) backlog.*
+## Stage 2 — Supervisor participants UI
+
+### Participants table: login column — **Done (todo_front_fix)**
+
+Supervisor settings → participants: show `login` column (distinct from email when invite uses custom login).
+
+---
+
+*Last updated: 2026-07-10 — todo_backend_fix + todo_front_fix (auth audit, demo user removal, ACTIVE round API guard, participants login column).*

@@ -33,6 +33,7 @@ from config.settings import get_settings
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.security import hash_password
 from database.base import Base
 from database.engine import create_engine, create_session_factory
 from database.models import (
@@ -51,7 +52,8 @@ from database.models import (
 
 logger = logging.getLogger(__name__)
 
-_PLACEHOLDER_PASSWORD_HASH = "test-data-placeholder-hash-not-for-auth"
+# Dev-only: contracted CSV users share this password so manual QA and E2E can log in.
+_DEV_LOADER_USER_PASSWORD_HASH = hash_password("user")
 
 # ---------------------------------------------------------------------------
 # Config helpers
@@ -217,7 +219,7 @@ async def _load_users(
 
         user = User(
             login=login,
-            password_hash=_PLACEHOLDER_PASSWORD_HASH,
+            password_hash=_DEV_LOADER_USER_PASSWORD_HASH,
             role=default_role,
             first_name=first_name,
             last_name=last_name,

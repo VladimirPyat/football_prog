@@ -216,7 +216,7 @@ async def test_script_finalize_profile_e2e_with_published(
         assert round_10 is not None
         assert round_10.deadline.replace(tzinfo=UTC) > datetime.now(UTC)
 
-        demo_user = await session.scalar(select(User).where(User.login == "user"))
+        demo_user = await session.scalar(select(User).where(User.login == "shutov"))
         assert demo_user is not None
         part = await session.scalar(
             select(ContestParticipant).where(

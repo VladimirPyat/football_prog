@@ -120,6 +120,11 @@ async def update_round(round_id: int, body: UpdateRoundRequest, session: DbSessi
         await set_deadline(session, round_id, body.deadline)
 
     if body.matches:
+        if round_.status == RoundStatus.ACTIVE:
+            for item in body.matches:
+                if item.team1_id is not None or item.team2_id is not None:
+                    raise ValidationError("На активном туре нельзя менять состав матчей")
+
         deadline_passed = False
         if round_.status == RoundStatus.ACTIVE:
             current_deadline = round_.deadline

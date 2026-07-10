@@ -41,9 +41,8 @@ export const SUPERVISOR_PASSWORD = rootEnv.SEED_SUPERVISOR_PASSWORD ?? "";
 export const ADMIN_LOGIN = rootEnv.SEED_ADMIN_LOGIN ?? "admin";
 export const ADMIN_PASSWORD = rootEnv.SEED_ADMIN_PASSWORD ?? "";
 
-/** Bootstrap demo user from `bootstrap_users.py` (Stage 2.1.1). */
-export const DEMO_USER_LOGIN = "user";
-export const DEMO_USER_PASSWORD = "user";
+export const CONTRACTED_E2E_USER_LOGIN = "shutov";
+export const CONTRACTED_E2E_USER_PASSWORD = "user";
 
 export const TOKEN_KEY = "fp_access_token";
 export const ACTIVE_CONTEST_KEY = "fp_active_contest_id";
@@ -59,10 +58,9 @@ function loadProvisionedUser(): E2EUserCredentials | null {
 
 const provisioned = loadProvisionedUser();
 
-/** Documented dev login `user/user` is unavailable after loader (placeholder hash). */
-export const USER_LOGIN = provisioned?.login ?? "user";
-export const USER_PASSWORD = provisioned?.password ?? "user";
+/** Contracted CSV user from `load_test_data.py` (password `user` in dev). */
+export const USER_LOGIN = provisioned?.login ?? CONTRACTED_E2E_USER_LOGIN;
+export const USER_PASSWORD = provisioned?.password ?? CONTRACTED_E2E_USER_PASSWORD;
 export const USER_CONTEST_ID = provisioned?.contestId ?? 1;
 
-export const DOCUMENTED_USER_LOGIN_UNAVAILABLE =
-  provisioned !== null || USER_LOGIN !== "user";
+export const DOCUMENTED_USER_LOGIN_UNAVAILABLE = provisioned !== null;

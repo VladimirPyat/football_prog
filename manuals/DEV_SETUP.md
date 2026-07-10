@@ -229,11 +229,11 @@ Use `127.0.0.1` consistently (matches Playwright `baseURL` in tester instruction
 
 | Role | Login | Password | Source |
 |------|-------|----------|--------|
-| USER (demo) | `user` | `user` | `bootstrap_users.py` (`SEED_DEMO_USER_*`; defaults work without `.env`) |
+| USER (contracted) | `shutov` (or any CSV login) | `user` | `load_test_data.py` — all contracted users share dev password `user` |
 | SUPERVISOR | `supervisor` | value from `.env` `SEED_SUPERVISOR_PASSWORD` | `bootstrap_users.py` |
 | ADMIN | `admin` | value from `.env` `SEED_ADMIN_PASSWORD` | `bootstrap_users.py` |
 
-> **Note:** `load_test_data.py` CSV also defines a `user` row, but its password hash is a placeholder — after `--reset`, only `bootstrap_users.py` provides a working `user/user` login. Other loader users (`shutov`, `volchenko`, …) may still use password **`user`** if their CSV hash matches; rely on the demo row above for E2E.
+> **Note:** For new participants use supervisor invite UI (`/admin/settings/participants`) or `dev_invite_setup.py confirm-all`. Playwright E2E provisions a dedicated user via `playwright.global-setup.ts`.
 
 Do **not** commit `.env` or real passwords.
 
@@ -280,7 +280,7 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 | CORS errors from `:3000` | Ensure `CORS_ORIGINS` includes frontend origin or `["*"]` |
 | `load_test_data` unique constraint | Use `--reset` or run full `dev_setup.py` |
 | Admin missing after loader | Run `bootstrap_users.py` **after** `load_test_data --reset` |
-| `user/user` login fails (401) | Re-run `dev_setup.py` — demo USER is created by `bootstrap_users.py` after loader |
+| `user/user` login fails (401) | Re-run `dev_setup.py --full` — use contracted login `shutov` / `user` |
 | Playwright E2E cannot find browser | `cd frontend && npm run playwright:install` (cache: `.playwright-browsers/`) |
 | Port in use | `uv run python src/scripts/dev_setup.py --check-ports`; stop process on :8000/:3000 or use another terminal's stack |
 | `--run` exits immediately | Check logs — missing `frontend/`, `node`, or `npm`; run `--check` |

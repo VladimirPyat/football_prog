@@ -39,6 +39,7 @@ export function ParticipantsTable({
         headers={
           <>
             <AdminTh>Имя</AdminTh>
+            <AdminTh>Логин</AdminTh>
             <AdminTh>Email</AdminTh>
             <AdminTh>Статус</AdminTh>
             <AdminTh>Действия</AdminTh>
@@ -50,6 +51,7 @@ export function ParticipantsTable({
             <td className={TD_ADMIN}>
               {p.first_name} {p.last_name}
             </td>
+            <td className={TD_ADMIN}>{p.login}</td>
             <td className={TD_ADMIN}>{p.email ?? "—"}</td>
             <td className={TD_ADMIN}>{participantStatusLabel(p.status)}</td>
             <td className={`${TD_ADMIN} space-x-2`}>

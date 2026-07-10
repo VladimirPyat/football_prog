@@ -33,6 +33,7 @@ from api.v1 import (
 )
 from api.error_handlers import register_error_handlers
 from config.settings import get_settings
+from core.auth_audit import AuthAuditMiddleware, setup_auth_audit_logging
 from core.logging_config import setup_logging
 
 settings = get_settings()
@@ -40,9 +41,14 @@ setup_logging(
     settings.log_level,
     log_file=settings.log_file if settings.log_to_file else None,
 )
+if settings.log_to_file:
+    setup_auth_audit_logging(settings.auth_log_file)
 
 app = FastAPI(title="Football Predictions API", version="1.1.0")
 register_error_handlers(app)
+
+if settings.log_to_file:
+    app.add_middleware(AuthAuditMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

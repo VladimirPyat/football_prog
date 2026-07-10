@@ -153,6 +153,38 @@ async def test_op_round_edit(loaded_api):
 
 
 @pytest.mark.asyncio
+async def test_active_round_rejects_team_structure_edit(loaded_api):
+    """[ACTIVE-ROUND-NO-TEAMS] PATCH ACTIVE round with team1_id/team2_id → 422."""
+    client, sf, _ = loaded_api
+    await ensure_contest_running(sf, client, DEFAULT_CONTEST_ID)
+    sup = await api_login(client, "supervisor_api")
+    h = auth_header(sup)
+    rid = await get_round_id(sf, 10, DEFAULT_CONTEST_ID)
+
+    async with sf() as session:
+        match = await session.scalar(
+            select(Match).where(Match.round_id == rid).limit(1)
+        )
+        assert match is not None
+        other = await session.scalar(
+            select(Match).where(Match.round_id == rid, Match.id != match.id).limit(1)
+        )
+        assert other is not None
+
+    resp = await client.patch(
+        contest_url(DEFAULT_CONTEST_ID, f"/admin/rounds/{rid}"),
+        headers=h,
+        json={
+            "matches": [
+                {"match_id": match.id, "team1_id": other.team1_id, "team2_id": other.team2_id},
+            ]
+        },
+    )
+    assert resp.status_code == 400
+    assert "состав" in resp.json().get("detail", "").lower()
+
+
+@pytest.mark.asyncio
 async def test_op_round_create(loaded_api):
     """[OP-ROUND-CREATE] POST admin round DRAFT with 8 matches → 200."""
     client, sf, _ = loaded_api

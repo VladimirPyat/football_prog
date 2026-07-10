@@ -22,6 +22,8 @@ The project currently spreads agent guidance across three layers that are **not 
 
 **Recommendation:** Split into a **thin core** (always apply) + **context-scoped rules** (`.cursor/rules/*.mdc` with `globs`) + **workflow agents** (`.cursor/agents/`) that **reference** rules instead of duplicating them.
 
+**Workflow gap:** Handoffs between @Planner, @Coder, and @Tester exist (`INSTRUCTIONS_READY` → `READY_FOR_TEST` → `TEST_PASS`), but there is **no unified end-to-end pipeline** tying success to commit and post-commit documentation sync. See §13.
+
 ---
 
 ## 2. Current inventory (as of 2026-07-10)
@@ -228,6 +230,7 @@ Fix 2.5.3 addressed code and `agent_docs/ui/*` but **not** Cursor rule activatio
 | `planner.mdc` | `agent_docs/**` | Phase A/B, language split, instruction templates, UI reuse section for frontend tasks |
 | `bug-fix.mdc` | `agent_docs/instructions/fix_*`, `agent_docs/reports/bug_*` | Triage classes, artifact templates, delegation |
 | `git.mdc` | manual | Commit only when asked, no force push, HEREDOC messages |
+| `workflow.mdc` | `agent_docs/**`, handoff triggers | End-to-end pipeline: instruction → code → test → commit → docs (see §13) |
 
 ### 5.4 What stays in sub-agents (thin wrappers)
 
@@ -269,6 +272,8 @@ Use this when splitting rules. **Single source of truth** = the `.mdc` file; age
 | Bug triage TRIVIAL/BUG/DESIGN | `bug-fix-coordinator.md` | `bug-fix.mdc` |
 | Planner Phase A/B | `planer.md` | `planner.mdc` + slim `planer.md` |
 | Russian user / English artifacts | each agent | `planner.mdc` or `00-core.mdc` (one table) |
+| Delivery pipeline (instruction→docs) | implicit in agents only | `workflow.mdc` (§13) |
+| Post-commit docs sync | `docs-create-diff` command only | `workflow.mdc` + `git.mdc` |
 
 ---
 
@@ -286,6 +291,7 @@ Use this when splitting rules. **Single source of truth** = the `.mdc` file; age
 │   ├── code-review.mdc          # alwaysApply: false
 │   ├── planner-workflow.mdc     # globs: agent_docs/**
 │   ├── bug-fix-workflow.mdc     # globs: agent_docs/instructions/fix_*, agent_docs/reports/bug_*
+│   ├── workflow.mdc             # delivery pipeline (§13)
 │   └── git.mdc                  # alwaysApply: false
 ├── agents/
 │   ├── planer.md                # thin: workflow + "see planner-workflow.mdc"
@@ -341,11 +347,14 @@ For repos that still require `.cursorrules` (older Cursor versions or team habit
 - [ ] Rewrite each `.cursor/agents/*.md` to reference rules, remove duplicated tables
 - [ ] Optionally add `frontend-coder.md`
 
-### Phase 4 — Instruction templates
+### Phase 4 — Instruction templates + delivery workflow
 
+- [ ] Create `.cursor/rules/workflow.mdc` — pipeline from §13
 - [ ] Update planner Phase B template with **UI reuse** block
 - [ ] Update bug-fixer `fix_XXX.md` template with UI section
 - [ ] Add `[UI-REUSE]` / `[UI-CONSISTENCY]` to tester checklist template
+- [ ] Wire `docs-create-diff` as mandatory post-commit step in `workflow.mdc` + `git.mdc`
+- [ ] Add status `DOCS_SYNCED` to progress append template
 
 ### Phase 5 — Validation
 
@@ -353,6 +362,7 @@ For repos that still require `.cursorrules` (older Cursor versions or team habit
 - [ ] Frontend task: `frontend.mdc` activates on `frontend/src/**/*.tsx`
 - [ ] E2E task: `testing.mdc` loads Playwright cache rules
 - [ ] Review task: `code-review.mdc` loads on demand
+- [ ] Full stage cycle: instruction → code → test → commit → `docs-create-diff` → `DOCS_SYNCED`
 
 ---
 
@@ -399,6 +409,283 @@ Body: link `agent_docs/ui/design_system.md`, reuse paths, extract-if-duplicated 
 
 ---
 
+## 13. End-to-end delivery workflow
+
+### 13.1 Problem today
+
+The repo has **partial** workflow pieces that do not form a closed loop:
+
+| Piece | Exists | Gap |
+|-------|--------|-----|
+| Planner writes `coder_X.md` / `tester_X.md` | ✅ | No mandatory "done" definition at instruction level |
+| Coder sets `READY_FOR_TEST` in progress | ✅ | Lint step referenced but not in a fixed sequence |
+| Tester sets `TEST_PASS` / `TEST_FAIL` | ✅ | FAIL loops back informally; no max-retry policy |
+| `BLOCKED.md` on ambiguity | ✅ | Not a first-class terminal state in progress |
+| Commit on success | ⚠️ | "Only when user asks" — decoupled from TEST_PASS |
+| `docs-create-diff` after commit | ⚠️ | Command exists (`.cursor/commands/docs-create-diff.md`) but **not wired** into any agent handoff |
+
+**Result:** Code merges with stale `manuals/`, or agents commit before tests pass, or documentation sync is forgotten until much later.
+
+### 13.2 Target pipeline
+
+Single mandatory sequence for every **stage** or **fix** (except TRIVIAL bugs):
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌──────────────────┐
+│ INSTRUCTION │ →  │    CODE     │ →  │    TEST     │ →  │   COMMIT    │ →  │  DOCS SYNC       │
+│  (Planner)  │    │  (Coder)    │    │  (Tester)   │    │  (on PASS)  │    │ (docs-create-diff)│
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └──────────────────┘
+       │                  │                  │                  │
+       │                  │                  │                  └── only if user approved commit
+       │                  │                  │
+       └──────────────────┴──────────────────┴── BLOCKED (any step) → HALT, no commit
+```
+
+**Mermaid (for plans / onboarding):**
+
+```mermaid
+stateDiagram-v2
+    [*] --> INSTRUCTIONS_READY: Planner Phase B
+    INSTRUCTIONS_READY --> READY_FOR_TEST: Coder + lint PASS
+    READY_FOR_TEST --> TEST_PASS: Tester PASS
+    READY_FOR_TEST --> TEST_FAIL: Tester FAIL
+    TEST_FAIL --> READY_FOR_TEST: Coder fix cycle
+    TEST_PASS --> COMMITTED: User-approved commit
+    COMMITTED --> DOCS_SYNCED: docs-create-diff
+    DOCS_SYNCED --> [*]: Stage complete
+
+    INSTRUCTIONS_READY --> BLOCKED: ambiguity / missing spec
+    READY_FOR_TEST --> BLOCKED: env / data / contract gap
+    TEST_FAIL --> BLOCKED: unfixable without Planner
+    BLOCKED --> [*]: Human resolves
+```
+
+### 13.3 Status gates (`agent_docs/progress/stage_X.md`)
+
+Append-only entries. Each handoff **must** set exactly one status:
+
+| Status | Set by | Meaning | Next step |
+|--------|--------|---------|-----------|
+| `INSTRUCTIONS_READY` | @Planner | `coder_X.md` + `tester_X.md` approved | Invoke @Coder |
+| `READY_FOR_TEST` | @Coder | Code done, **lint PASS**, local checks run | Invoke @Tester |
+| `TEST_PASS` | @Tester | All acceptance criteria met | Request commit |
+| `TEST_FAIL` | @Tester | Defects found — report in `reports/test_X.md` | @Coder fix cycle |
+| `BLOCKED` | Any agent | `agent_docs/reports/BLOCKED.md` created | Human / @Planner |
+| `COMMITTED` | Human or agent (if user asked) | Git commit created with stage/fix scope | Run `docs-create-diff` |
+| `DOCS_SYNCED` | Agent after docs command | `manuals/` updated from last commit | Stage closed |
+
+**Fix workflow** (`fix_XXX.md`): same gates, but progress may append to `stage_X.md` or a dedicated `bug_XXX.md` status section — pick one convention per project and document in `workflow.mdc`.
+
+### 13.4 Step-by-step responsibilities
+
+#### Step 1 — Instruction (@Planner)
+
+**Input:** Approved Phase A drafts, user ✅  
+**Output:** `agent_docs/instructions/coder_X.md`, `tester_X.md`  
+**Gate:** Append `INSTRUCTIONS_READY` to progress
+
+Instruction file **must** end with:
+
+```markdown
+## Acceptance criteria
+- [ ] …
+
+## Verification (Coder, before READY_FOR_TEST)
+- Lint: see `.cursor/rules/linting.mdc`
+- …
+
+## Verification (Tester, before TEST_PASS)
+- …
+
+## On TEST_PASS
+- Commit message template: `feat(stage-X): …` / `fix(BUG-XXX): …`
+- Docs sync: run `/docs-create-diff` immediately after commit
+```
+
+#### Step 2 — Code (@Coder or frontend implementer)
+
+**Input:** `INSTRUCTIONS_READY`, instruction file  
+**Pre-handoff checklist:**
+
+1. Implement only files listed in instruction.
+2. Run lint per scope (backend / frontend — see `linting.mdc`).
+3. Run any local verification commands from instruction.
+4. Update living docs in scope (`agent_docs/ui/*`, contracts) if instruction requires — **not** `manuals/` (that is post-commit).
+
+**Output:** Append `READY_FOR_TEST` with files list + commands run  
+**On block:** `BLOCKED` + `reports/BLOCKED.md` — do **not** set `READY_FOR_TEST`
+
+#### Step 3 — Test (@Tester)
+
+**Input:** `READY_FOR_TEST`  
+**Actions:**
+
+1. Lint again (catch drift since Coder handoff).
+2. Run integration / E2E per `tester_X.md`.
+3. Write `agent_docs/reports/test_X.md`.
+
+**Output:**
+
+| Result | Status | Next |
+|--------|--------|------|
+| All criteria met | `TEST_PASS` | Proceed to commit |
+| Defects found | `TEST_FAIL` | @Coder with report |
+| Cannot test (env, data, contradiction) | `BLOCKED` | Human / @Planner |
+
+**Rule:** @Tester never commits. @Tester never weakens tests to get PASS.
+
+#### Step 4 — Commit (on TEST_PASS only)
+
+**Preconditions:**
+
+- Status is `TEST_PASS` (not `READY_FOR_TEST`, not `TEST_FAIL`)
+- User has approved commit (per project git rules — agent does not commit silently unless user asked)
+
+**Actions:**
+
+1. `git status` / `git diff` — review scope matches instruction.
+2. Stage relevant files (exclude secrets, accidental debug).
+3. Commit with HEREDOC message tied to stage or `BUG-XXX`.
+4. Append `COMMITTED` to progress with commit hash + message.
+
+**On TEST_FAIL or BLOCKED:** **no commit.** Fix or escalate first.
+
+#### Step 5 — Documentation sync (immediately after commit)
+
+**Trigger:** Status just became `COMMITTED`  
+**Command:** Cursor slash command `/docs-create-diff` (spec: `.cursor/commands/docs-create-diff.md`)
+
+**What it does:**
+
+1. Diff last commit (`HEAD~1..HEAD`) or staged files.
+2. Filter to relevant source paths (`src/`, `config/`, `alembic/`, `frontend/src/` — extend mapping as needed).
+3. Update `manuals/*.md` (DB, API, scoring, config, frontend reference).
+4. Mark sections `[UPDATED]` / `[NEW]`.
+
+**Agent actions after `/docs-create-diff`:**
+
+1. Review generated `manuals/` changes for accuracy.
+2. If docs changes are correct → **second commit** (optional but recommended):
+   ```
+   docs(stage-X): sync manuals after <feature>
+   ```
+   Or squash into feature commit only if team policy allows — prefer **separate docs commit** for review clarity.
+3. Append `DOCS_SYNCED` to progress.
+
+**If docs-create-diff returns "No relevant source changes":** still append `DOCS_SYNCED` with note "no manuals update required".
+
+**Frontend gap today:** `docs-create-diff` maps `src/`, `config/`, `alembic/` but not `frontend/` explicitly. **Extend the command** when adopting this workflow:
+
+```markdown
+# Add to docs-create-diff mapping (future):
+- frontend/src/app/, routes, pages → manuals/FRONTEND_REFERENCE.md
+- frontend/src/components/ui/* → manuals/FRONTEND_REFERENCE.md § components
+- agent_docs/ui/* changes → do NOT sync to manuals automatically (living agent docs)
+```
+
+### 13.5 How to implement (rules + agents + commands)
+
+#### A. New rule: `.cursor/rules/workflow.mdc`
+
+```yaml
+---
+description: Delivery pipeline — instruction → code → test → commit → docs sync
+globs: agent_docs/**
+alwaysApply: false
+---
+```
+
+Body (summary):
+
+- Never skip test gate before commit.
+- Never commit on `TEST_FAIL` or `BLOCKED`.
+- After every user-approved commit → run `/docs-create-diff` before marking stage complete.
+- Progress append-only; use status table from §13.3.
+
+Optionally set `alwaysApply: true` with **≤15 lines** in core that only say: "Full delivery workflow → `.cursor/rules/workflow.mdc`".
+
+#### B. Thin agent updates (future)
+
+Each agent adds one line + status enforcement:
+
+| Agent | Add |
+|-------|-----|
+| `planer.md` | Instruction template includes acceptance + post-commit docs step |
+| `coder.md` | Handoff only as `READY_FOR_TEST` after lint; never commit |
+| `tester.md` | Handoff as `TEST_PASS` / `TEST_FAIL`; remind user to commit then `/docs-create-diff` |
+| `bug-fix-coordinator.md` | BUG/DESIGN: same pipeline after `fix_XXX.md`; TRIVIAL: commit + docs-create-diff if user asks |
+
+#### C. Extend `git.mdc`
+
+```markdown
+## Commit gate
+- Allowed only when progress status is TEST_PASS (or TRIVIAL fix verified).
+- Forbidden on TEST_FAIL, BLOCKED, READY_FOR_TEST.
+
+## Post-commit (mandatory)
+- Run `/docs-create-diff` before closing the task.
+- Append DOCS_SYNCED to progress.
+```
+
+#### D. Optional: Cursor hook (advanced)
+
+`.cursor/hooks.json` — `afterFileEdit` or post-commit hook is limited; **reliable approach** is:
+
+- Document in `workflow.mdc` as mandatory agent step (not automated hook).
+- Optional CI check: fail if `manuals/` untouched when `src/` changed in same PR (future).
+
+#### E. User-facing checklist (chat summary template)
+
+After `TEST_PASS`, agent reports in Russian:
+
+```
+✅ Тесты пройдены (TEST_PASS)
+📋 Следующие шаги:
+   1. Коммит (если подтверждаете): <предложенное сообщение>
+   2. Сразу после коммита: /docs-create-diff
+   3. Проверить manuals/, при необходимости docs-коммит
+   4. Статус DOCS_SYNCED → этап закрыт
+```
+
+### 13.6 Exception paths
+
+| Case | Pipeline |
+|------|----------|
+| **TRIVIAL bug** (bug-fixer) | Skip full instruction file; still: fix → verify → commit (if asked) → docs-create-diff |
+| **DESIGN bug** | Planner updates contracts first → then normal pipeline |
+| **Docs-only change** | Skip code/test; commit → docs-create-diff may no-op |
+| **User declines commit** | Stay at `TEST_PASS`; do not run docs-create-diff until commit exists |
+| **docs-create-diff finds nothing** | `DOCS_SYNCED` with note; not a failure |
+
+### 13.7 Bug-fix variant
+
+Same pipeline, different instruction source:
+
+```
+bug report → triage → fix_XXX.md → Coder → Tester → TEST_PASS → commit → docs-create-diff
+```
+
+`agent_docs/reports/bug_XXX.md` tracks status in parallel:
+
+```markdown
+## Status
+OPEN → IN_PROGRESS → READY_FOR_TEST → TEST_PASS → COMMITTED → DOCS_SYNCED → VERIFIED
+```
+
+`VERIFIED` = tests + docs sync complete (rename current `VERIFIED` to align or map 1:1).
+
+### 13.8 Success criteria for workflow adoption
+
+| Check | Expected |
+|-------|----------|
+| No commit without `TEST_PASS` in progress | Enforced by `git.mdc` + agent habit |
+| Every merged feature commit followed by manuals update | `DOCS_SYNCED` within same session |
+| `TEST_FAIL` loops to Coder with report | No silent retries |
+| `BLOCKED` stops pipeline | No drive-by commits |
+| Planner instructions include post-commit docs step | 100% of new `coder_*.md` |
+
+---
+
 ## 10. Anti-patterns to avoid
 
 | Anti-pattern | Why it fails |
@@ -409,6 +696,10 @@ Body: link `agent_docs/ui/design_system.md`, reuse paths, extract-if-duplicated 
 | Replace `design_system.md` with Cursor rules | Rules should be short pointers; detailed catalogue stays in `agent_docs/ui/` |
 | Delete sub-agents when adding rules | Agents carry workflow/delegation; rules carry constraints |
 | Migrate without deprecating `.cursorrules` | Two always-on sources fight each other |
+| Commit before `TEST_PASS` | Untested code in main; breaks trust in pipeline |
+| Skip `docs-create-diff` after commit | `manuals/` drifts from `src/` — humans read wrong docs |
+| Run docs-create-diff before commit | Diff targets wrong revision (staged vs HEAD) |
+| Set `DOCS_SYNCED` without running the command | False completion signal in progress |
 
 ---
 
@@ -421,6 +712,8 @@ Body: link `agent_docs/ui/design_system.md`, reuse paths, extract-if-duplicated 
 | New UI fix duplicates inline Tailwind | Observed in audit (25+ files) | Reviewer + `frontend.mdc` flag |
 | Planner instructions include UI reuse | Rare (fix 2.5.3 exception) | Every frontend `coder_*.md` / `fix_*.md` |
 | Rule update touch points | 2–7 files per concept | 1 `.mdc` file |
+| Stages with `DOCS_SYNCED` after commit | Rare / manual | Every `TEST_PASS` → commit → docs cycle |
+| Commits without prior `TEST_PASS` | Observed in ad-hoc work | Zero for stage/fix work |
 
 ---
 
@@ -435,6 +728,8 @@ Body: link `agent_docs/ui/design_system.md`, reuse paths, extract-if-duplicated 
 | Component catalogue | `agent_docs/ui/components.md` |
 | Consistency audit | `agent_docs/reports/frontend_design_consistency_audit.md` |
 | Fix 2.5.3 (example UI instruction) | `agent_docs/instructions/fix_2.5.3.md` |
+| Docs sync command | `.cursor/commands/docs-create-diff.md` |
+| Progress status examples | `agent_docs/progress/stage_1.md`, `stage_2.md` |
 | Cursor rule format skill | `create-rule` skill (`.mdc` frontmatter spec) |
 
 ---
@@ -444,3 +739,4 @@ Body: link `agent_docs/ui/design_system.md`, reuse paths, extract-if-duplicated 
 | Date | Change |
 |------|--------|
 | 2026-07-10 | Initial proposal: inventory, frontend analysis, 3-layer target, migration plan. No repo rules modified. |
+| 2026-07-10 | §13: end-to-end workflow (instruction → code → test → commit → docs-create-diff); `workflow.mdc` in target tree; migration Phase 4 updated. |

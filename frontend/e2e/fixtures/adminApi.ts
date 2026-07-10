@@ -437,7 +437,7 @@ export function ensureLoadedContestDevState(): void {
   );
 }
 
-/** E2E hybrid: rounds 1–9 PUBLISHED, round 10 ACTIVE, demo user ACCEPTED. */
+/** E2E hybrid: rounds 1–9 PUBLISHED, round 10 ACTIVE, contracted user ACCEPTED. */
 export const DEV_SETUP_E2E_HYBRID =
   "--ensure-running-only --e2e-with-published";
 

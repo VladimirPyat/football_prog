@@ -67,30 +67,9 @@ async def _contracted_logins() -> set[str]:
 async def _restrict_participants_to_contracted(
     session: AsyncSession, contest_id: int
 ) -> None:
-    """Only contracted CSV users stay ACCEPTED — bootstrap admin/demo must not add score rows."""
+    """Only contracted CSV users stay ACCEPTED — bootstrap admin must not add score rows."""
     allowed = await _contracted_logins()
     await _apply_participant_allowlist(session, contest_id, allowed)
-
-
-async def _ensure_demo_user_accepted(
-    session: AsyncSession, contest_id: int, *, demo_login: str
-) -> None:
-    """Re-accept bootstrap demo login after contracted-only scoring (E2E hybrid)."""
-    user = await session.scalar(select(User).where(User.login == demo_login))
-    if user is None:
-        logger.warning("Demo login %s not found — skip ACCEPTED", demo_login)
-        return
-    part = await session.scalar(
-        select(ContestParticipant).where(
-            ContestParticipant.contest_id == contest_id,
-            ContestParticipant.user_id == user.id,
-        )
-    )
-    if part is None:
-        logger.warning("Demo participant missing for %s — skip ACCEPTED", demo_login)
-        return
-    part.status = ParticipantStatus.ACCEPTED.value
-    logger.info("Demo participant %s set ACCEPTED (e2e hybrid)", demo_login)
 
 
 async def _apply_participant_allowlist(
@@ -371,10 +350,6 @@ async def finalize_dev_fixture(
     if profile not in ("manual", "e2e_with_published"):
         raise ValueError(f"Unknown profile: {profile!r}")
 
-    from config.settings import get_settings
-
-    demo_login = get_settings().seed_demo_user_login
-
     engine = create_engine()
     session_factory = create_session_factory(engine)
     async with session_factory() as session:
@@ -393,10 +368,6 @@ async def finalize_dev_fixture(
             await ensure_round_11_closed(
                 session, contest_id, reference_now=reference_now
             )
-            if profile == "e2e_with_published":
-                await _ensure_demo_user_accepted(
-                    session, contest_id, demo_login=demo_login
-                )
     await engine.dispose()
     logger.info("Dev fixture finalized for contest %s (profile=%s)", contest_id, profile)
 
