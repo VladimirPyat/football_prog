@@ -2,6 +2,8 @@
 
 import type { ContestListItem } from "@/types/api";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { StatusChip } from "@/components/ui/StatusChip";
 
 interface ContestListProps {
   contests: ContestListItem[];
@@ -26,7 +28,7 @@ export function ContestList({
   if (loading) return <LoadingState />;
 
   if (!contests.length) {
-    return <p className="text-gray-500 py-8 text-center">Нет доступных конкурсов</p>;
+    return <EmptyState message="Нет доступных конкурсов" />;
   }
 
   return (
@@ -41,9 +43,11 @@ export function ContestList({
               className="w-full text-left px-4 py-3 hover:bg-gray-50 flex justify-between items-center"
             >
               <span className="font-medium text-gray-900">{c.name}</span>
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                {STATUS_LABELS[c.status] ?? c.status}
-              </span>
+              <StatusChip
+                kind="contest"
+                status={c.status}
+                label={STATUS_LABELS[c.status] ?? c.status}
+              />
             </button>
           </li>
         ))}

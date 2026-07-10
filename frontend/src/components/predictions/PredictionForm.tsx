@@ -15,6 +15,7 @@ import {
   type MatchScoreState,
 } from "@/lib/validation/prediction";
 import type { MatchOut, PredictionEntryOut, RoundOut } from "@/types/api";
+import { Button } from "@/components/ui/Button";
 
 interface PredictionFormProps {
   contestId: number;
@@ -166,17 +167,17 @@ export function PredictionForm({
 
       <div className="flex gap-3 pt-2">
         {editing ? (
-          <button
+          <Button
             type="button"
             onClick={handleSave}
             disabled={!batchComplete || submitting || readonly || hasOutOfRange}
-            className="bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Сохранить прогноз
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => setEditing(true)}
             disabled={
               deadline.deadlinePassed ||
@@ -184,10 +185,9 @@ export function PredictionForm({
               round.status !== "ACTIVE" ||
               contestPaused
             }
-            className="border border-gray-300 rounded px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Редактировать
-          </button>
+          </Button>
         )}
       </div>
     </div>

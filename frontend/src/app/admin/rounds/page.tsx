@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { AdminPageShell } from "@/components/admin/AdminPageShell";
 import { RoundManagementPanel } from "@/components/admin/RoundManagementPanel";
 import { useContestAdmin } from "@/hooks/useContestAdmin";
 import { useAdminRounds } from "@/hooks/useAdminRounds";
 import { useRoundMatches } from "@/hooks/useRoundMatches";
 import { useTeams } from "@/hooks/useTeams";
+import { usePersistedRoundSelection } from "@/hooks/usePersistedRoundSelection";
 import { useToast } from "@/hooks/useToast";
 import { isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
+import { pickDefaultAdminRound } from "@/lib/contest/pickDefaultRound";
 import { AppError } from "@/lib/api/client";
 
 export default function AdminRoundsPage() {
@@ -23,10 +25,20 @@ export default function AdminRoundsPage() {
     createFreeTour,
   } = useAdminRounds(contestId);
   const { teams } = useTeams(contestId);
-  const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
+
+  const pickDefault = useCallback(() => pickDefaultAdminRound(rounds), [rounds]);
+
+  const { selectedRoundId, setSelectedRoundId } = usePersistedRoundSelection({
+    contestId,
+    scope: "admin-rounds",
+    rounds,
+    pickDefault,
+  });
+
   const handleDeadlinePassed = useCallback(() => {
     void refetchRounds();
   }, [refetchRounds]);
+
   const {
     matches,
     deadlinePassed,
@@ -46,12 +58,6 @@ export default function AdminRoundsPage() {
       void refetchRounds();
     }
   }, [effectiveDeadlinePassed, selectedRound?.status, selectedRound?.id, refetchRounds]);
-
-  useEffect(() => {
-    if (rounds.length && !selectedRoundId) {
-      setSelectedRoundId(rounds[rounds.length - 1].id);
-    }
-  }, [rounds, selectedRoundId]);
 
   if (!contest) return null;
 

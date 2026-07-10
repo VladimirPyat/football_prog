@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { participantInviteSchema } from "@/lib/validation/admin";
+import { Button } from "@/components/ui/Button";
 
 interface ParticipantInviteFormProps {
   disabled?: boolean;
@@ -101,13 +102,9 @@ export function ParticipantInviteForm({ disabled = false, onSubmit }: Participan
           className="w-full border border-gray-300 rounded px-3 py-2 text-sm disabled:bg-gray-100"
         />
       </div>
-      <button
-        type="submit"
-        disabled={disabled || submitting}
-        className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button type="submit" disabled={disabled || submitting}>
         Пригласить
-      </button>
+      </Button>
     </form>
   );
 }

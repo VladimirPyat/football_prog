@@ -3,6 +3,8 @@
 import { matchStatusLabel, roundStatusHint, roundStatusLabel } from "@/lib/admin/format";
 import { effectiveRoundStatus, isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
 import type { ContestOut, MatchOut, RoundOut } from "@/types/api";
+import { Callout } from "@/components/ui/Callout";
+import { StatusChip } from "@/components/ui/StatusChip";
 
 interface RoundStatusSidebarProps {
   contest: ContestOut;
@@ -10,14 +12,6 @@ interface RoundStatusSidebarProps {
   matches: MatchOut[];
   deadlinePassed: boolean;
 }
-
-const STATUS_BADGE: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-800",
-  ACTIVE: "bg-green-100 text-green-800",
-  CLOSED: "bg-orange-100 text-orange-800",
-  CALCULATED: "bg-blue-100 text-blue-800",
-  PUBLISHED: "bg-purple-100 text-purple-800",
-};
 
 const POST_DEADLINE_HINT =
   "Дедлайн прогнозов прошёл. Прогнозы закрыты; ввод результатов — на вкладке «Результаты».";
@@ -30,30 +24,20 @@ export function RoundStatusSidebar({
 }: RoundStatusSidebarProps) {
   const passed = deadlinePassed || isDeadlinePassedNow(round.deadline);
   const displayStatus = effectiveRoundStatus(round, passed);
-  const badgeClass = STATUS_BADGE[displayStatus] ?? "bg-gray-100 text-gray-800";
-  const hint = roundStatusHint(displayStatus);
-
-  const activeHint =
+  const baseHint = roundStatusHint(displayStatus);
+  const hint =
     displayStatus === "ACTIVE"
       ? "Тур активен. Состав фиксирован; до начала матча — перенос времени, отмена или свободный тур."
       : displayStatus === "CLOSED" && round.status === "ACTIVE" && passed
         ? POST_DEADLINE_HINT
-        : hint;
+        : baseHint;
 
   return (
     <aside className="border border-gray-200 rounded-lg p-4 space-y-4 h-fit">
       <h3 className="text-sm font-semibold text-gray-900">Статус тура</h3>
-      <div>
-        <span className={`inline-block text-xs font-semibold px-2 py-1 rounded ${badgeClass}`}>
-          {roundStatusLabel(displayStatus)}
-        </span>
-      </div>
+      <StatusChip kind="round" status={displayStatus} label={roundStatusLabel(displayStatus)} />
 
-      {activeHint && (
-        <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded px-3 py-2">
-          {activeHint}
-        </p>
-      )}
+      {hint && <Callout variant="info">{hint}</Callout>}
 
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between gap-2">

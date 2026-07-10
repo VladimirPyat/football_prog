@@ -4,6 +4,7 @@ import { useState } from "react";
 import { fromDatetimeLocal, toDatetimeLocal } from "@/lib/admin/format";
 import { nextMatchDateTime } from "@/lib/admin/roundBuilderDefaults";
 import { roundBuilderSchema } from "@/lib/validation/admin";
+import { Button } from "@/components/ui/Button";
 import type { TeamOut } from "@/types/api";
 
 interface MatchDraft {
@@ -183,13 +184,13 @@ export function RoundBuilderForm({
                   />
                 </div>
                 {matches.length > 1 && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghostLink"
                     onClick={() => setMatches((prev) => prev.filter((_, j) => j !== i))}
-                    className="text-sm text-red-600"
                   >
                     Удалить
-                  </button>
+                  </Button>
                 )}
               </div>
               {(dateError || team2Error) && (
@@ -202,24 +203,15 @@ export function RoundBuilderForm({
           <p className="text-sm text-red-600">{errors.matches}</p>
         )}
         {matches.length < matchesPerRound && (
-          <button
-            type="button"
-            onClick={addMatch}
-            disabled={disabled}
-            className="text-sm text-blue-600 hover:underline"
-          >
+          <Button type="button" variant="link" onClick={addMatch} disabled={disabled}>
             + Добавить матч
-          </button>
+          </Button>
         )}
       </div>
 
-      <button
-        type="submit"
-        disabled={disabled || submitting}
-        className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button type="submit" disabled={disabled || submitting}>
         {isEditing ? "Сохранить черновик" : "Создать черновик тура"}
-      </button>
+      </Button>
     </form>
   );
 }

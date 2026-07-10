@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiPost, AppError } from "@/lib/api/client";
 import { auth as authEndpoints } from "@/lib/api/endpoints";
 import type { PasswordResetResponse } from "@/types/api";
+import { Button } from "@/components/ui/Button";
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -155,27 +156,23 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             />
           </div>
           {resetMessage && <p className="text-sm text-gray-700">{resetMessage}</p>}
-          <button
+          <Button
             type="button"
+            fullWidth
             disabled={resetting}
             onClick={() => {
               void handleReset({ preventDefault: () => {} } as FormEvent);
             }}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
             {resetting ? "Отправка…" : "Отправить ссылку для восстановления"}
-          </button>
+          </Button>
         </div>
       )}
 
       {apiError && <p className="text-red-600 text-sm">{apiError}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button type="submit" fullWidth disabled={submitting}>
         {submitting ? "Вход…" : "Войти"}
-      </button>
+      </Button>
     </form>
   );
 }

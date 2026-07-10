@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { deriveAdminUiMode } from "@/lib/admin/deriveAdminUiMode";
-import { formatRoundOptionLabel } from "@/lib/admin/roundLabel";
+import { formatRoundOptionLabel, formatRoundTitle } from "@/lib/admin/roundLabel";
 import { effectiveRoundStatus, isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
 import {
   BONUSES_PENDING_FALLBACK_MESSAGE,
@@ -12,8 +12,13 @@ import { roundStatusHint } from "@/lib/admin/format";
 import type { ContestOut, MatchOut, RoundOut } from "@/types/api";
 import { MatchResultRow } from "@/components/admin/MatchResultRow";
 import { RoundResultsPreview } from "@/components/admin/RoundResultsPreview";
+import { AdminTable, AdminTh } from "@/components/ui/AdminTable";
+import { Button } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { Modal } from "@/components/ui/Modal";
+import { Select } from "@/components/ui/Select";
 import { apiGet } from "@/lib/api/client";
 import { contestAdmin } from "@/lib/api/endpoints";
 
@@ -120,24 +125,23 @@ export function ResultsEntryPanel({
   return (
     <div className="space-y-6">
       {eligibleRounds.length === 0 && (
-        <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded px-4 py-3">
+        <Callout variant="info">
           Нет туров, готовых к вводу результатов. Дождитесь окончания дедлайна активного тура.
-        </p>
+        </Callout>
       )}
 
       {activeRoundId != null && activeDeadlinePassed && eligibleRounds.length === 0 && (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-4 py-3">
+        <Callout variant="warning">
           Дедлайн прогнозов прошёл. Прогнозы закрыты; ввод результатов — на этой вкладке после
           обновления списка туров.
-        </p>
+        </Callout>
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm text-gray-700">Тур:</label>
-        <select
+        <Select
+          label="Тур:"
           value={selectedRoundId ?? ""}
           onChange={(e) => onSelectRound(Number(e.target.value))}
-          className="border border-gray-300 rounded px-3 py-1 text-sm"
         >
           <option value="">Выберите тур</option>
           {eligibleRounds.map((r) => (
@@ -145,7 +149,7 @@ export function ResultsEntryPanel({
               {formatRoundOptionLabel(r)}
             </option>
           ))}
-        </select>
+        </Select>
         {selectedRound && uiMode.showAppliedBadge && (
           <span className="text-sm font-medium text-green-700 bg-green-50 px-2 py-1 rounded">
             Применено
@@ -155,58 +159,54 @@ export function ResultsEntryPanel({
 
       {selectedRound && (
         <>
-          <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+          <Callout variant="info">
             {roundStatusHint(displayRoundStatus ?? selectedRound.status)}
-          </p>
+          </Callout>
 
           <p className="text-sm text-gray-600">
             {resultsStatusHint(displayRoundStatus ?? selectedRound.status)}
           </p>
 
           {showBonusesPendingNote && (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            <Callout variant="warning">
               {bonusesPendingMessage ?? BONUSES_PENDING_FALLBACK_MESSAGE}
-            </p>
+            </Callout>
           )}
 
           {displayRoundStatus === "CLOSED" && (
-            <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+            <Callout variant="info">
               Счёт можно вносить после времени начала каждого матча.
-            </p>
+            </Callout>
           )}
 
-          <div className="overflow-x-auto border border-gray-200 rounded-lg">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left">Матч</th>
-                  <th className="px-3 py-2 text-left">Дата</th>
-                  <th className="px-3 py-2 text-left">Статус</th>
-                  <th className="px-3 py-2 text-left">Счёт</th>
-                  <th className="px-3 py-2 text-left">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matches.map((m) => (
-                  <MatchResultRow
-                    key={m.id}
-                    match={m}
-                    roundStatus={displayRoundStatus ?? selectedRound.status}
-                    maxScore={maxScore}
-                    scoresReadonly={uiMode.resultsReadonly || !uiMode.canEnterResults}
-                    canVoid={uiMode.canVoidMatch && m.status !== "VOID"}
-                    onSave={onSaveResult}
-                    onVoid={(id) => setVoidId(id)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdminTable
+            headers={
+              <>
+                <AdminTh>Матч</AdminTh>
+                <AdminTh>Дата</AdminTh>
+                <AdminTh>Статус</AdminTh>
+                <AdminTh>Счёт</AdminTh>
+                <AdminTh>Действия</AdminTh>
+              </>
+            }
+          >
+            {matches.map((m) => (
+              <MatchResultRow
+                key={m.id}
+                match={m}
+                roundStatus={displayRoundStatus ?? selectedRound.status}
+                maxScore={maxScore}
+                scoresReadonly={uiMode.resultsReadonly || !uiMode.canEnterResults}
+                canVoid={uiMode.canVoidMatch && m.status !== "VOID"}
+                onSave={onSaveResult}
+                onVoid={(id) => setVoidId(id)}
+              />
+            ))}
+          </AdminTable>
 
           <div className="flex flex-wrap gap-3">
             {uiMode.canCalculate && allFinished && (
-              <button
-                type="button"
+              <Button
                 disabled={working}
                 onClick={async () => {
                   setWorking(true);
@@ -216,14 +216,13 @@ export function ResultsEntryPanel({
                     setWorking(false);
                   }
                 }}
-                className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
               >
                 Рассчитать
-              </button>
+              </Button>
             )}
             {uiMode.canPublish && (
-              <button
-                type="button"
+              <Button
+                variant="success"
                 disabled={working}
                 onClick={async () => {
                   setWorking(true);
@@ -233,78 +232,56 @@ export function ResultsEntryPanel({
                     setWorking(false);
                   }
                 }}
-                className="px-4 py-2 text-sm text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
               >
                 Опубликовать
-              </button>
+              </Button>
             )}
             {selectedRound.status === "CALCULATED" && (
-              <button
-                type="button"
-                onClick={() => setPreviewOpen(true)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-              >
+              <Button variant="secondary" onClick={() => setPreviewOpen(true)}>
                 Результаты участников
-              </button>
+              </Button>
             )}
             {displayRoundStatus === "CLOSED" && (
               <span
                 title="Сначала рассчитайте тур"
-                className="px-4 py-2 text-sm border border-gray-200 rounded text-gray-400 cursor-not-allowed"
+                className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-400 cursor-not-allowed"
               >
                 Результаты участников
               </span>
             )}
             {selectedRound.status === "PUBLISHED" && (
-              <button
-                type="button"
-                onClick={() => setPreviewOpen(true)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-              >
+              <Button variant="secondary" onClick={() => setPreviewOpen(true)}>
                 Результаты участников
-              </button>
+              </Button>
             )}
           </div>
         </>
       )}
 
-      {previewOpen && selectedRound && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lb-preview-title"
-        >
-          <div className="bg-white rounded-lg shadow-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 id="lb-preview-title" className="text-lg font-semibold">
-                Результаты участников — тур {selectedRound.number}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setPreviewOpen(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl leading-none"
-                aria-label="Закрыть"
-              >
-                ×
-              </button>
-            </div>
-            <RoundResultsPreview
-              contestId={contest.id}
-              roundId={selectedRound.id}
-              roundNumber={selectedRound.number}
-              preview={selectedRound.status === "CALCULATED"}
-            />
-            <button
-              type="button"
-              onClick={() => setPreviewOpen(false)}
-              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={previewOpen && selectedRound != null}
+        onClose={() => setPreviewOpen(false)}
+        title={
+          selectedRound
+            ? `Результаты участников — ${formatRoundTitle(selectedRound)}`
+            : undefined
+        }
+        size="xl"
+        footer={
+          <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
+            Закрыть
+          </Button>
+        }
+      >
+        {selectedRound && (
+          <RoundResultsPreview
+            contestId={contest.id}
+            roundId={selectedRound.id}
+            roundLabel={formatRoundTitle(selectedRound)}
+            preview={selectedRound.status === "CALCULATED"}
+          />
+        )}
+      </Modal>
 
       <ConfirmDialog
         open={voidId !== null}

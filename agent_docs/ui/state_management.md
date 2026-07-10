@@ -83,7 +83,9 @@ Each hook returns `{ data, error, loading, refetch }`. Errors are typed `AppErro
 | Predictions (pre-deadline) | no cache, always fresh |
 | Auth user | context only; re-hydrate on reload |
 
-`localStorage` keys: `fp_access_token`, `fp_etag:<url>`, `fp_cache:<url>` (public read-only data only — never predictions).
+| `fp_selected_round:{contestId}:{scope}` | Last selected round per page context (`contest-public`, `predict`, `admin-rounds`, `admin-results`) — 2.5.3 |
+
+`localStorage` keys: `fp_access_token`, `fp_active_contest_id`, `fp_selected_round:{contestId}:{scope}`, `fp_etag:<url>`, `fp_cache:<url>` (public read-only data only — never predictions).
 
 ---
 
@@ -157,4 +159,4 @@ Phase derivation lives in **`deriveAdminUiMode(contest, round, { deadlinePassed 
 | 2026-06-28 | Stage 2.3.4: ContestProvider refetch on id change; `useContestStartReadiness`; `contest-setup-changed` events. |
 | 2026-06-28 | Stage 2.3.5: `effectiveRoundStatus`; `useRoundMatches.onDeadlinePassed`; rounds refetch on deadline transition. |
 | 2026-06-28 | Stage 2.2: `usePredictionsView`, `usePredictionSubmit`, `useDeadline`, `useMaxScore`, `useRounds`. |
-| 2026-07-08 | Stage 2.4: `useLeaderboard`, `useRoundResults`; `contestPublic` path builders; PUBLISHED gate via `shouldFetchPublicResults`. |
+| 2026-07-10 | Stage 2.5.3: `usePersistedRoundSelection`; `fp_selected_round:{contestId}:{scope}` localStorage keys. |

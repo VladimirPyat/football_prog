@@ -31,6 +31,8 @@ export function ResultsRowDetail({ row, matches }: ResultsRowDetailProps) {
         </ul>
       </section>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-gray-100 pt-3">
+        <dt className="text-gray-500">Исход</dt>
+        <dd className="text-right tabular-nums">{row.correct_outcomes}</dd>
         <dt className="text-gray-500">Бонус 1</dt>
         <dd className="text-right tabular-nums">{row.bonus1 ?? "—"}</dd>
         <dt className="text-gray-500">Бонус 2</dt>

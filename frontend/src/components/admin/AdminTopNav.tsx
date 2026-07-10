@@ -9,6 +9,7 @@ import { apiPost } from "@/lib/api/client";
 import { contests } from "@/lib/api/endpoints";
 import { useContest } from "@/hooks/useContest";
 import { useToast } from "@/hooks/useToast";
+import { Button } from "@/components/ui/Button";
 import type { ContestOut } from "@/types/api";
 import { AppError } from "@/lib/api/client";
 
@@ -72,13 +73,9 @@ export function AdminTopNav() {
         </div>
         <div className="px-4 py-3 flex flex-wrap items-center justify-end gap-3">
           <ContestPicker adminMode />
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="text-sm text-white bg-blue-600 px-3 py-1.5 rounded hover:bg-blue-700"
-          >
+          <Button size="sm" onClick={() => setShowCreate(true)}>
             + Новый конкурс
-          </button>
+          </Button>
         </div>
       </nav>
       <CreateContestForm

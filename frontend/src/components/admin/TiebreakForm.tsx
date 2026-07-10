@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { tiebreakSchema } from "@/lib/validation/admin";
+import { Button } from "@/components/ui/Button";
 
 interface TiebreakFormProps {
   initialPoints: number;
@@ -44,20 +45,12 @@ export function TiebreakForm({ initialPoints, onSubmit, onCancel }: TiebreakForm
         {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
       </div>
       <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-        >
+        <Button type="button" variant="secondary" onClick={onCancel}>
           Отмена
-        </button>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
+        </Button>
+        <Button type="submit" disabled={submitting}>
           Сохранить
-        </button>
+        </Button>
       </div>
     </form>
   );

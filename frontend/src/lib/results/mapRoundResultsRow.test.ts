@@ -46,6 +46,7 @@ describe("mapRoundResultsRow", () => {
   it("aligns points[] to match order as match_points[]", () => {
     const row = mapRoundResultsRow(baseRow, [10, 20]);
     expect(row.match_points).toEqual([4, 8]);
+    expect(row.correct_outcomes).toBe(2);
     expect(row.total_without_bonus).toBe(12);
     expect(row.total).toBe(15);
   });

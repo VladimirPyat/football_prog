@@ -11,6 +11,7 @@ import { HeaderDateTime } from "@/components/layout/HeaderDateTime";
 import { MobileMenuButton } from "@/components/layout/MobileMenuButton";
 import { UserSidebarLayout } from "@/components/layout/UserSidebarLayout";
 import { UserNavProvider } from "@/providers/UserNavProvider";
+import { Button } from "@/components/ui/Button";
 
 interface AppShellProps {
   children: ReactNode;
@@ -61,22 +62,14 @@ function AppShellInner({ children }: AppShellProps) {
                     </Link>
                   )
                 )}
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="text-sm text-gray-600 hover:text-red-600 border border-gray-300 rounded px-3 py-1"
-                >
+                <Button variant="secondary" size="sm" onClick={logout}>
                   Выйти
-                </button>
+                </Button>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={() => setLoginOpen(true)}
-                className="text-sm bg-blue-600 text-white rounded px-4 py-1.5 hover:bg-blue-700"
-              >
+              <Button size="sm" onClick={() => setLoginOpen(true)}>
                 Вход
-              </button>
+              </Button>
             )}
           </div>
         </div>

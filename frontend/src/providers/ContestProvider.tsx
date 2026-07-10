@@ -46,6 +46,7 @@ export function ContestProvider({ children }: { children: ReactNode }) {
     setContestIdState(id);
     setActiveContestId(id);
     if (fetchDetails) {
+      setContest((prev) => (prev?.id !== id ? null : prev));
       try {
         const details = await fetchContestDetails(id);
         setContest(details);

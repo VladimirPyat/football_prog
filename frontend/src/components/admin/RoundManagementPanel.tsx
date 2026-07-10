@@ -29,6 +29,11 @@ import { FreeTourModal } from "@/components/admin/FreeTourModal";
 import { NewsletterPromptModal } from "@/components/admin/NewsletterPromptModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { AdminTh } from "@/components/ui/AdminTable";
+import { Button } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { DataTable } from "@/components/ui/DataTable";
+import { Select } from "@/components/ui/Select";
 import { useAuth } from "@/hooks/useAuth";
 import type { ContestOut, MatchOut, MatchStatus, RoundOut, TeamOut } from "@/types/api";
 
@@ -259,11 +264,10 @@ export function RoundManagementPanel({
     <div className="space-y-6">
       {/* Selector row — "Тур" select + «+ Создать тур» always beside it (§10.2) */}
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm text-gray-700">Тур:</label>
-        <select
+        <Select
+          label="Тур:"
           value={selectedRoundId ?? ""}
           onChange={(e) => onSelectRound(Number(e.target.value))}
-          className="border border-gray-300 rounded px-3 py-1 text-sm"
         >
           <option value="">Выберите тур</option>
           {rounds.map((r) => (
@@ -271,30 +275,18 @@ export function RoundManagementPanel({
               {formatRoundOptionLabel(r)}
             </option>
           ))}
-        </select>
+        </Select>
 
-        {/* «+ Создать тур» always visible, disabled at cap / draft (§10.2) */}
         {!uiMode.disableAllMutations && (
-          <button
-            type="button"
-            disabled={createDisabled}
-            title={createTooltip}
-            onClick={() => setShowCreateForm((v) => !v)}
-            className="px-3 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <Button size="sm" disabled={createDisabled} title={createTooltip} onClick={() => setShowCreateForm((v) => !v)}>
             + Создать тур
-          </button>
+          </Button>
         )}
 
-        {/* «+ Добавить свободный тур» as secondary link */}
         {!uiMode.disableAllMutations && !hasDraft && (
-          <button
-            type="button"
-            onClick={() => setShowFreeTour(true)}
-            className="text-sm text-blue-600 hover:underline"
-          >
+          <Button variant="link" onClick={() => setShowFreeTour(true)}>
             + Добавить свободный тур
-          </button>
+          </Button>
         )}
       </div>
 
@@ -343,20 +335,16 @@ export function RoundManagementPanel({
                   {/* DRAFT: Редактировать / Активировать */}
                   {selectedRound.status === "DRAFT" && !uiMode.disableAllMutations && (
                     <div className="flex gap-2">
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setShowDraftEdit((v) => !v)}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
                       >
                         {showDraftEdit ? "Свернуть" : "Редактировать"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowActivate(true)}
-                        className="px-4 py-2 text-sm text-white bg-green-600 rounded hover:bg-green-700"
-                      >
+                      </Button>
+                      <Button variant="success" size="sm" onClick={() => setShowActivate(true)}>
                         Активировать
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -389,17 +377,17 @@ export function RoundManagementPanel({
 
                 {/* ACTIVE: phase-aware hints */}
                 {effectiveStatus === "ACTIVE" && (
-                  <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 mb-3">
+                  <Callout variant="info" className="mb-3">
                     Тур активен. Состав матчей изменить нельзя. До начала матча можно перенести
                     время; отмена — в любой момент. Перенос на другую неделю — статус «Перенесён» и
                     свободный тур.
-                  </p>
+                  </Callout>
                 )}
                 {uiMode.showDeadlinePassedHint && (
-                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
+                  <Callout variant="warning" className="mb-3">
                     Дедлайн прогнозов прошёл. Прогнозы закрыты; ввод результатов — на вкладке
                     «Результаты».
-                  </p>
+                  </Callout>
                 )}
 
                 {/* Deadline editor (hidden in DRAFT inline edit — form has its own field) */}
@@ -427,58 +415,47 @@ export function RoundManagementPanel({
 
                 {/* Match table (DRAFT full or ACTIVE depending on phase) */}
                 {effectiveStatus !== "DRAFT" || !showDraftEdit ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Матч</th>
-                          <th className="px-3 py-2 text-left">Дата</th>
-                          <th className="px-3 py-2 text-left">Статус</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {localMatches.map((m) => (
-                          <MatchEditorRow
-                            key={m.id}
-                            match={m}
-                            roundStatus={effectiveStatus ?? selectedRound.status}
-                            isAdmin={isAdmin}
-                            teams={teams}
-                            canEditStructure={uiMode.canEditRoundStructure}
-                            canEditStatusAndDate={uiMode.canEditMatchStatusAndDate}
-                            onRequestAction={(action, match) =>
-                              setPendingMatchAction({ action, match })
-                            }
-                            onChange={(patch) => {
-                              setSaveError(null);
-                              setLocalMatches((prev) =>
-                                prev.map((row) => (row.id === m.id ? { ...row, ...patch } : row)),
-                              );
-                            }}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable variant="admin">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <AdminTh>Матч</AdminTh>
+                        <AdminTh>Дата</AdminTh>
+                        <AdminTh>Статус</AdminTh>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {localMatches.map((m) => (
+                        <MatchEditorRow
+                          key={m.id}
+                          match={m}
+                          roundStatus={effectiveStatus ?? selectedRound.status}
+                          isAdmin={isAdmin}
+                          teams={teams}
+                          canEditStructure={uiMode.canEditRoundStructure}
+                          canEditStatusAndDate={uiMode.canEditMatchStatusAndDate}
+                          onRequestAction={(action, match) =>
+                            setPendingMatchAction({ action, match })
+                          }
+                          onChange={(patch) => {
+                            setSaveError(null);
+                            setLocalMatches((prev) =>
+                              prev.map((row) => (row.id === m.id ? { ...row, ...patch } : row)),
+                            );
+                          }}
+                        />
+                      ))}
+                    </tbody>
+                  </DataTable>
                 ) : null}
 
-                {saveError && (
-                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mt-4">
-                    {saveError}
-                  </p>
-                )}
+                {saveError && <Callout variant="error" className="mt-4">{saveError}</Callout>}
 
                 {(effectiveStatus === "ACTIVE" || effectiveStatus === "DRAFT") &&
                   !uiMode.disableAllMutations &&
                   effectiveStatus !== "DRAFT" && (
-                    <button
-                      type="button"
-                      onClick={handleSaveActive}
-                      disabled={saveDisabled}
-                      className="mt-4 px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-                    >
+                    <Button className="mt-4" disabled={saveDisabled} onClick={handleSaveActive}>
                       Сохранить изменения
-                    </button>
+                    </Button>
                   )}
 
                 {selectedRound.deadline && (

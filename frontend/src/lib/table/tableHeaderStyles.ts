@@ -5,3 +5,8 @@ export const TH_STICKY = `${TH_BASE} sticky bg-gray-50 z-10`;
 export const TH_GROUP = `${TH_BASE} bg-gray-50`;
 export const TH_BONUS = `${TH_BASE} bg-amber-50/80`;
 export const TH_TOTAL = `${TH_BASE} bg-green-50`;
+
+/** Admin CRUD / match list tables */
+export const TH_ADMIN = "px-3 py-2 text-left text-sm font-medium text-gray-700";
+export const TD_ADMIN = "px-3 py-2";
+export const TR_ADMIN_BORDER = "border-t border-gray-200";

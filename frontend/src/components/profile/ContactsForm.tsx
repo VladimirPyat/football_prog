@@ -6,6 +6,7 @@ import { useContacts } from "@/hooks/useContacts";
 import { useToast } from "@/hooks/useToast";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { AppError } from "@/lib/api/client";
+import { Button } from "@/components/ui/Button";
 
 export function ContactsForm() {
   const { contacts, loading, readonly, save } = useContacts();
@@ -125,13 +126,9 @@ export function ContactsForm() {
           </label>
         </div>
         {!readonly && (
-          <button
-            type="submit"
-            disabled={submitting}
-            className="bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
+        <Button type="submit" disabled={submitting}>
             {submitting ? "Сохранение…" : "Сохранить"}
-          </button>
+          </Button>
         )}
       </form>
     </section>

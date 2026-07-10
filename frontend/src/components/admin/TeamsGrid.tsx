@@ -6,6 +6,7 @@ import type { TeamOut } from "@/types/api";
 import { TeamForm } from "@/components/admin/TeamForm";
 import { TeamLogoUpload } from "@/components/admin/TeamLogoUpload";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Button } from "@/components/ui/Button";
 import { useState } from "react";
 
 interface TeamsGridProps {
@@ -74,20 +75,12 @@ export function TeamsGrid({
               <div className="flex flex-wrap gap-2">
                 {!readonly && (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(team.id)}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
+                    <Button type="button" variant="link" onClick={() => setEditingId(team.id)}>
                       Редактировать
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteId(team.id)}
-                      className="text-sm text-red-600 hover:underline"
-                    >
+                    </Button>
+                    <Button type="button" variant="ghostLink" onClick={() => setDeleteId(team.id)}>
                       Удалить
-                    </button>
+                    </Button>
                     <TeamLogoUpload onUpload={(file) => onUploadLogo(team.id, file)} />
                   </>
                 )}

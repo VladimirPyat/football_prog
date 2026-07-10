@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { teamFormSchema } from "@/lib/validation/admin";
+import { Button } from "@/components/ui/Button";
 
 interface TeamFormProps {
   readonly?: boolean;
@@ -77,21 +78,13 @@ export function TeamForm({
       </div>
       {!readonly && (
         <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={submitting}>
             {submitLabel}
-          </button>
+          </Button>
           {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
-            >
+            <Button type="button" variant="secondary" onClick={onCancel}>
               Отмена
-            </button>
+            </Button>
           )}
         </div>
       )}

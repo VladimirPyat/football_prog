@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { validateLogoFile } from "@/lib/validation/admin";
+import { Button } from "@/components/ui/Button";
 
 interface TeamLogoUploadProps {
   disabled?: boolean;
@@ -35,14 +36,14 @@ export function TeamLogoUpload({ disabled = false, onUpload }: TeamLogoUploadPro
 
   return (
     <div>
-      <button
+      <Button
         type="button"
+        variant="link"
         disabled={disabled || uploading}
         onClick={() => inputRef.current?.click()}
-        className="text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
       >
         {uploading ? "Загрузка…" : "Загрузить логотип"}
-      </button>
+      </Button>
       <input
         ref={inputRef}
         type="file"

@@ -47,10 +47,12 @@ export function useContestAdmin() {
     return apiGet<ContestOut>(contests.byId(effectiveId));
   }, [effectiveId]);
 
+  const isStale = contest != null && contest.id !== effectiveId;
+
   return {
     contestId: effectiveId,
     contest,
-    loading,
+    loading: loading || isStale,
     error,
     refetch,
     patchContest,

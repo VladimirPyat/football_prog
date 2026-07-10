@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ContestOut } from "@/types/api";
+import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface LifecyclePanelProps {
@@ -91,62 +92,36 @@ export function LifecyclePanel({
 
       <div className="flex flex-wrap gap-3">
         {contest.status === "RUNNING" && (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setConfirmAction("pause")}
-            className="px-4 py-2 text-sm text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
-          >
+          <Button variant="warning" disabled={disabled} onClick={() => setConfirmAction("pause")}>
             Пауза
-          </button>
+          </Button>
         )}
         {contest.status === "PAUSED" && (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setConfirmAction("resume")}
-            className="px-4 py-2 text-sm text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50"
-          >
+          <Button variant="success" disabled={disabled} onClick={() => setConfirmAction("resume")}>
             Возобновить
-          </button>
+          </Button>
         )}
         {contest.status !== "FINISHED" && showFinishDelete && (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setConfirmAction("finish")}
-            className="px-4 py-2 text-sm text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
-          >
+          <Button variant="danger" disabled={disabled} onClick={() => setConfirmAction("finish")}>
             Завершить
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setConfirmAction("recalculate")}
-          className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
-        >
+        <Button variant="secondary" disabled={disabled} onClick={() => setConfirmAction("recalculate")}>
           Пересчитать
-        </button>
+        </Button>
         {showFinishDelete && (
-          <button
-            type="button"
+          <Button
+            variant="dangerOutline"
             disabled={disabled}
             onClick={() => setConfirmAction("delete")}
-            className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50 disabled:opacity-50"
           >
             Удалить конкурс
-          </button>
+          </Button>
         )}
         {restoreAvailable && onRestore && contest.status === "DRAFT" && (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setConfirmAction("restore")}
-            className="px-4 py-2 text-sm text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50"
-          >
+          <Button variant="indigo" disabled={disabled} onClick={() => setConfirmAction("restore")}>
             Восстановить
-          </button>
+          </Button>
         )}
       </div>
 

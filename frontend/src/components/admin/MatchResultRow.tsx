@@ -5,6 +5,7 @@ import { canEnterMatchResult } from "@/lib/admin/matchResultsGating";
 import { matchResultSchema } from "@/lib/validation/admin";
 import type { MatchOut } from "@/types/api";
 import { useState } from "react";
+import { Button } from "@/components/ui/Button";
 
 interface MatchResultRowProps {
   match: MatchOut;
@@ -95,24 +96,21 @@ export function MatchResultRow({
       </td>
       <td className="px-3 py-2 space-x-2">
         {showApply && (
-          <button
+          <Button
             type="button"
+            variant="link"
+            className="!text-green-600"
             onClick={handleFinish}
             disabled={saving || !scoresComplete}
-            className="text-sm text-green-600 hover:underline disabled:opacity-50 disabled:no-underline"
             title={!scoresComplete ? "Укажите счёт для обеих команд" : undefined}
           >
             Применить
-          </button>
+          </Button>
         )}
         {canVoid && match.status !== "VOID" && (
-          <button
-            type="button"
-            onClick={() => onVoid(match.id)}
-            className="text-sm text-red-600 hover:underline"
-          >
+          <Button type="button" variant="ghostLink" onClick={() => onVoid(match.id)}>
             Отменить
-          </button>
+          </Button>
         )}
       </td>
     </tr>

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { changePasswordSchema } from "@/lib/validation/changePassword";
 import { useAuth } from "@/hooks/useAuth";
 import { AppError } from "@/lib/api/client";
+import { Button } from "@/components/ui/Button";
 
 export function ChangePasswordForm() {
   const { changePassword } = useAuth();
@@ -98,13 +99,9 @@ export function ChangePasswordForm() {
         {fieldErrors.confirm && <p className="text-red-600 text-xs mt-1">{fieldErrors.confirm}</p>}
       </div>
       {apiError && <p className="text-red-600 text-sm">{apiError}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button type="submit" fullWidth disabled={submitting}>
         {submitting ? "Сохранение…" : "Сменить пароль"}
-      </button>
+      </Button>
     </form>
   );
 }

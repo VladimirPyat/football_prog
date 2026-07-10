@@ -13,6 +13,7 @@ export interface ResultsMatrixMatch {
 export interface ResultsMatrixRow {
   user_name: string;
   match_points: (number | null)[];
+  correct_outcomes: number;
   bonus1: number | null;
   bonus2: number | null;
   bonus3: number | null;
@@ -37,6 +38,7 @@ export function mapRoundResultsRow(row: RoundResultRowOut, matchIds: number[]): 
   return {
     user_name: row.user_name,
     match_points: matchIds.map((matchId) => pointsByMatch.get(matchId) ?? null),
+    correct_outcomes: row.correct_outcomes,
     bonus1: row.bonus1,
     bonus2: row.bonus2,
     bonus3: row.bonus3,

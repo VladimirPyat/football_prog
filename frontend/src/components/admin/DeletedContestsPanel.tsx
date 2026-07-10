@@ -6,6 +6,7 @@ import { contests } from "@/lib/api/endpoints";
 import type { DeletedContestOut } from "@/types/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { Button } from "@/components/ui/Button";
 
 interface DeletedContestsPanelProps {
   onRestored: () => void;
@@ -100,14 +101,14 @@ export function DeletedContestsPanel({
               <p className="text-sm text-gray-500">Удалён: {formatDeletedAt(item.deleted_at)}</p>
             </div>
             {item.restore_available ? (
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="indigo"
                 disabled={working}
                 onClick={() => setRestoreId(item.id)}
-                className="px-3 py-1.5 text-sm text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-50"
               >
                 Восстановить
-              </button>
+              </Button>
             ) : (
               <span className="text-sm text-gray-400">Снимок недоступен</span>
             )}

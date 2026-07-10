@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPost, AppError } from "@/lib/api/client";
 import { auth as authEndpoints } from "@/lib/api/endpoints";
+import { Button } from "@/components/ui/Button";
 
 interface SetupPreview {
   login: string;
@@ -86,13 +87,9 @@ export function SetupPasswordForm() {
     return (
       <div className="space-y-4">
         <p className="text-green-700 text-sm">Участие подтверждено. Войдите с вашим паролем.</p>
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700"
-        >
+        <Button type="button" fullWidth onClick={() => router.push("/")}>
           Перейти ко входу
-        </button>
+        </Button>
       </div>
     );
   }
@@ -144,17 +141,13 @@ export function SetupPasswordForm() {
         </>
       )}
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button type="submit" fullWidth disabled={submitting}>
         {submitting
           ? "Сохранение…"
           : preview?.mode === "confirm_only"
             ? "Подтвердить"
             : "Сохранить"}
-      </button>
+      </Button>
     </form>
   );
 }

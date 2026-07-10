@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { createOrganizerSchema } from "@/lib/validation/admin";
+import { Button } from "@/components/ui/Button";
 
 interface CreateOrganizerFormProps {
   onSubmit: (data: {
@@ -99,13 +100,9 @@ export function CreateOrganizerForm({ onSubmit }: CreateOrganizerFormProps) {
         />
         Временный пароль
       </label>
-      <button
-        type="submit"
-        disabled={submitting}
-        className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-      >
+      <Button type="submit" disabled={submitting}>
         Создать организатора
-      </button>
+      </Button>
     </form>
   );
 }

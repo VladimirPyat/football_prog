@@ -22,10 +22,11 @@ export function AdminPageShell({
   showSettingsNav = false,
   showSetupLockBanner = false,
 }: AdminPageShellProps) {
-  const { contest, loading } = useContestAdmin();
+  const { contest, contestId, loading } = useContestAdmin();
   const uiMode = deriveAdminUiMode({ contest, round: null });
+  const contestReady = contest != null && contest.id === contestId;
 
-  if (loading && !contest) {
+  if (loading || !contestReady) {
     return <LoadingState message="Загрузка конкурса…" />;
   }
 

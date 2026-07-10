@@ -340,3 +340,11 @@
 - Verified: eslint + tsc + test:unit OK
 - Report: agent_docs/reports/bug_2.5.2.md
 - Instruction: agent_docs/instructions/fix_2.5.2.md
+
+## 2026-07-10 — Fix 2.5.3 (shared UI primitives & design-system rollout)
+- STATUS: VERIFIED (lint/tsc/unit)
+- Scope: Button/Modal/DataTable/AdminTable/Callout/EmptyState/StatusChip; ContestResultsView/ContestLeaderboardView; usePersistedRoundSelection; admin table migrations; PredictionsMatrix shared stack
+- Key paths: frontend/src/components/ui/*, ContestResultsView.tsx, ContestLeaderboardView.tsx, usePersistedRoundSelection.ts, roundSelectionStorage.ts
+- Verified: eslint + tsc + test:unit 175/175 OK
+- Report: agent_docs/reports/bug_2.5.3.md; audit: frontend_design_consistency_audit.md; instruction: fix_2.5.3.md
+- Follow-up P2: `Input`/`FormField` primitives; `DetailModal` → `Modal`

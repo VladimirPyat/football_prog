@@ -68,15 +68,16 @@ Global layout guard; redirects authenticated `is_temp_password` users to `/chang
 | `PublicTabs` | Segmented control `Лидерборд / Прогнозы / Результаты` | `{ active, onChange }` |
 | `RoundSelector` | Top-right dropdown `Тур N (Текущий)`; disables unavailable rounds | `{ rounds, value, onChange }` |
 | `DeadlineCountdown` | Time remaining → «Дедлайн прошёл» | `{ deadline }` |
-| `StatusChip` | Colored badge for round/match/contest status | `{ kind, status }` — **Planned** → extract to `frontend/src/components/ui/StatusChip.tsx`; colours duplicated in `RoundStatusSidebar`, `ContestList` until then — see `design_system.md` §4 |
+| `StatusChip` | Colored badge for round/match/contest status | `{ kind, status, label }` — **Implemented (2.5.3)** → `frontend/src/components/ui/StatusChip.tsx` |
 | `Toast` / `ToastProvider` | Success/error notifications (no animation lib) | `{ type, message }` — **Implemented (2.1)** → `frontend/src/components/ui/Toast.tsx`, `frontend/src/providers/ToastProvider.tsx` |
 | `ConfirmDialog` | Confirm VOID / activate / delete | **Implemented (2.3)** → `frontend/src/components/ui/ConfirmDialog.tsx` |
-| `LoadingState` / `ErrorState` / `EmptyState` | Consistent fetch states | `{ message? }` — **LoadingState, ErrorState implemented (2.1)** → `frontend/src/components/ui/`; **EmptyState planned** → `frontend/src/components/ui/EmptyState.tsx` |
+| `EmptyState` | Centred empty message | `{ message? }` — **Implemented (2.5.3)** → `frontend/src/components/ui/EmptyState.tsx` |
 | `RoleBadge` | Show current role | `{ role }` — **Planned** (low priority) |
-| `Button` | Primary / secondary / danger actions | `{ variant, size?, fullWidth?, disabled? }` — **Planned** → `frontend/src/components/ui/Button.tsx`; ~25 files use inline classes today |
-| `Callout` | Info / warning / error inline banners | `{ variant, children }` — **Planned** → `frontend/src/components/ui/Callout.tsx` |
-| `DataTable` / `AdminTable` | Table shell + scroll wrapper | `{ children, variant?, testId? }` — **Planned** → `frontend/src/components/ui/`; admin tables currently ad-hoc |
-| `PreviewBadge` | «Предпросмотр — тур ещё не опубликован» | — **Planned**; duplicated in `RoundLeaderboardPreview`, `RoundResultsPreview` |
+| `Button` | Primary / secondary / danger / success / warning / indigo / link actions | `{ variant, size?, fullWidth?, disabled? }` — **Implemented (2.5.3)** → `frontend/src/components/ui/Button.tsx` |
+| `Callout` | Info / warning / error inline banners | `{ variant, children }` — **Implemented (2.5.3)** → `frontend/src/components/ui/Callout.tsx` |
+| `Modal` | Overlay + panel shell | `{ open, onClose, title?, footer?, size? }` — **Implemented (2.5.3)** → `frontend/src/components/ui/Modal.tsx` |
+| `PreviewBadge` | «Предпросмотр — тур ещё не опубликован» | — **Implemented (2.5.3)** → `frontend/src/components/ui/PreviewBadge.tsx` |
+| `DataTable` / `AdminTable` | Table shell + scroll wrapper | `{ children, variant?, testId? }` — **Implemented (2.5.3)** → `frontend/src/components/ui/` |
 | `ContestStatusBanner` | PAUSED / FINISHED / locked notice | **Implemented (2.3)** → `frontend/src/components/admin/ContestStatusBanner.tsx` |
 | `LockBanner` | «Редактирование параметров недоступно — Конкурс уже запущен» | **Implemented (2.3)** → `frontend/src/components/admin/LockBanner.tsx` — **settings pages only** (2.3.1 F8) |
 
@@ -219,3 +220,4 @@ Contest scoreboard tables (`LeaderboardTable`, `ResultsMatrix`) share `lib/table
 | 2026-06-28 | Stage 2.3.5: `roundEffectiveStatus`; `MatchResultRow`; removed manual close UX from sidebar. |
 | 2026-06-28 | Stage 2.2: prediction form, matrix, privacy, deadline UX, `PublicTabs`, `RoundSelector`. |
 | 2026-07-10 | Design consistency audit: §0 maintenance/reuse rules; link to `design_system.md`; marked planned primitives (`Button`, `StatusChip`, `EmptyState`, `DataTable`, …); documented `lib/table/*` shared layer and gaps (`PredictionsMatrix`, admin tables). Report: `agent_docs/reports/frontend_design_consistency_audit.md`. |
+| 2026-07-10 | **Fix 2.5.3 shipped:** shared UI primitives (`Button`, `Modal`, `DataTable`, `AdminTable`, `Callout`, `EmptyState`, `StatusChip`, `PreviewBadge`, `Select`, `PointsCell`); `ContestResultsView` / `ContestLeaderboardView`; `usePersistedRoundSelection` + `fp_selected_round:{contestId}:{scope}`; admin tables migrated; `PredictionsMatrix` on shared table stack; instructions: `fix_2.5.3.md`, report: `bug_2.5.3.md`. |

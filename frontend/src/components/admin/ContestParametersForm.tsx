@@ -18,6 +18,7 @@ import {
   type RulesFormState,
 } from "@/lib/admin/rulesEditor";
 import { useContestStartReadiness } from "@/hooks/useContestStartReadiness";
+import { Button } from "@/components/ui/Button";
 
 const SETUP_HINT_KEY = (id: number) => `contest_setup_hint_${id}`;
 
@@ -274,13 +275,9 @@ export function ContestParametersForm({
         />
 
         {!readonly && (
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={submitting}>
             Сохранить параметры
-          </button>
+          </Button>
         )}
       </form>
 

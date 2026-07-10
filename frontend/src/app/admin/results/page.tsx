@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { AdminPageShell } from "@/components/admin/AdminPageShell";
 import { ResultsEntryPanel } from "@/components/admin/ResultsEntryPanel";
 import { useContest } from "@/hooks/useContest";
@@ -8,24 +9,54 @@ import { useContestAdmin } from "@/hooks/useContestAdmin";
 import { useAdminRounds } from "@/hooks/useAdminRounds";
 import { useRoundMatches } from "@/hooks/useRoundMatches";
 import { useAdminResults } from "@/hooks/useAdminResults";
+import { usePersistedRoundSelection } from "@/hooks/usePersistedRoundSelection";
 import { useToast } from "@/hooks/useToast";
 import { isDeadlinePassedNow } from "@/lib/admin/roundEffectiveStatus";
 import { AppError } from "@/lib/api/client";
 
 export default function AdminResultsPage() {
+  const searchParams = useSearchParams();
   const { contest, contestId } = useContestAdmin();
   const { maxScore } = useContest();
   const { rounds, loading, calculateRound, publishRound, refetch } = useAdminRounds(contestId);
   const activeRound = rounds.find((r) => r.status === "ACTIVE") ?? null;
-  const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
+
+  const roundFromUrl = Number(searchParams.get("round"));
+  const initialRoundId =
+    Number.isInteger(roundFromUrl) && roundFromUrl > 0 ? roundFromUrl : null;
+
   const handleActiveDeadlinePassed = useCallback(() => {
     void refetch();
   }, [refetch]);
+
   const { deadlinePassed: activeDeadlinePassed } = useRoundMatches(
     contestId,
     activeRound?.id ?? null,
     { onDeadlinePassed: handleActiveDeadlinePassed },
   );
+
+  const effectiveActiveDeadlinePassed =
+    activeDeadlinePassed || (activeRound != null && isDeadlinePassedNow(activeRound.deadline));
+
+  const eligibleRounds = rounds.filter(
+    (r) =>
+      ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status) ||
+      (r.id === activeRound?.id && effectiveActiveDeadlinePassed),
+  );
+
+  const pickDefault = useCallback(() => {
+    if (!eligibleRounds.length) return null;
+    return eligibleRounds[eligibleRounds.length - 1].id;
+  }, [eligibleRounds]);
+
+  const { selectedRoundId, setSelectedRoundId } = usePersistedRoundSelection({
+    contestId,
+    scope: "admin-results",
+    rounds: eligibleRounds,
+    pickDefault,
+    initialRoundId,
+  });
+
   const {
     matches: resultMatches,
     loading: resultMatchesLoading,
@@ -34,25 +65,11 @@ export default function AdminResultsPage() {
   const { putResult, patchStatus } = useAdminResults(contestId);
   const { showSuccess, showError } = useToast();
 
-  const effectiveActiveDeadlinePassed =
-    activeDeadlinePassed || (activeRound != null && isDeadlinePassedNow(activeRound.deadline));
-
   useEffect(() => {
     if (effectiveActiveDeadlinePassed && activeRound?.status === "ACTIVE") {
       void refetch();
     }
   }, [effectiveActiveDeadlinePassed, activeRound?.status, activeRound?.id, refetch]);
-
-  useEffect(() => {
-    const eligible = rounds.filter(
-      (r) =>
-        ["CLOSED", "CALCULATED", "PUBLISHED"].includes(r.status) ||
-        (r.id === activeRound?.id && effectiveActiveDeadlinePassed),
-    );
-    if (eligible.length && !selectedRoundId) {
-      setSelectedRoundId(eligible[eligible.length - 1].id);
-    }
-  }, [rounds, selectedRoundId, activeRound?.id, effectiveActiveDeadlinePassed]);
 
   if (!contest) return null;
 

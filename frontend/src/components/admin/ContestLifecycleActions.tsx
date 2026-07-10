@@ -5,6 +5,7 @@ import { apiDelete, apiPost, AppError } from "@/lib/api/client";
 import { contests } from "@/lib/api/endpoints";
 import { useAuth } from "@/hooks/useAuth";
 import type { ContestOut } from "@/types/api";
+import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface ContestLifecycleActionsProps {
@@ -93,14 +94,9 @@ export function ContestLifecycleActions({
   };
 
   const deleteButton = showDelete ? (
-    <button
-      type="button"
-      disabled={working}
-      onClick={() => setConfirmDelete(true)}
-      className="px-4 py-2 text-sm font-medium text-red-600 border border-red-300 bg-white rounded-lg shadow hover:bg-red-50 disabled:opacity-50"
-    >
+    <Button variant="dangerOutline" disabled={working} onClick={() => setConfirmDelete(true)}>
       Удалить конкурс
-    </button>
+    </Button>
   ) : null;
 
   const deleteDialog = showDelete ? (
@@ -123,15 +119,13 @@ export function ContestLifecycleActions({
       <>
         <div className="fixed bottom-6 right-6 z-10 flex flex-wrap items-center gap-3 justify-end">
           {deleteButton}
-          <button
-            type="button"
+          <Button
             disabled={startDisabled}
             title={startTitle}
             onClick={() => setConfirmStart(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Запустить конкурс
-          </button>
+          </Button>
         </div>
         <ConfirmDialog
           open={confirmStart}
@@ -154,14 +148,9 @@ export function ContestLifecycleActions({
     return (
       <>
         <div className="fixed bottom-6 right-6 z-10 flex flex-wrap items-center gap-3 justify-end">
-          <button
-            type="button"
-            disabled={working}
-            onClick={() => setConfirmPause(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg shadow hover:bg-red-700 disabled:opacity-50"
-          >
+          <Button variant="danger" disabled={working} onClick={() => setConfirmPause(true)}>
             Остановить конкурс
-          </button>
+          </Button>
         </div>
         <ConfirmDialog
           open={confirmPause}
@@ -181,14 +170,9 @@ export function ContestLifecycleActions({
       <>
         <div className="fixed bottom-6 right-6 z-10 flex flex-wrap items-center gap-3 justify-end">
           {deleteButton}
-          <button
-            type="button"
-            disabled={working}
-            onClick={() => runLifecycle("resume")}
-            className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg shadow hover:bg-green-700 disabled:opacity-50"
-          >
+          <Button variant="success" disabled={working} onClick={() => runLifecycle("resume")}>
             Запустить конкурс
-          </button>
+          </Button>
         </div>
         {deleteDialog}
       </>
