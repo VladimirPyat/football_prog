@@ -1,10 +1,34 @@
 # UI Component Catalogue (Stage 2)
 
 > **Living document** — see update log at the bottom.
-> **Refs:** `agent_docs/plans/draft_2.md` (§5, §11), screenshots in `docs/screens/`, **`agent_docs/contracts/admin_ui_status_matrix.md`**.
+> **Refs:** `agent_docs/plans/draft_2.md` (§5, §11), screenshots in `docs/screens/`, **`agent_docs/contracts/admin_ui_status_matrix.md`**, **`agent_docs/ui/design_system.md`** (shared styling & reuse rules).
 > **Constraints:** Tailwind only, no external UI libraries, no animations (`docs/02_project_structure.md`). Russian UI copy.
 
 Components grouped by layer. Props are TypeScript-ish sketches; exact types live in `frontend/src/types`.
+
+---
+
+## 0. Maintenance & reuse (mandatory)
+
+This catalogue lists **what** exists. **`design_system.md`** defines **how to style and reuse** shared primitives.
+
+| When | Do |
+|------|-----|
+| Adding/changing a table, button, badge, banner, or empty state | Check `design_system.md` §3–§4 first; extend existing `lib/table/*` or `components/ui/*` — do not copy-paste Tailwind strings |
+| Shipping a new shared component | Add entry below **and** update `design_system.md` + update log in both files |
+| Fixing table/button styling on one page | Fix the shared primitive so all consumers of the same taxonomy type inherit the change (see audit: `agent_docs/reports/frontend_design_consistency_audit.md`) |
+| Coder / fix instructions | Must include: «Reuse `agent_docs/ui/design_system.md`; update catalogue if new primitive» |
+
+**Shared styling layer (implemented):**
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| Column tokens | `frontend/src/lib/table/columnStyles.ts` | Width/align for scoreboard columns (`COL_RANK`, `COL_NAME`, `COL_DIGIT2`, `COL_DIGIT3`) |
+| Header tokens | `frontend/src/lib/table/tableHeaderStyles.ts` | Thead cell classes (`TH_*`) for contest tables |
+| Header helper | `frontend/src/lib/table/headerLabel.tsx` | Multiline `<th>` labels |
+| Generic UI | `frontend/src/components/ui/*` | Loading, error, confirm, detail modal, toast |
+
+**Planned extractions (P0–P2):** `DataTable`, `AdminTable`, `Button`, `StatusChip`, `EmptyState`, `Callout` — see `design_system.md` §4.
 
 ---
 
@@ -44,11 +68,15 @@ Global layout guard; redirects authenticated `is_temp_password` users to `/chang
 | `PublicTabs` | Segmented control `Лидерборд / Прогнозы / Результаты` | `{ active, onChange }` |
 | `RoundSelector` | Top-right dropdown `Тур N (Текущий)`; disables unavailable rounds | `{ rounds, value, onChange }` |
 | `DeadlineCountdown` | Time remaining → «Дедлайн прошёл» | `{ deadline }` |
-| `StatusChip` | Colored badge for round/match/contest status | `{ kind, status }` |
+| `StatusChip` | Colored badge for round/match/contest status | `{ kind, status }` — **Planned** → extract to `frontend/src/components/ui/StatusChip.tsx`; colours duplicated in `RoundStatusSidebar`, `ContestList` until then — see `design_system.md` §4 |
 | `Toast` / `ToastProvider` | Success/error notifications (no animation lib) | `{ type, message }` — **Implemented (2.1)** → `frontend/src/components/ui/Toast.tsx`, `frontend/src/providers/ToastProvider.tsx` |
 | `ConfirmDialog` | Confirm VOID / activate / delete | **Implemented (2.3)** → `frontend/src/components/ui/ConfirmDialog.tsx` |
-| `LoadingState` / `ErrorState` / `EmptyState` | Consistent fetch states | `{ message? }` — **LoadingState, ErrorState implemented (2.1)** → `frontend/src/components/ui/` |
-| `RoleBadge` | Show current role | `{ role }` |
+| `LoadingState` / `ErrorState` / `EmptyState` | Consistent fetch states | `{ message? }` — **LoadingState, ErrorState implemented (2.1)** → `frontend/src/components/ui/`; **EmptyState planned** → `frontend/src/components/ui/EmptyState.tsx` |
+| `RoleBadge` | Show current role | `{ role }` — **Planned** (low priority) |
+| `Button` | Primary / secondary / danger actions | `{ variant, size?, fullWidth?, disabled? }` — **Planned** → `frontend/src/components/ui/Button.tsx`; ~25 files use inline classes today |
+| `Callout` | Info / warning / error inline banners | `{ variant, children }` — **Planned** → `frontend/src/components/ui/Callout.tsx` |
+| `DataTable` / `AdminTable` | Table shell + scroll wrapper | `{ children, variant?, testId? }` — **Planned** → `frontend/src/components/ui/`; admin tables currently ad-hoc |
+| `PreviewBadge` | «Предпросмотр — тур ещё не опубликован» | — **Planned**; duplicated in `RoundLeaderboardPreview`, `RoundResultsPreview` |
 | `ContestStatusBanner` | PAUSED / FINISHED / locked notice | **Implemented (2.3)** → `frontend/src/components/admin/ContestStatusBanner.tsx` |
 | `LockBanner` | «Редактирование параметров недоступно — Конкурс уже запущен» | **Implemented (2.3)** → `frontend/src/components/admin/LockBanner.tsx` — **settings pages only** (2.3.1 F8) |
 
@@ -91,9 +119,14 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 ### Cell atoms
 | Component | Renders |
 |-----------|---------|
-| `ScoreCell` | `N:M` (inline in `PredictionsMatrix`) |
-| `PointsCell` | points with green highlight when >0 |
+| `ScoreCell` | `N:M` prediction pill — **inline in `PredictionsMatrix`**; planned extract → `components/predictions/ScoreCell.tsx` |
+| `PointsCell` / `TotalCell` | points with green highlight when >0 — **inline in `LeaderboardTable`, `ResultsMatrix`**; planned extract → `components/ui/PointsCell.tsx` |
 | `PrivacyMask` — **Implemented (2.2)** → `frontend/src/components/predictions/PrivacyMask.tsx` | «Прогноз сделан» |
+
+### Shared table styling (fix 2.5.2)
+Contest scoreboard tables (`LeaderboardTable`, `ResultsMatrix`) share `lib/table/columnStyles.ts`, `tableHeaderStyles.ts`, `headerLabel.tsx`.  
+**Gap:** `PredictionsMatrix` uses `COL_NAME` only — must adopt full stack (see `frontend_design_consistency_audit.md` §1.1).  
+**Gap:** Admin tables (`ParticipantsTable`, `RoundPhasePanel`, `ResultsEntryPanel`, `RoundManagementPanel`, `RoundLeaderboardPreview`) do not use shared tokens — must migrate to `AdminTable` (planned).
 
 ---
 
@@ -185,3 +218,4 @@ First column `Счет`; per-match header + actual `score1:score2` sub-row; cell
 | 2026-06-28 | Stage 2.3.3–2.3.4: slim create; `RulesEditorPanel`, `ContestLifecycleActions`, `ContestStartReadinessPanel`; `roundLabel`, `rulesEditor`, `contestStartReadiness`. |
 | 2026-06-28 | Stage 2.3.5: `roundEffectiveStatus`; `MatchResultRow`; removed manual close UX from sidebar. |
 | 2026-06-28 | Stage 2.2: prediction form, matrix, privacy, deadline UX, `PublicTabs`, `RoundSelector`. |
+| 2026-07-10 | Design consistency audit: §0 maintenance/reuse rules; link to `design_system.md`; marked planned primitives (`Button`, `StatusChip`, `EmptyState`, `DataTable`, …); documented `lib/table/*` shared layer and gaps (`PredictionsMatrix`, admin tables). Report: `agent_docs/reports/frontend_design_consistency_audit.md`. |
