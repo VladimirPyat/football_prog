@@ -31,8 +31,8 @@ from services.contest_setup_service import update_contest
 
 router = APIRouter(prefix="/admin", tags=["legacy (deprecated)", "admin (contest)"])
 
-_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
-_admin = Depends(RoleChecker(UserRole.ADMIN))
+_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.SUPPORT))
+_support = Depends(RoleChecker(UserRole.SUPPORT))
 
 
 def _lifecycle_out(settings) -> ContestLifecycleOut:
@@ -74,7 +74,7 @@ async def patch_settings(body: ContestSettingsPatchRequest, session: DbSession) 
     return ContestSettingsOut.model_validate(settings)
 
 
-@router.post("/contest/pause", response_model=ContestLifecycleOut, dependencies=[_admin], deprecated=True)
+@router.post("/contest/pause", response_model=ContestLifecycleOut, dependencies=[_support], deprecated=True)
 async def pause(session: DbSession) -> ContestLifecycleOut:
     """Приостановить конкурс. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
@@ -83,7 +83,7 @@ async def pause(session: DbSession) -> ContestLifecycleOut:
     return _lifecycle_out(settings)
 
 
-@router.post("/contest/resume", response_model=ContestLifecycleOut, dependencies=[_admin], deprecated=True)
+@router.post("/contest/resume", response_model=ContestLifecycleOut, dependencies=[_support], deprecated=True)
 async def resume(session: DbSession) -> ContestLifecycleOut:
     """Возобновить конкурс. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
@@ -92,7 +92,7 @@ async def resume(session: DbSession) -> ContestLifecycleOut:
     return _lifecycle_out(settings)
 
 
-@router.post("/contest/finish", response_model=ContestLifecycleOut, dependencies=[_admin], deprecated=True)
+@router.post("/contest/finish", response_model=ContestLifecycleOut, dependencies=[_support], deprecated=True)
 async def finish(session: DbSession) -> ContestLifecycleOut:
     """Завершить конкурс. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)
@@ -101,7 +101,7 @@ async def finish(session: DbSession) -> ContestLifecycleOut:
     return _lifecycle_out(settings)
 
 
-@router.delete("/contest", response_model=ContestDeleteResponse, dependencies=[_admin], deprecated=True)
+@router.delete("/contest", response_model=ContestDeleteResponse, dependencies=[_support], deprecated=True)
 async def delete_contest(body: ContestDeleteConfirmRequest, session: DbSession) -> ContestDeleteResponse:
     """Удалить данные конкурса. Устаревший shim: default contest."""
     if body.confirm != "DELETE":
@@ -117,7 +117,7 @@ async def delete_contest(body: ContestDeleteConfirmRequest, session: DbSession) 
 @router.put(
     "/users/{user_id}/exceptional-tiebreak",
     response_model=ExceptionalTiebreakResponse,
-    dependencies=[_admin],
+    dependencies=[_support],
     deprecated=True,
 )
 async def set_exceptional_tiebreak(

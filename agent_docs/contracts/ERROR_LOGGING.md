@@ -144,7 +144,7 @@ Future: separate **auth.log** for login audit — see `agent_docs/reports/todo.m
 
 | Level | Purpose | Examples |
 |-------|---------|----------|
-| **ERROR** | requires admin attention | unhandled exception, `CriticalError`, `ADMIN_ALERT` |
+| **ERROR** | requires support attention | unhandled exception, `CriticalError`, `ADMIN_ALERT` (code name; support role) |
 | **WARNING** | recoverable | skipped prediction, auto-close skip, boundary 4xx `AppError` |
 | **INFO** | key business events | predictions saved, round calculated, pause/resume/finish |
 | **DEBUG** | heavy-path debugging | data volumes during scoring, auto-close |

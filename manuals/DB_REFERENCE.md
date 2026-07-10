@@ -37,7 +37,7 @@ Defined in `src/database/models.py` as `StrEnum` values stored as `VARCHAR`.
 | Value | Description |
 |-------|-------------|
 | `SUPERVISOR` | Contest organizer — setup, rounds, results, scoring (see [API_GUIDE — RBAC](API_GUIDE.md#role-based-access-control)) |
-| `ADMIN` | Technical administrator |
+| `SUPPORT` | Technical support (`users.role=SUPPORT`) |
 | `USER` | Participant — predictions and leaderboard as a player |
 
 > **Organizer who also wants to play:** use a **separate `USER` login** invited into the contest. Global role is one per account; pre-deadline prediction privacy applies to `SUPERVISOR` same as `USER`. Details: [API_GUIDE — Organizer vs participant](API_GUIDE.md#organizer-vs-participant-same-person).

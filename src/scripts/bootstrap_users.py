@@ -1,13 +1,13 @@
-"""Bootstrap ADMIN and SUPERVISOR users from .env (one-time / dev server setup).
+"""Bootstrap Support (ADMIN) and SUPERVISOR users from .env (one-time / dev server setup).
 
 Run after migrations and optional contest seed::
 
     uv run python src/scripts/bootstrap_users.py
 
-Requires SEED_ADMIN_PASSWORD in .env (or SEED_ADMIN_PASSWORD_HASH with a bcrypt hash).
+Requires SEED_SUPPORT_PASSWORD in .env (or SEED_SUPPORT_PASSWORD_HASH with a bcrypt hash).
 
 Organizer (SUPERVISOR) block is optional via SEED_SUPERVISOR_* variables.
-Comment out ``seed_supervisor_user`` call below once user management lives in the admin UI.
+Comment out ``seed_supervisor_user`` call below once user management lives in the supervisor UI.
 """
 
 from __future__ import annotations
@@ -47,30 +47,29 @@ def resolve_password_hash(settings: Settings, *, plain_var: str | None, hash_var
     )
 
 
-async def seed_admin_user(session: AsyncSession, settings: Settings, contest_id: int | None) -> User | None:
-    settings = settings
-    existing = await session.scalar(select(User).where(User.login == settings.seed_admin_login))
+async def seed_support_user(session: AsyncSession, settings: Settings, contest_id: int | None) -> User | None:
+    existing = await session.scalar(select(User).where(User.login == settings.seed_support_login))
     if existing is not None:
-        logger.info("Admin user already exists (login=%s), skipping", existing.login)
+        logger.info("Support user already exists (login=%s), skipping", existing.login)
         user = existing
     else:
         password_hash = resolve_password_hash(
             settings,
-            plain_var=settings.seed_admin_password,
-            hash_var=settings.seed_admin_password_hash,
-            label="SEED_ADMIN",
+            plain_var=settings.seed_support_password,
+            hash_var=settings.seed_support_password_hash,
+            label="SEED_SUPPORT",
         )
         user = User(
-            login=settings.seed_admin_login,
+            login=settings.seed_support_login,
             password_hash=password_hash,
-            role=UserRole.ADMIN,
-            first_name=settings.seed_admin_first_name,
-            last_name=settings.seed_admin_last_name,
+            role=UserRole.SUPPORT,
+            first_name=settings.seed_support_first_name,
+            last_name=settings.seed_support_last_name,
             is_temp_password=False,
         )
         session.add(user)
         await session.flush()
-        logger.info("Created admin user (login=%s, id=%s)", user.login, user.id)
+        logger.info("Created support user (login=%s, id=%s)", user.login, user.id)
 
     if contest_id is not None:
         participant = await session.get(ContestParticipant, (contest_id, user.id))
@@ -82,12 +81,12 @@ async def seed_admin_user(session: AsyncSession, settings: Settings, contest_id:
                     status=ParticipantStatus.ACCEPTED,
                 )
             )
-            logger.info("Enrolled admin as participant in contest id=%s", contest_id)
+            logger.info("Enrolled support user as participant in contest id=%s", contest_id)
     return user
 
 
 async def seed_supervisor_user(session: AsyncSession, settings: Settings) -> User | None:
-    # When the admin UI can create organizers via POST /admin/users/supervisor,
+    # When the supervisor UI can create organizers via POST /admin/users/supervisor,
     # comment out the call to this function in run_bootstrap().
     if not settings.seed_supervisor_password and not settings.seed_supervisor_password_hash:
         logger.info(
@@ -139,9 +138,11 @@ async def run_bootstrap(database_url: str | None = None, *, enroll_contest: bool
                 if contest is not None:
                     contest_id = contest.id
                 else:
-                    logger.warning("No contest row found — admin will not be enrolled as participant")
+                    logger.warning(
+                        "No contest row found — support user will not be enrolled as participant"
+                    )
 
-            await seed_admin_user(session, settings, contest_id)
+            await seed_support_user(session, settings, contest_id)
             await seed_supervisor_user(session, settings)
 
     await engine.dispose()
@@ -149,7 +150,7 @@ async def run_bootstrap(database_url: str | None = None, *, enroll_contest: bool
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    parser = argparse.ArgumentParser(description="Bootstrap ADMIN and SUPERVISOR users from .env")
+    parser = argparse.ArgumentParser(description="Bootstrap Support (ADMIN) and SUPERVISOR users from .env")
     parser.add_argument(
         "--database-url",
         default=None,
@@ -158,7 +159,7 @@ def main() -> None:
     parser.add_argument(
         "--no-contest-enroll",
         action="store_true",
-        help="Do not add admin to contest_participants even if a contest exists",
+        help="Do not add support user to contest_participants even if a contest exists",
     )
     args = parser.parse_args()
     asyncio.run(run_bootstrap(database_url=args.database_url, enroll_contest=not args.no_contest_enroll))

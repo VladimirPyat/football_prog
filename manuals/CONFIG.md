@@ -42,9 +42,9 @@ Copy [`.env.example`](../.env.example) → `.env` and fill in **before first boo
 |----------|----------|-------------|
 | `DATABASE_URL` | dev: has default | Async SQLAlchemy URL; use PostgreSQL in production |
 | `JWT_SECRET_KEY` | **prod: yes** | HS256 signing key for access tokens |
-| `SEED_ADMIN_PASSWORD` | **bootstrap: yes** | Plaintext admin password (hashed at runtime) |
+| `SEED_SUPPORT_PASSWORD` | **bootstrap: yes** | Plaintext support password (hashed at runtime) |
 | `SEED_SUPERVISOR_PASSWORD` | recommended | Plaintext supervisor password |
-| `SEED_ADMIN_PASSWORD_HASH` | alternative | Precomputed bcrypt instead of `SEED_ADMIN_PASSWORD` |
+| `SEED_SUPPORT_PASSWORD_HASH` | alternative | Precomputed bcrypt instead of `SEED_SUPPORT_PASSWORD` |
 | `SEED_SUPERVISOR_PASSWORD_HASH` | alternative | Precomputed bcrypt instead of `SEED_SUPERVISOR_PASSWORD` |
 
 Generate hash: `uv run python src/scripts/hash_password.py 'your-password'`
@@ -59,9 +59,9 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 
 | Setting field | Env override | Default | Description |
 |---------------|--------------|---------|-------------|
-| `seed_admin_login` | `SEED_ADMIN_LOGIN` | `admin` | Bootstrap ADMIN login |
-| `seed_admin_first_name` | `SEED_ADMIN_FIRST_NAME` | `Admin` | ADMIN first name |
-| `seed_admin_last_name` | `SEED_ADMIN_LAST_NAME` | `User` | ADMIN last name |
+| `seed_support_login` | `SEED_SUPPORT_LOGIN` | `support` | Bootstrap Support login |
+| `seed_support_first_name` | `SEED_SUPPORT_FIRST_NAME` | `Support` | Support first name |
+| `seed_support_last_name` | `SEED_SUPPORT_LAST_NAME` | `User` | Support last name |
 | `seed_supervisor_login` | `SEED_SUPERVISOR_LOGIN` | `supervisor` | Bootstrap SUPERVISOR login |
 | `seed_supervisor_first_name` | `SEED_SUPERVISOR_FIRST_NAME` | `Supervisor` | SUPERVISOR first name |
 | `seed_supervisor_last_name` | `SEED_SUPERVISOR_LAST_NAME` | `User` | SUPERVISOR last name |
@@ -187,21 +187,21 @@ Scoring rule values are documented in [SCORING_LOGIC.md](SCORING_LOGIC.md). DB s
 - `contests.is_locked` defaults to `false` at seed.
 - After first round activation (`DRAFT → ACTIVE`), `is_locked=true` and `status=RUNNING`.
 - While locked: structural fields and `rules_json` cannot be PATCHed (HTTP 403).
-- `contest_participants.exceptional_tiebreak_points` is **not** locked — ADMIN may update per contest at any time via API.
+- `contest_participants.exceptional_tiebreak_points` is **not** locked — Support (ADMIN) may update per contest at any time via API.
 
 See [API_GUIDE.md — Contest Lifecycle](API_GUIDE.md#contest-lifecycle--immutability).
 
 ## Seed Script [UPDATED]
 
-**Path:** `src/scripts/seed.py` — contest defaults + optional ADMIN (if login missing).
+**Path:** `src/scripts/seed.py` — contest defaults + optional Support (ADMIN) (if login missing).
 
-Uses `SEED_ADMIN_PASSWORD` when set (hashed at runtime); else `SEED_ADMIN_PASSWORD_HASH`; else dev placeholder hash (login will not work until bootstrap).
+Uses `SEED_SUPPORT_PASSWORD` when set (hashed at runtime); else `SEED_SUPPORT_PASSWORD_HASH`; else dev placeholder hash (login will not work until bootstrap).
 
 ### What it does
 
 1. Ensures tables exist (`Base.metadata.create_all`)
 2. Inserts default `contests` row from `contest_defaults.json` (skips if contest exists)
-3. Inserts ADMIN user from env (skips if login exists)
+3. Inserts Support (ADMIN) user from env (skips if login exists)
 
 ### Usage
 
@@ -213,27 +213,27 @@ uv run python src/scripts/seed.py --defaults-path docs/test_data/config/contest_
 
 ### Idempotency
 
-- Second run logs "already exist, skipping" for both default contest and ADMIN user.
+- Second run logs "already exist, skipping" for both default contest and Support user.
 - Safe to re-run after migrations.
 
 ## Bootstrap Users Script [NEW]
 
 **Path:** `src/scripts/bootstrap_users.py`
 
-One-time (or fresh-DB) creation of **ADMIN** and optional **SUPERVISOR** from `.env`. Users remain in the database — **do not re-run** on every app start (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
+One-time (or fresh-DB) creation of **Support (ADMIN)** and optional **SUPERVISOR** from `.env`. Users remain in the database — **do not re-run** on every app start (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
 
 ```bash
 uv run alembic upgrade head
 uv run python src/scripts/seed.py              # contest row, optional admin
-uv run python src/scripts/bootstrap_users.py   # ADMIN + SUPERVISOR from .env
+uv run python src/scripts/bootstrap_users.py   # Support (ADMIN) + SUPERVISOR from .env
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--database-url` | Override `DATABASE_URL` |
-| `--no-contest-enroll` | Skip adding ADMIN to `contest_participants` |
+| `--no-contest-enroll` | Skip adding Support user to `contest_participants` |
 
-**Requires** `SEED_ADMIN_PASSWORD` or `SEED_ADMIN_PASSWORD_HASH`. Supervisor block runs only when `SEED_SUPERVISOR_LOGIN` and password/hash are set.
+**Requires** `SEED_SUPPORT_PASSWORD` or `SEED_SUPPORT_PASSWORD_HASH`. Supervisor block runs only when `SEED_SUPERVISOR_LOGIN` and password/hash are set.
 
 **Idempotent:** existing logins skipped; passwords **not** updated on re-run.
 
@@ -254,8 +254,8 @@ flowchart TD
     A[contest_defaults.json] --> B[seed.py]
     C[config/settings.py] --> B
     B --> D[contests row]
-    B --> E[users row ADMIN]
-    H[bootstrap_users.py] --> I[users ADMIN + SUPERVISOR]
+    B --> E[users row Support (ADMIN)]
+    H[bootstrap_users.py] --> I[users Support + SUPERVISOR]
     C --> H
     F[alembic upgrade head] --> G[(football.db)]
     B --> G

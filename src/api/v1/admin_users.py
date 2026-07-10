@@ -12,13 +12,13 @@ from services.user_admin_service import create_supervisor
 
 router = APIRouter(prefix="/admin/users", tags=["admin (users)"])
 
-_admin = Depends(RoleChecker(UserRole.ADMIN))
+_support = Depends(RoleChecker(UserRole.SUPPORT))
 
 
 @router.post(
     "/supervisor",
     response_model=CreateSupervisorResponse,
-    dependencies=[_admin],
+    dependencies=[_support],
 )
 async def post_supervisor(body: CreateSupervisorRequest, session: DbSession) -> CreateSupervisorResponse:
     """Создать организатора конкурса (роль SUPERVISOR). Только ADMIN."""

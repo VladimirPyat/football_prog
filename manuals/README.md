@@ -10,14 +10,24 @@ Human-facing technical documentation for the Football Predictions Contest projec
 | [DB_REFERENCE.md](DB_REFERENCE.md) | SQLAlchemy models, enums, constraints, migrations |
 | [CONFIG.md](CONFIG.md) | Settings, env vars, seed script, contest defaults |
 | [SCORING_LOGIC.md](SCORING_LOGIC.md) | Points, bonuses, tie-breakers, validation rules |
-| [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) | Initial ADMIN/SUPERVISOR via `.env` + bootstrap script |
+| [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) | Initial Support (ADMIN) / SUPERVISOR via `.env` + bootstrap script |
 | [DEV_SETUP.md](DEV_SETUP.md) | **Local dev:** deps, bootstrap script, API + frontend, test logins |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | **Server deploy:** PostgreSQL, URLs, CORS, env split, first deploy |
 | [FRONTEND_REFERENCE.md](FRONTEND_REFERENCE.md) | **Frontend map:** routes, components, editable UI copy (human quick edits) |
 | [STATUS_REFERENCE.md](STATUS_REFERENCE.md) | **Статусы:** конкурс, тур, матч — смысл, переходы, где в коде; API vs подписи UI |
 | [SUPERVISOR_TESTING_SCENARIOS.md](SUPERVISOR_TESTING_SCENARIOS.md) | **Ручное QA организатора:** чек-лист по маршрутам, фикстура, известные пробелы |
 | [API_GUIDE.md](API_GUIDE.md) | FastAPI routes, auth, RBAC, contest lifecycle |
-| [ADMIN_TO_SUPPORT_RENAME.md](ADMIN_TO_SUPPORT_RENAME.md) | **Planned:** role `ADMIN`→`SUPPORT`, support API paths, verification (not executed yet) |
+| [ADMIN_TO_SUPPORT_RENAME.md](ADMIN_TO_SUPPORT_RENAME.md) | **Planned:** role enum `ADMIN`→`SUPPORT`, support API paths, code migration (docs use Support terminology) |
+
+## Terminology
+
+| Term | Meaning |
+|------|---------|
+| **Supervisor (организатор)** | `users.role=SUPERVISOR`; contest setup, rounds, results. UI at `/admin/*` (historical path name). |
+| **Support (техподдержка)** | `users.role=ADMIN` (enum rename to `SUPPORT` planned); lifecycle, restore, recalculate, create supervisor accounts. Platform API `/api/v1/admin/users/*`. |
+| **Path `/admin/…`** | Organizer workspace — **not** renamed; both SUPERVISOR and Support (ADMIN) may use it. |
+
+See also [API_GUIDE.md — Role-Based Access Control](API_GUIDE.md#role-based-access-control).
 | [ERROR_LOGGING.md](ERROR_LOGGING.md) | Политика ошибок и логирования (RU) |
 | [MANUAL_SCORING_VERIFICATION.md](MANUAL_SCORING_VERIFICATION.md) | Stage 1 sign-off: ручная проверка scoring + CANARY (RU) |
 

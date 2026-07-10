@@ -1,4 +1,4 @@
-export type UserRole = "USER" | "SUPERVISOR" | "ADMIN";
+export type UserRole = "USER" | "SUPERVISOR" | "SUPPORT";
 
 export type ContestStatus = "DRAFT" | "RUNNING" | "PAUSED" | "FINISHED";
 

@@ -84,14 +84,14 @@ export default function AdminLifecyclePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user && user.role !== "ADMIN") {
+    if (!loading && user && user.role !== "SUPPORT") {
       router.replace("/admin");
     }
   }, [loading, user, router]);
 
   if (loading || !user) return <LoadingState />;
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "SUPPORT") {
     return <LoadingState message="Доступ только для администратора" />;
   }
 

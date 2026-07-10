@@ -103,7 +103,7 @@ export async function loginAsSupervisor(page: Page): Promise<void> {
 
 export async function loginAsAdmin(page: Page): Promise<void> {
   if (!ADMIN_PASSWORD) {
-    throw new Error("SEED_ADMIN_PASSWORD missing in root .env");
+    throw new Error("SEED_SUPPORT_PASSWORD missing in root .env");
   }
   await loginWithCredentials(page, ADMIN_LOGIN, ADMIN_PASSWORD, "STAFF");
 }

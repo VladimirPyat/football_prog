@@ -175,7 +175,7 @@ erDiagram
 
 | Concept | Storage |
 |---------|---------|
-| Login, password, global role | `users.role` — one of `USER`, `SUPERVISOR`, `ADMIN` |
+| Login, password, global role | `users.role` — one of `USER`, `SUPERVISOR`, `ADMIN` (support) |
 | Playing in a contest | `contest_participants` — `PENDING` / `ACCEPTED` |
 | Scoring rules | `contests.rules_json` (frozen when `is_locked`) |
 | Manual tie-break override | `contest_participants.exceptional_tiebreak_points` (not in `rules_json`) |
@@ -208,10 +208,10 @@ Legacy routes without `{contest_id}` resolve the default contest (`id=1`) for ba
 stateDiagram-v2
     [*] --> DRAFT
     DRAFT --> RUNNING : first round activate\n(is_locked=true)
-    RUNNING --> PAUSED : ADMIN pause
-    PAUSED --> RUNNING : ADMIN resume
-    RUNNING --> FINISHED : ADMIN finish
-    PAUSED --> FINISHED : ADMIN finish
+    RUNNING --> PAUSED : Support pause
+    PAUSED --> RUNNING : Support resume
+    RUNNING --> FINISHED : Support finish
+    PAUSED --> FINISHED : Support finish
 ```
 
 | Phase | `status` | `is_locked` | Typical operations |
@@ -219,7 +219,7 @@ stateDiagram-v2
 | Setup | `DRAFT` | `false` | Teams, invites, logos, PATCH rules |
 | Operational | `RUNNING` | `true` | Predictions, results, calculate |
 | Frozen | `PAUSED` | `true` | Read-only mutations; safe delete after grace |
-| Terminal | `FINISHED` | `true` | Read-only; ADMIN recalculate allowed |
+| Terminal | `FINISHED` | `true` | Read-only; Support recalculate allowed |
 
 Matrix of allowed operations: [`agent_docs/contracts/contest_lifecycle_flow.md`](../agent_docs/contracts/contest_lifecycle_flow.md)
 
@@ -337,14 +337,14 @@ flowchart TB
     AUTH -->|valid| RBAC[RoleChecker + contest guards]
     RBAC --> USER[USER — own predictions]
     RBAC --> SUP[SUPERVISOR — admin ops]
-    RBAC --> ADM[ADMIN — recalc, lifecycle, all predictions pre-deadline]
+    RBAC --> ADM[Support — recalc, lifecycle, all predictions pre-deadline]
 ```
 
 | Mechanism | Notes |
 |-----------|--------|
 | JWT payload | `{sub: user_id, role, exp}` |
 | Invite flow | Temp password → `PENDING` participant → change password → `ACCEPTED` |
-| Prediction privacy | Before deadline: USER/SUPERVISOR see own scores only; ADMIN sees all |
+| Prediction privacy | Before deadline: USER/SUPERVISOR see own scores only; Support (ADMIN) sees all |
 | Contest guards | `PAUSED` / `FINISHED` block mutating ops; `is_locked` blocks setup CRUD |
 
 RBAC tables: [API Guide — RBAC](API_GUIDE.md#role-based-access-control)

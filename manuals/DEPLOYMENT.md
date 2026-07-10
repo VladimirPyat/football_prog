@@ -2,7 +2,7 @@
 
 How to deploy the Football Predictions Contest stack on a server: API (FastAPI) + frontend (Next.js).
 
-**Related docs:** [CONFIG.md](CONFIG.md) (full settings table), [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) (first ADMIN/SUPERVISOR), [API_GUIDE.md](API_GUIDE.md) (invite `setup_url`), [DEV_SETUP.md](DEV_SETUP.md) (local dev only).
+**Related docs:** [CONFIG.md](CONFIG.md) (full settings table), [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) (first Support/SUPERVISOR), [API_GUIDE.md](API_GUIDE.md) (invite `setup_url`), [DEV_SETUP.md](DEV_SETUP.md) (local dev only).
 
 ## Table of Contents
 
@@ -91,7 +91,7 @@ DATABASE_URL=postgresql+asyncpg://football:STRONG_PASSWORD@127.0.0.1:5432/footba
 JWT_SECRET_KEY=replace-with-64-plus-char-random-string
 
 # One-time bootstrap (see First deploy)
-SEED_ADMIN_PASSWORD=your-admin-password
+SEED_SUPPORT_PASSWORD=your-support-password
 SEED_SUPERVISOR_PASSWORD=your-supervisor-password
 ```
 
@@ -352,7 +352,7 @@ Static files: team logos are served by FastAPI from `UPLOAD_DIR` at `/static/tea
 
 ## Invite links & SMTP
 
-- **SMTP is not configured** in v1. Invite `setup_url` is shown in the admin UI modal after `POST …/participants`.
+- **SMTP is not configured** in v1. Invite `setup_url` is shown in the supervisor UI modal after `POST …/participants`.
 - Links are **real** signed JWTs; base URL = `FRONTEND_BASE_URL` at invite time.
 - When SMTP is added later, it will reuse `build_setup_url()` in `src/core/setup_tokens.py` — only `FRONTEND_BASE_URL` must be correct on the API host.
 

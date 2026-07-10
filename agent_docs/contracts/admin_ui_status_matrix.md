@@ -311,7 +311,7 @@ Sources: `scoring_persistence.calculate_round`, `match_service.set_result` (reca
 
 ### 10.1 By round status and role
 
-| Round API status | USER / guest | SUPERVISOR / ADMIN | Global `GET …/leaderboard` |
+| Round API status | USER / guest | SUPERVISOR / Support (ADMIN) | Global `GET …/leaderboard` |
 |------------------|--------------|--------------------|-----------------------------|
 | `DRAFT` / `ACTIVE` / `CLOSED` | 403 / stub | 403 / no preview | **Excluded** |
 | `CALCULATED` | 403 `RESULTS_NOT_AVAILABLE` | **Preview** `GET …/rounds/{id}/leaderboard` | **Excluded** |
@@ -348,7 +348,7 @@ See §11 if `bonuses_pending`.
 
 **Endpoint:** `GET …/rounds/{id}/predictions` → `deadline_passed`, `matches`, `entries`.
 
-| Phase | Condition | USER / SUPERVISOR see others' scores | ADMIN |
+| Phase | Condition | USER / SUPERVISOR see others' scores | Support (ADMIN) |
 |-------|-----------|--------------------------------------|-------|
 | Before deadline | `now < deadline`, round `ACTIVE` | **No** — only `submitted: true` for others; own scores visible | **All** scores (support) |
 | After deadline | `now >= deadline` (effective **Дедлайн**) | **Full matrix** for all participants | Full matrix |

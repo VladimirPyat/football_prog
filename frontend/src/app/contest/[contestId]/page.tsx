@@ -60,7 +60,7 @@ export default function ContestPage() {
     [visibleRounds, effectiveRoundId],
   );
 
-  const isAdminViewer = user?.role === "ADMIN";
+  const isSupportViewer = user?.role === "SUPPORT";
   const roundIsPublished =
     selectedRound != null && shouldFetchPublicResults(selectedRound.status);
 
@@ -68,7 +68,7 @@ export default function ContestPage() {
     tab === "predictions" &&
     selectedRound != null &&
     !isDeadlinePassedNow(selectedRound.deadline) &&
-    !isAdminViewer;
+    !isSupportViewer;
 
   const shouldFetchPredictions =
     tab === "predictions" &&

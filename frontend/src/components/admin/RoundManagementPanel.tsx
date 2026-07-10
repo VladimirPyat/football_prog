@@ -94,7 +94,7 @@ export function RoundManagementPanel({
   refetchContest,
 }: RoundManagementPanelProps) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const isSupport = user?.role === "SUPPORT";
   const selectedRound = rounds.find((r) => r.id === selectedRoundId) ?? null;
   const effectiveDeadlinePassed =
     deadlinePassed || (selectedRound != null && isDeadlinePassedNow(selectedRound.deadline));
@@ -429,7 +429,7 @@ export function RoundManagementPanel({
                           key={m.id}
                           match={m}
                           roundStatus={effectiveStatus ?? selectedRound.status}
-                          isAdmin={isAdmin}
+                          isAdmin={isSupport}
                           teams={teams}
                           canEditStructure={uiMode.canEditRoundStructure}
                           canEditStatusAndDate={uiMode.canEditMatchStatusAndDate}

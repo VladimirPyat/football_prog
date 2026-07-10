@@ -28,7 +28,7 @@
 ### In scope (this instruction)
 
 1. **Role enum:** `UserRole.ADMIN` → `UserRole.SUPPORT`, DB value `ADMIN` → `SUPPORT`
-2. **Env / bootstrap:** `SEED_ADMIN_*` → `SEED_SUPPORT_*`, default login `support` (optional; keep `admin` login if preferred — document choice)
+2. **Env / bootstrap:** `SEED_SUPPORT_*` — **done** (2026-07-11). Default login `admin` kept (`SEED_SUPPORT_LOGIN`).
 3. **Support-only API paths** (same commit as role):
    - `POST /api/v1/admin/users/supervisor` → `POST /api/v1/support/users/supervisor`
    - `POST /api/v1/contests/{id}/admin/recalculate` → `POST /api/v1/contests/{id}/support/recalculate`
@@ -76,7 +76,7 @@
 
 2. **`src/database/models.py`:** `SUPPORT = "SUPPORT"` (remove `ADMIN` or keep alias temporarily — prefer clean break).
 
-3. **`config/settings.py`:** rename `seed_admin_*` → `seed_support_*`; env vars `SEED_SUPPORT_PASSWORD`, `SEED_SUPPORT_LOGIN` (default `support`).
+3. **`config/settings.py`:** `seed_support_*` — **done** (2026-07-11).
 
 4. **`.env.example`**, **`frontend/.env.local.example`:** `SEED_SUPPORT_*`, `E2E_SUPPORT_PASSWORD`.
 

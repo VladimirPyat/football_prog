@@ -55,7 +55,7 @@ tie-break points** per participant. This is **not** a contest rule change.
 - Default: 0 for all participants → no effect on ranking.
 - `LeaderboardService` loads values for the contest and passes `{user_id: points}` to
   `build_standings(..., manual_overrides=...)` (higher points = better rank on key 5).
-- API: `PUT /api/v1/contests/{contest_id}/participants/{user_id}/exceptional-tiebreak` (ADMIN only).
+- API: `PUT /api/v1/contests/{contest_id}/participants/{user_id}/exceptional-tiebreak` (Support (ADMIN) only).
   Legacy shim: `PUT /api/v1/admin/users/{user_id}/exceptional-tiebreak` → default contest (deprecated).
 - Display: include `exceptional_tiebreak_points` in contest leaderboard rows.
 - Probability is negligible, but the column and endpoint are mandatory.

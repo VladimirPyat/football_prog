@@ -25,7 +25,7 @@ from services.scoring_persistence import recalculate_contest
 
 router = APIRouter(tags=["legacy (deprecated)", "rounds (public)", "admin (system)"])
 
-_admin = Depends(RoleChecker(UserRole.ADMIN))
+_support = Depends(RoleChecker(UserRole.SUPPORT))
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 
@@ -71,7 +71,7 @@ async def round_results(
     return out
 
 
-@router.post("/admin/recalculate", dependencies=[_admin], deprecated=True)
+@router.post("/admin/recalculate", dependencies=[_support], deprecated=True)
 async def admin_recalculate(session: DbSession) -> dict:
     """Пересчёт туров. Устаревший shim: default contest."""
     contest_id = await resolve_default_contest_id(session)

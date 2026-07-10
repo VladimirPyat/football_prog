@@ -17,7 +17,7 @@ export function shouldShowScore(
 ): boolean {
   if (deadlinePassed) return entry.predictions !== null;
   if (!viewer) return false;
-  if (viewer.role === "ADMIN") return entry.predictions !== null;
+  if (viewer.role === "SUPPORT") return entry.predictions !== null;
   if (entry.user_id === viewer.id) return entry.predictions !== null;
   return false;
 }

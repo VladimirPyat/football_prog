@@ -10,7 +10,7 @@ info:
     Auth via JWT (Bearer). Score fields integers [0, max_score_value]; MISSING prediction = absent row, never 0.
     CSV delimiter ';' (teams.csv ',' in loader). Timestamps TIMESTAMPTZ UTC ISO 8601.
     Phases: SETUP (DRAFT, !is_locked) vs RUNNING (after first activate). See contest_lifecycle_flow.md.
-    Exceptional tie-break: contest_participants.exceptional_tiebreak_points (admin, NOT rules_json; allowed when locked).
+    Exceptional tie-break: contest_participants.exceptional_tiebreak_points (support (ADMIN), NOT rules_json; allowed when locked).
     Auto-close: sync hook on contest-scoped calls — ACTIVE→CLOSED when deadline passed (no BackgroundTasks).
 
 servers:
@@ -25,7 +25,8 @@ tags:
   - name: rounds (public)
   - name: admin (supervisor)
   - name: admin (contest)
-  - name: admin (system)
+  - name: support (system)
+  - name: support (platform)
   - name: legacy (deprecated)
 
 paths:
@@ -251,7 +252,7 @@ paths:
       tags: [admin (contest)]
       summary: Safe delete one contest (PAUSED + grace + confirm)
       description: >-
-        RBAC: ADMIN always; SUPERVISOR when supervisor_training_mode=true.
+        RBAC: Support (ADMIN) always; SUPERVISOR when supervisor_training_mode=true.
         Instant delete (skip grace) when contest_allow_instant_delete or supervisor_training_mode.
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/contest_id' }]
@@ -294,7 +295,7 @@ paths:
       tags: [admin (contest)]
       summary: Early finish (RUNNING|PAUSED -> FINISHED)
       description: >-
-        RBAC: ADMIN always; SUPERVISOR when supervisor_training_mode=true.
+        RBAC: Support (ADMIN) always; SUPERVISOR when supervisor_training_mode=true.
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/contest_id' }]
       responses:
@@ -309,7 +310,7 @@ paths:
       tags: [admin (contest)]
       summary: Restore contest from training-mode snapshot (within restore window)
       description: >-
-        Available only when supervisor_training_mode=true (SUPERVISOR + ADMIN).
+        Available only when supervisor_training_mode=true (SUPERVISOR + Support (ADMIN)).
         After DELETE wipe: replays snapshot (teams, rounds, matches, participants).
         Snapshot consumed on success; 404/410 when missing or expired.
       security: [{ bearerAuth: [] }]
@@ -496,7 +497,7 @@ paths:
       description: >-
         Optional Bearer. Before deadline: anonymous callers receive 403
         (code PREDICTIONS_NOT_PUBLIC). Authenticated USER and SUPERVISOR see only own scores;
-        others show submitted-only. ADMIN sees all (support). After deadline: full table
+        others show submitted-only. Support (ADMIN) sees all (troubleshooting). After deadline: full table
         for everyone including anonymous callers.
       security: []
       parameters:
@@ -736,8 +737,8 @@ paths:
 
   /api/v1/contests/{contest_id}/admin/recalculate:
     post:
-      tags: [admin (system)]
-      summary: ADMIN full contest recalculation
+      tags: [support (system)]
+      summary: Support full contest recalculation (users.role=ADMIN)
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/contest_id' }]
       responses:
@@ -796,8 +797,8 @@ paths:
 
   /api/v1/admin/users/supervisor:
     post:
-      tags: [admin (users)]
-      summary: Create contest organizer (SUPERVISOR role; ADMIN only)
+      tags: [support (platform)]
+      summary: Create contest organizer (SUPERVISOR role; Support (ADMIN) only)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -811,7 +812,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/CreateSupervisorResponse' }
         '400': { description: Duplicate login or validation error }
-        '403': { description: Not ADMIN }
+        '403': { description: Not Support (ADMIN role) }
 
   /api/v1/admin/users/{user_id}/exceptional-tiebreak:
     put:
@@ -917,7 +918,7 @@ components:
       properties:
         id: { type: integer }
         login: { type: string }
-        role: { type: string, enum: [SUPERVISOR, ADMIN, USER] }
+        role: { type: string, enum: [SUPERVISOR, SUPPORT, USER], description: 'SUPPORT = technical support staff' }
         first_name: { type: string }
         last_name: { type: string }
         is_temp_password: { type: boolean }
@@ -942,7 +943,7 @@ components:
         name: { type: string }
         status: { $ref: '#/components/schemas/ContestStatus' }
         participant_status: { type: string, enum: [PENDING, ACCEPTED] }
-        role: { type: string, enum: [USER, SUPERVISOR, ADMIN] }
+        role: { type: string, enum: [USER, SUPERVISOR, SUPPORT], description: 'SUPPORT = technical support staff' }
         slug: { type: string, nullable: true }
     PublicContestOut:
       type: object

@@ -10,7 +10,7 @@ import {
 
 test.describe("[E2E-PRED-PRIVACY-PRE]", () => {
   test("participant sees stub before deadline on predictions tab", async ({ page }) => {
-    test.skip(!ADMIN_PASSWORD, "SEED_ADMIN_PASSWORD missing");
+    test.skip(!ADMIN_PASSWORD, "SEED_SUPPORT_PASSWORD missing");
     await ensureE2eActiveRound(1);
     const roundId = await getActiveRoundId(1);
     test.skip(!roundId, "No ACTIVE round");

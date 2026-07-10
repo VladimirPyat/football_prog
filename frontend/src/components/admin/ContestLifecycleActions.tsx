@@ -46,7 +46,7 @@ export function ContestLifecycleActions({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [working, setWorking] = useState(false);
 
-  const isStaff = user?.role === "ADMIN" || user?.role === "SUPERVISOR";
+  const isStaff = user?.role === "SUPPORT" || user?.role === "SUPERVISOR";
   const showDelete = isStaff && canDeleteContest(contest);
 
   const runLifecycle = async (action: "pause" | "resume") => {

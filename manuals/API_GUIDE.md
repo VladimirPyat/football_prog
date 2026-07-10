@@ -54,7 +54,7 @@ FastAPI application, authentication, RBAC, HTTP endpoints, and service layer int
 | OpenAPI contract | 📋 Authoritative spec | `agent_docs/contracts/api_v1.yaml` (v1.2.1) |
 | HTTP integration tests | ✅ Stage 1.6 | `tests/api/` — loader DB + httpx ASGI |
 
-**Before → After (Stage 1.6):** ADMIN can create global `SUPERVISOR` accounts via `POST /admin/users/supervisor`. Initial ADMIN/SUPERVISOR on a fresh DB via `bootstrap_users.py` + `SEED_*` env vars (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
+**Before → After (Stage 1.6):** Support (ADMIN) can create global `SUPERVISOR` accounts via `POST /admin/users/supervisor`. Initial Support/SUPERVISOR on a fresh DB via `bootstrap_users.py` + `SEED_*` env vars (see [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
 
 ## Running the Application [NEW]
 
@@ -83,7 +83,7 @@ Client → FastAPI (Uvicorn) → CORS → logging
 | Logging | `src/core/logging_config.py` | Root logger format; level from `LOG_LEVEL` |
 | Dependencies | `src/api/deps.py` | DB session, JWT user resolution, RBAC, contest context, **batch auto-close hook** [UPDATED 1.16] |
 | Routers | `src/api/v1/*.py` | HTTP mapping only — delegates to services or `src/api/handlers/` |
-| Admin users | `src/api/v1/admin_users.py` | `POST /admin/users/supervisor` (ADMIN only) [NEW] |
+| Admin users | `src/api/v1/admin_users.py` | `POST /admin/users/supervisor` (Support (ADMIN) only) [NEW] |
 | Shared handlers | `src/api/handlers/` | DRY builders for predictions view and leaderboard/results |
 | Schemas | `src/schemas/*.py` | Pydantic request/response models |
 | Security | `src/core/security.py` | bcrypt password hash/verify, JWT encode/decode |
@@ -154,7 +154,7 @@ Dev workflow without SMTP: [DEV_SETUP.md — New contest: confirm participants](
 | **Visitor** (no token) | Public GET: rounds list; round/global leaderboard and results **only for `PUBLISHED` rounds** [UPDATED]; **`GET /contests/public`** (RUNNING contests) |
 | **USER** | Own predictions read/write; **`GET /me/contests`** (enrolled contests only); round LB/results same visibility as Visitor (`PUBLISHED` only) |
 | **SUPERVISOR** | Round/match/result/VOID, calculate, publish, read contest settings; **same pre-deadline prediction privacy as USER** (own scores only); round LB/results preview for **`CALCULATED`** rounds when authenticated [UPDATED] |
-| **ADMIN** | All SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete, **create organizers** (`POST /admin/users/supervisor`); **only role that may see all predictions before deadline** (support/troubleshooting) |
+| **ADMIN** | **Support (technical staff)** — all SUPERVISOR actions + recalculate, contest lifecycle, exceptional tie-break, safe delete, **create organizers** (`POST /admin/users/supervisor`); **only role that may see all predictions before deadline** (troubleshooting) |
 
 **Contest status guards:** When `contests.status ∈ {PAUSED, FINISHED}` for the target contest, all mutating round/match/prediction operations return `403`. Public GETs remain allowed.
 
@@ -164,23 +164,23 @@ The system separates two concepts:
 
 | Concept | Storage | Meaning |
 |---------|---------|---------|
-| **Global role** | `users.role` | One value per login: `USER`, `SUPERVISOR`, or `ADMIN` |
+| **Global role** | `users.role` | One value per login: `USER`, `SUPERVISOR`, or `ADMIN` (support) |
 | **Contest membership** | `contest_participants` | Whether this login plays in a given contest (`PENDING` / `ACCEPTED`) |
 
 An organizer (`SUPERVISOR`) **may** also want to submit predictions and appear on the leaderboard. There is **no** rule forbidding that in business terms, but the product model assumes **separate logins** for the two hats:
 
 | Need | Recommended approach |
 |------|----------------------|
-| Run the contest (teams, rounds, results, calculate) | `SUPERVISOR` account — `bootstrap_users.py`, `POST /admin/users/supervisor`, or admin UI |
+| Run the contest (teams, rounds, results, calculate) | `SUPERVISOR` account — `bootstrap_users.py`, `POST /admin/users/supervisor`, or supervisor UI (`/admin/*`) |
 | Play as a participant | **`USER` account** — invite via `POST /contests/{id}/participants` like any other player |
 
 **Why not one login for both?**
 
 1. **Single global role** — `users.role` cannot be `USER` and `SUPERVISOR` at once. Invite flow always creates a new `USER`; bootstrap and organizer API create `SUPERVISOR` without enrolling them in `contest_participants`.
-2. **Prediction privacy** — before a round deadline, `USER` and `SUPERVISOR` see only their own prediction scores; others appear as submitted-only. Only `ADMIN` bypasses this filter (`prediction_service.visible_predictions`). There is no supervisor “god mode” for pre-deadline picks.
+2. **Prediction privacy** — before a round deadline, `USER` and `SUPERVISOR` see only their own prediction scores; others appear as submitted-only. Only **Support (ADMIN)** bypasses this filter (`prediction_service.visible_predictions`). There is no supervisor “god mode” for pre-deadline picks.
 3. **UI/API routing** — organizers pick contests via `GET /contests`; players via `GET /me/contests`. Two accounts keep flows clear.
 
-**What organizers can do without playing:** manage setup and scoring, publish results, and (ADMIN only) set `exceptional_tiebreak_points` when standings are tied — they do **not** need a participant row for that.
+**What organizers can do without playing:** manage setup and scoring, publish results, and (Support (ADMIN) only) set `exceptional_tiebreak_points` when standings are tied — they do **not** need a participant row for that.
 
 **Operational pattern:** same human, two logins (e.g. `ivan_org` / `ivan_player`). Invite the player email through the normal participant flow; use the organizer login only for back-office work.
 
@@ -190,21 +190,21 @@ An organizer (`SUPERVISOR`) **may** also want to submit predictions and appear o
 
 Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/…`. Legacy 1.3 paths (no `contest_id`) remain as **deprecated shims** resolving the default contest (`resolve_default_contest_id`).
 
-### Contest management (SUPERVISOR+ / ADMIN)
+### Contest management (SUPERVISOR+ / Support (ADMIN))
 
 | Method | Path | Role | Description |
 |--------|------|------|-------------|
 | `GET` | `/contests` | SUPERVISOR+ | List active contests (`deleted_at IS NULL`) |
-| `GET` | `/contests/deleted` | ADMIN | Soft-deleted contests with `restore_available` flag |
+| `GET` | `/contests/deleted` | Support (ADMIN) | Soft-deleted contests with `restore_available` flag |
 | `POST` | `/contests` | SUPERVISOR+ | Create contest (setup phase) |
 | `GET` | `/contests/{id}` | SUPERVISOR+ | Contest details |
 | `PATCH` | `/contests/{id}` | SUPERVISOR+ | Update settings (blocked when `is_locked`) |
 | `POST` | `/contests/{id}/start` | SUPERVISOR+ | DRAFT → RUNNING, `is_locked=true`; purges unconfirmed PENDING participants [UPDATED Stage 1.15] |
 | `POST` | `/contests/{id}/pause` | SUPERVISOR+ | RUNNING → PAUSED |
 | `POST` | `/contests/{id}/resume` | SUPERVISOR+ | PAUSED → RUNNING |
-| `POST` | `/contests/{id}/finish` | ADMIN; SUPERVISOR when `supervisor_training_mode=true` | RUNNING\|PAUSED → FINISHED |
+| `POST` | `/contests/{id}/finish` | Support (ADMIN); SUPERVISOR when `supervisor_training_mode=true` | RUNNING\|PAUSED → FINISHED |
 | `DELETE` | `/contests/{id}` | SUPERVISOR+ | Soft-delete: snapshot + wipe data + set `deleted_at`; DRAFT instant, PAUSED after grace; body `{confirm: "DELETE"}` → `{status: "DELETED"}` |
-| `POST` | `/contests/{id}/restore` | ADMIN | Replay snapshot within restore window; clears `deleted_at` |
+| `POST` | `/contests/{id}/restore` | Support (ADMIN) | Replay snapshot within restore window; clears `deleted_at` |
 
 ### Setup phase (SUPERVISOR+)
 
@@ -213,7 +213,7 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | `GET/POST/PATCH/DELETE` | `/contests/{id}/teams` | Team CRUD |
 | `POST` | `/contests/{id}/teams/{team_id}/logo` | Multipart logo upload (PNG/JPEG/GIF, max 2 MiB; SETUP only) |
 | `GET/POST/DELETE` | `/contests/{id}/participants` | Invite/list/remove participants |
-| `PUT` | `/contests/{id}/participants/{user_id}/exceptional-tiebreak` | Per-contest tie-break (ADMIN) |
+| `PUT` | `/contests/{id}/participants/{user_id}/exceptional-tiebreak` | Per-contest tie-break (Support (ADMIN)) |
 
 ### Contest operations
 
@@ -225,7 +225,7 @@ Stage 1.4 introduces contest-scoped routes under `/api/v1/contests/{contest_id}/
 | `GET` | `/contests/{id}/rounds/{rid}/results` | Public (optional Bearer) | Results + points; same visibility rules as round leaderboard [UPDATED] |
 | `GET` | `/contests/{id}/leaderboard` | Public | Global standings — aggregates **`PUBLISHED` rounds only** [UPDATED] |
 | `POST/PATCH/…` | `/contests/{id}/admin/rounds`, `/admin/matches/…` | SUPERVISOR+ | Round/match admin (same semantics as legacy) |
-| `POST` | `/contests/{id}/admin/recalculate` | ADMIN | Recalculate all CALCULATED rounds |
+| `POST` | `/contests/{id}/admin/recalculate` | Support (ADMIN) | Recalculate all CALCULATED rounds |
 
 **Leaderboard row fields (Stage 1.7) [UPDATED]:** Each entry includes tie-break count columns from persisted scores / `StandingRow` aggregates:
 
@@ -243,7 +243,7 @@ Round leaderboard reads per-round `scores` columns; global leaderboard uses cros
 | Viewer | Round statuses returned | HTTP when blocked |
 |--------|-------------------------|-------------------|
 | No token / `USER` | `PUBLISHED` only | `403` `RESULTS_NOT_AVAILABLE` |
-| `SUPERVISOR` / `ADMIN` | `CALCULATED`, `PUBLISHED` | `403` `RESULTS_NOT_AVAILABLE` |
+| `SUPERVISOR` / Support (ADMIN) | `CALCULATED`, `PUBLISHED` | `403` `RESULTS_NOT_AVAILABLE` |
 
 Global leaderboard (`GET …/leaderboard`) sums scores from **`PUBLISHED` rounds only** — `CALCULATED` preview rounds are excluded even for staff. Frontend should gate fetch with [STATUS_REFERENCE.md](STATUS_REFERENCE.md) §2.3 before calling public LB/results for non-`PUBLISHED` rounds.
 
@@ -300,7 +300,7 @@ Allowed while `is_temp_password=true`. Invite flow (`POST /contests/{id}/partici
 
 | Method | Path | Role | Description |
 |--------|------|------|-------------|
-| `POST` | `/admin/users/supervisor` | ADMIN | Create global contest organizer (`users.role = SUPERVISOR`) |
+| `POST` | `/admin/users/supervisor` | Support (ADMIN) | Create global contest organizer (`users.role = SUPERVISOR`) |
 
 **Request** (`CreateSupervisorRequest`):
 
@@ -320,7 +320,7 @@ Allowed while `is_temp_password=true`. Invite flow (`POST /contests/{id}/partici
 |-----------|------|--------|
 | Success | 200 | — |
 | Duplicate login | 400 | `VALIDATION_ERROR` |
-| Not ADMIN | 403 | (RBAC, no `code`) |
+| Not Support (ADMIN) | 403 | (RBAC, no `code`) |
 | Invalid body | 422 | (Pydantic) |
 
 Does **not** auto-enroll the new user in `contest_participants` — organizer is a global role, not a player.
@@ -353,11 +353,11 @@ DRAFT ──(first activate)──► RUNNING ──(POST /pause)──► PAUSE
 | Unconfirmed purge | On first activate, `contest_setup_service.purge_unconfirmed_participants` removes `contest_participants` rows with `status=PENDING` and `users.role=USER`; orphan users deleted unless enrolled in another contest |
 | Settings PATCH when locked | `403 ContestLocked` — structural fields and `rules_json` frozen |
 | Settings GET when locked | Always allowed (SUPERVISOR+) — read-only snapshot |
-| Exceptional tie-break update | Allowed by ADMIN even when locked — not part of contest rules |
-| Safe delete | SUPERVISOR+ soft-delete (DRAFT instant; PAUSED after grace); hidden from lists (`deleted_at`); ADMIN restore within snapshot window |
+| Exceptional tie-break update | Allowed by Support (ADMIN) even when locked — not part of contest rules |
+| Safe delete | SUPERVISOR+ soft-delete (DRAFT instant; PAUSED after grace); hidden from lists (`deleted_at`); Support (ADMIN) restore within snapshot window |
 | Hard purge | Ops script `purge_deleted_contests.py`; retention `contest_purge_retention_seconds` in settings (default 30 days) |
 
-**Before → After (Stage 1.15+):** Pause/resume: SUPERVISOR+. Finish: ADMIN (SUPERVISOR only when `supervisor_training_mode`). Delete: SUPERVISOR+ without training flag; restore: **ADMIN only**. Delete creates snapshot then soft-delete.
+**Before → After (Stage 1.15+):** Pause/resume: SUPERVISOR+. Finish: Support (ADMIN) (SUPERVISOR only when `supervisor_training_mode`). Delete: SUPERVISOR+ without training flag; restore: **Support (ADMIN) only**. Delete creates snapshot then soft-delete.
 
 **Safe delete wipe** (`contest_teardown.wipe_contest_data`): deletes contest-scoped operational data and resets contest to empty DRAFT (contest row retained). When training mode is on, a restore snapshot is written first — see `contest_restore_service.py`.
 
@@ -385,7 +385,7 @@ Response body: `{"detail": "<Russian message>", "code": "<CODE>"}`. See [Error R
 
 **Hard purge (ops):** `uv run python src/scripts/purge_deleted_contests.py` removes soft-deleted rows past `CONTEST_PURGE_RETENTION_SECONDS` (default 30 days). Options: `--dry-run`, `--before ISO-DATE`, `--all-deleted`.
 
-Legacy shim: `DELETE /admin/contest` (default contest only, ADMIN, deprecated).
+Legacy shim: `DELETE /admin/contest` (default contest only, Support (ADMIN), deprecated).
 
 > **SQLite note:** `paused_at` may round-trip as naive datetime. Grace-period comparison in `assert_deletable` expects timezone-aware values; normalize to UTC in production code or use PostgreSQL for production.
 

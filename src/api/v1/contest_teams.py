@@ -19,7 +19,7 @@ from services.team_out import team_to_out
 
 router = APIRouter(prefix="/contests/{contest_id}/teams", tags=["contest setup"])
 
-_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
+_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.SUPPORT))
 
 
 @router.get("", response_model=list[TeamOut], dependencies=[_supervisor])

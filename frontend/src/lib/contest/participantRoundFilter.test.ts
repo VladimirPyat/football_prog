@@ -47,6 +47,6 @@ describe("filterParticipantVisibleRounds", () => {
 
   it("keeps DRAFT rounds for staff", () => {
     expect(filterParticipantVisibleRounds(rounds, "SUPERVISOR")).toHaveLength(3);
-    expect(filterParticipantVisibleRounds(rounds, "ADMIN")).toHaveLength(3);
+    expect(filterParticipantVisibleRounds(rounds, "SUPPORT")).toHaveLength(3);
   });
 });

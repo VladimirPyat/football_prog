@@ -28,15 +28,15 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./football.db"
     jwt_secret_key: str = "dev-secret-change-in-production"
 
-    seed_admin_password: str | None = None
-    seed_admin_password_hash: str | None = None
+    seed_support_password: str | None = None
+    seed_support_password_hash: str | None = None
     seed_supervisor_password: str | None = None
     seed_supervisor_password_hash: str | None = None
 
     # ── Bootstrap identities (non-secret; override rarely) ───────────────────
-    seed_admin_login: str = "admin"
-    seed_admin_first_name: str = "Admin"
-    seed_admin_last_name: str = "User"
+    seed_support_login: str = "support"
+    seed_support_first_name: str = "Support"
+    seed_support_last_name: str = "User"
     seed_supervisor_login: str = "supervisor"
     seed_supervisor_first_name: str = "Supervisor"
     seed_supervisor_last_name: str = "User"
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # ── Logging ─────────────────────────────────────────────────────────────
     log_level: str = "INFO"
     log_to_file: bool = True
-    log_file: Path = PROJECT_ROOT / "app.log"
+    log_file: Path = PROJECT_ROOT / "logs" / "app.log"
     log_archive_dir: Path = PROJECT_ROOT / "logs" / "archive"
     log_archive_max_bytes: int = 5_242_880  # 5 MiB
     log_archive_interval_days: int = 7

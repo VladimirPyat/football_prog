@@ -23,7 +23,7 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | Login modal | `LoginModal` | `frontend/src/components/layout/LoginModal.tsx` | Heading «Вход» |
 | Login form | `LoginForm` | `frontend/src/components/auth/LoginForm.tsx` | Labels «Логин», «Пароль», button «Войти» |
 | Staff login page | `/staff/login` | `frontend/src/app/staff/login/page.tsx` | «Вход для организаторов», subtitle |
-| Admin top nav | `AdminTopNav` | `frontend/src/components/admin/AdminTopNav.tsx` | Tab labels, brand, «+ Новый конкурс» |
+| Supervisor top nav | `AdminTopNav` | `frontend/src/components/admin/AdminTopNav.tsx` | Tab labels, brand, «+ Новый конкурс» |
 
 ---
 
@@ -36,7 +36,7 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | `/contests` | `frontend/src/app/contests/page.tsx` | USER | Enrolled contests list |
 | `/change-password` | `frontend/src/app/change-password/page.tsx` | Auth + temp password | Password change form |
 | `/staff/login` | `frontend/src/app/staff/login/page.tsx` | Public | Staff-oriented login |
-| `/admin` | `frontend/src/app/admin/page.tsx` | SUPERVISOR+ | Admin dashboard stub |
+| `/admin` | `frontend/src/app/admin/page.tsx` | SUPERVISOR+ | Supervisor dashboard stub |
 | `/admin/settings/parameters` | `frontend/src/app/admin/settings/parameters/page.tsx` | SUPERVISOR+ | Contest settings stub |
 
 ---
@@ -67,7 +67,7 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | `OutcomeStatsFooter` | `frontend/src/components/predictions/OutcomeStatsFooter.tsx` | «Статистика», П1 / Х / П2 |
 | `ProfileMenu` | `frontend/src/components/profile/ProfileMenu.tsx` | «Сделать прогноз» (links to active round) |
 
-### Stage 2.3 — Supervisor admin UI
+### Stage 2.3 — Supervisor UI (`/admin/*`)
 
 #### Routes
 
@@ -79,8 +79,8 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | `/admin/rounds` | `frontend/src/app/admin/rounds/page.tsx` | SUPERVISOR+ | DRAFT builder, activate, ACTIVE editor, free tour |
 | `/admin/results` | `frontend/src/app/admin/results/page.tsx` | SUPERVISOR+ | Scores, calculate, publish, VOID |
 | `/admin/newsletters` | `frontend/src/app/admin/newsletters/page.tsx` | SUPERVISOR+ | Stage 3 placeholder |
-| `/admin/lifecycle` | `frontend/src/app/admin/lifecycle/page.tsx` | ADMIN | Pause/resume/finish/delete/recalculate |
-| `/admin/users` | `frontend/src/app/admin/users/page.tsx` | ADMIN | Create organizer (SUPERVISOR) |
+| `/admin/lifecycle` | `frontend/src/app/admin/lifecycle/page.tsx` | Support (ADMIN) only | Pause/resume/finish/delete/recalculate |
+| `/admin/users` | `frontend/src/app/admin/users/page.tsx` | Support (ADMIN) only | Create organizer (SUPERVISOR) |
 
 #### Components (editable Russian copy)
 
@@ -104,7 +104,7 @@ Human-facing map of the Next.js UI: where routes live, which components implemen
 | Module | Source file | Behavior |
 |--------|-------------|----------|
 | UI mode | `frontend/src/lib/admin/deriveAdminUiMode.ts` | `canEditRoundStructure` → `DRAFT` only; schedule edits on `ACTIVE` |
-| Schedule rules | `frontend/src/lib/admin/matchScheduleEdit.ts` | Reschedule until kickoff; cancel anytime; ADMIN restore; 7-day postpone hint |
+| Schedule rules | `frontend/src/lib/admin/matchScheduleEdit.ts` | Reschedule until kickoff; cancel anytime; Support restore; 7-day postpone hint |
 | Score validation | `frontend/src/lib/validation/admin.ts` | `matchResultSchema`: empty string invalid (not coerced to `0`) |
 | Phase panels | `frontend/src/components/admin/RoundPhasePanel.tsx` | CLOSED / CALCULATED / PUBLISHED read-only panels on `/admin/rounds` |
 | Leaderboard preview | `frontend/src/components/admin/RoundLeaderboardPreview.tsx` | Staff preview for `CALCULATED` rounds |
@@ -147,7 +147,7 @@ Public contest page `/contest/[contestId]` — **Лидерборд** and **Ре
 | Date | Stage | Summary |
 |------|-------|---------|
 | 2026-06-24 | 2.1 / 2.1.1 | Baseline shell, auth routes, admin stubs |
-| 2026-06-24 | 2.3 | Full supervisor admin UI: settings, rounds, results, lifecycle, B5 logo |
+| 2026-06-24 | 2.3 | Full supervisor UI: settings, rounds, results, lifecycle, B5 logo |
 | 2026-06-27 | 2.3.2 | ACTIVE schedule-only editing, match status confirms, empty score guard on results |
 | 2026-06-28 | 2.2 | Prediction form, privacy matrix, deadline UX, contest Прогнозы tab |
 | 2026-07-08 | 2.4 | Public LB/results API wiring; PUBLISHED gate; mock removed from contest page |

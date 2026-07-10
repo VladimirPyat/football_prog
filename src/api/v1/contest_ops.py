@@ -62,8 +62,8 @@ from services.scoring_persistence import calculate_round, recalculate_contest
 
 router = APIRouter(prefix="/contests/{contest_id}", tags=["contest operations"])
 
-_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
-_admin = Depends(RoleChecker(UserRole.ADMIN))
+_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.SUPPORT))
+_support = Depends(RoleChecker(UserRole.SUPPORT))
 
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
@@ -451,7 +451,7 @@ async def patch_status(
     return MatchStatusResponse(recalculation_triggered=recalc)
 
 
-@router.post("/admin/recalculate", dependencies=[_admin])
+@router.post("/admin/recalculate", dependencies=[_support])
 async def admin_recalculate(
     contest_id: int, session: DbSession, _contest: ContestContext
 ) -> dict:

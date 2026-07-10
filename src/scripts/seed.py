@@ -65,20 +65,20 @@ async def seed_contest(session: AsyncSession, defaults_path: Path) -> Contest:
     return contest
 
 
-def _admin_password_hash() -> str:
+def _support_password_hash() -> str:
     settings = get_settings()
-    if settings.seed_admin_password:
-        return hash_password(settings.seed_admin_password)
-    if settings.seed_admin_password_hash:
-        return settings.seed_admin_password_hash
+    if settings.seed_support_password:
+        return hash_password(settings.seed_support_password)
+    if settings.seed_support_password_hash:
+        return settings.seed_support_password_hash
     return "dev-only-placeholder-hash"
 
 
-async def seed_admin_user(session: AsyncSession, contest_id: int) -> User:
+async def seed_support_user(session: AsyncSession, contest_id: int) -> User:
     settings = get_settings()
-    existing = await session.scalar(select(User).where(User.login == settings.seed_admin_login))
+    existing = await session.scalar(select(User).where(User.login == settings.seed_support_login))
     if existing is not None:
-        logger.info("Admin user already exists (login=%s), skipping", existing.login)
+        logger.info("Support user already exists (login=%s), skipping", existing.login)
         participant = await session.get(ContestParticipant, (contest_id, existing.id))
         if participant is None:
             session.add(
@@ -91,11 +91,11 @@ async def seed_admin_user(session: AsyncSession, contest_id: int) -> User:
         return existing
 
     user = User(
-        login=settings.seed_admin_login,
-        password_hash=_admin_password_hash(),
-        role=UserRole.ADMIN,
-        first_name=settings.seed_admin_first_name,
-        last_name=settings.seed_admin_last_name,
+        login=settings.seed_support_login,
+        password_hash=_support_password_hash(),
+        role=UserRole.SUPPORT,
+        first_name=settings.seed_support_first_name,
+        last_name=settings.seed_support_last_name,
         is_temp_password=True,
     )
     session.add(user)
@@ -107,7 +107,7 @@ async def seed_admin_user(session: AsyncSession, contest_id: int) -> User:
             status=ParticipantStatus.ACCEPTED,
         )
     )
-    logger.info("Created admin user (login=%s, id=%s)", user.login, user.id)
+    logger.info("Created support user (login=%s, id=%s)", user.login, user.id)
     return user
 
 
@@ -126,14 +126,14 @@ async def run_seed(database_url: str | None = None, defaults_path: Path | None =
     async with session_factory() as session:
         async with session.begin():
             contest = await seed_contest(session, path)
-            await seed_admin_user(session, contest.id)
+            await seed_support_user(session, contest.id)
 
     await engine.dispose()
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    parser = argparse.ArgumentParser(description="Seed contest and admin user")
+    parser = argparse.ArgumentParser(description="Seed contest and support user")
     parser.add_argument(
         "--database-url",
         default=None,

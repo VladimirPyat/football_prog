@@ -5,7 +5,7 @@ const entryOwn = { user_id: 1, predictions: [{ match_id: 1 }] };
 const entryOther = { user_id: 2, predictions: null };
 const entryOtherVisible = { user_id: 2, predictions: [{ match_id: 1 }] };
 const viewer = { id: 1, role: "USER" as const };
-const admin = { id: 99, role: "ADMIN" as const };
+const support = { id: 99, role: "SUPPORT" as const };
 
 describe("shouldShowScore", () => {
   it("[UNIT-PRIVACY-SHOW] pre-deadline: own scores visible", () => {
@@ -16,9 +16,9 @@ describe("shouldShowScore", () => {
     expect(shouldShowScore(entryOther, viewer, false)).toBe(false);
   });
 
-  it("[UNIT-PRIVACY-SHOW] pre-deadline: ADMIN sees all", () => {
-    expect(shouldShowScore(entryOther, admin, false)).toBe(false);
-    expect(shouldShowScore({ user_id: 2, predictions: [{ match_id: 1 }] }, admin, false)).toBe(
+  it("[UNIT-PRIVACY-SHOW] pre-deadline: SUPPORT sees all", () => {
+    expect(shouldShowScore(entryOther, support, false)).toBe(false);
+    expect(shouldShowScore({ user_id: 2, predictions: [{ match_id: 1 }] }, support, false)).toBe(
       true,
     );
   });

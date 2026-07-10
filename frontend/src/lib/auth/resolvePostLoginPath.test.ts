@@ -4,7 +4,7 @@ import { resolvePostLoginPath } from "@/lib/auth/resolvePostLoginPath";
 describe("resolvePostLoginPath", () => {
   it("redirects temp password users to change-password", () => {
     expect(resolvePostLoginPath({ role: "USER", is_temp_password: true })).toBe("/change-password");
-    expect(resolvePostLoginPath({ role: "ADMIN", is_temp_password: true })).toBe(
+    expect(resolvePostLoginPath({ role: "SUPPORT", is_temp_password: true })).toBe(
       "/change-password",
     );
   });
@@ -20,6 +20,6 @@ describe("resolvePostLoginPath", () => {
   });
 
   it("redirects ADMIN to admin dashboard", () => {
-    expect(resolvePostLoginPath({ role: "ADMIN", is_temp_password: false })).toBe("/admin");
+    expect(resolvePostLoginPath({ role: "SUPPORT", is_temp_password: false })).toBe("/admin");
   });
 });

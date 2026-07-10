@@ -82,7 +82,7 @@ async def _seed_test_users(sf: async_sessionmaker[AsyncSession]) -> None:
             for user in all_users:
                 user.password_hash = hash_password(TEST_PASSWORD)
 
-            for login, role in [("admin_api", UserRole.ADMIN), ("supervisor_api", UserRole.SUPERVISOR)]:
+            for login, role in [("admin_api", UserRole.SUPPORT), ("supervisor_api", UserRole.SUPERVISOR)]:
                 existing = await session.scalar(select(User).where(User.login == login))
                 if existing is None:
                     session.add(

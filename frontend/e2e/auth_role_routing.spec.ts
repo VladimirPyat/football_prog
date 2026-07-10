@@ -32,7 +32,7 @@ test.describe("[E2E-ROLE-ROUTING]", () => {
   });
 
   test("[E2E-ADMIN-LOGIN-ADMIN] admin sees stub dashboard", async ({ page }) => {
-    test.skip(!ADMIN_PASSWORD, "SEED_ADMIN_PASSWORD not configured");
+    test.skip(!ADMIN_PASSWORD, "SEED_SUPPORT_PASSWORD not configured");
 
     await clearAuthStorage(page);
     await loginAsAdmin(page);

@@ -91,7 +91,7 @@ export async function supervisorToken(): Promise<string> {
 }
 
 export async function adminToken(): Promise<string> {
-  if (!ADMIN_PASSWORD) throw new Error("SEED_ADMIN_PASSWORD missing");
+  if (!ADMIN_PASSWORD) throw new Error("SEED_SUPPORT_PASSWORD missing");
   return apiLogin(ADMIN_LOGIN, ADMIN_PASSWORD);
 }
 
@@ -426,7 +426,7 @@ export async function seedSupervisorSession(page: Page): Promise<void> {
 }
 
 export async function seedAdminSession(page: Page): Promise<void> {
-  if (!ADMIN_PASSWORD) throw new Error("SEED_ADMIN_PASSWORD missing");
+  if (!ADMIN_PASSWORD) throw new Error("SEED_SUPPORT_PASSWORD missing");
   await loginAsAdmin(page);
 }
 

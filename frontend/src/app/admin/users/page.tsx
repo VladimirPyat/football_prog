@@ -40,13 +40,13 @@ export default function AdminUsersPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user && user.role !== "ADMIN") {
+    if (!loading && user && user.role !== "SUPPORT") {
       router.replace("/admin");
     }
   }, [loading, user, router]);
 
   if (loading || !user) return <LoadingState />;
-  if (user.role !== "ADMIN") return <LoadingState message="Доступ запрещён" />;
+  if (user.role !== "SUPPORT") return <LoadingState message="Доступ запрещён" />;
 
   return <UsersContent />;
 }

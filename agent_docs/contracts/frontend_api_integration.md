@@ -91,7 +91,7 @@ Config field names (`enforce_password_setup`, `frontend_base_url`, `supervisor_t
 - Attach `Authorization: Bearer <token>` to every authenticated request.
 - While `is_temp_password=true`, backend allows only `/auth/change-password` and `/auth/me`; all mutations return `403`. UI must hard-gate to `/change-password`.
 - Test credentials (seed/bootstrap, `manuals/BOOTSTRAP_USERS.md`): `admin/…`, `supervisor/…`; demo participant `user/user` from `bootstrap_users.py` (2.1.1, **TEMPORARY** until 2.3 invite UI).
-- Roles: `ADMIN ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
+- Roles: `Support (ADMIN) ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 
 ### 2.4 Post-login routing by role
 
@@ -102,7 +102,7 @@ After successful `POST /auth/login` and `GET /auth/me`, the frontend **must not*
 | `is_temp_password === true` | `/change-password` |
 | `role === 'USER'` | `/profile` (participant hub) |
 | `role === 'SUPERVISOR'` | `/admin/settings/parameters` (or `/admin` with redirect to settings stub) |
-| `role === 'ADMIN'` | `/admin` (dashboard stub until 2.3) |
+| `role === 'ADMIN'` (support) | `/admin` (dashboard stub until 2.3) |
 
 **Same resolver** applies after `POST /auth/change-password` success (not hardcoded `/profile`).
 
@@ -110,9 +110,9 @@ After successful `POST /auth/login` and `GET /auth/me`, the frontend **must not*
 
 | Route | Allowed roles | Notes |
 |-------|---------------|-------|
-| `/profile` | USER only | SUPERVISOR+/ADMIN → redirect `/admin` |
+| `/profile` | USER only | SUPERVISOR+/Support → redirect `/admin` |
 | `/admin/*` | SUPERVISOR+ | USER → redirect `/` or `/profile` |
-| `/` (authenticated) | all | USER → participant flow (`/contests`); SUPERVISOR+/ADMIN → `/admin` |
+| `/` (authenticated) | all | USER → participant flow (`/contests`); SUPERVISOR+/Support → `/admin` |
 | `/staff/login` | Visitor (login form) | Same API as modal login; staff-oriented copy |
 
 **Staff login:** optional dedicated page `/staff/login` — still `POST /auth/login`; no second auth mechanism.
@@ -225,8 +225,8 @@ const next = await res.json(); saveEtag(url, res.headers.get('ETag')); return ne
 | POST | `/api/v1/contests` | SUPERVISOR+ |
 | GET | `/api/v1/contests/{id}` | SUPERVISOR+ |
 | PATCH | `/api/v1/contests/{id}` | SUPERVISOR+ (403 when locked) |
-| POST | `/api/v1/contests/{id}/pause\|resume\|finish` | ADMIN |
-| DELETE | `/api/v1/contests/{id}` (body `{confirm:"DELETE"}`) | ADMIN |
+| POST | `/api/v1/contests/{id}/pause\|resume\|finish` | Support (ADMIN) |
+| DELETE | `/api/v1/contests/{id}` (body `{confirm:"DELETE"}`) | Support (ADMIN) |
 
 ### 5.3 Setup (SUPERVISOR+, SETUP phase)
 | Method | Path |
@@ -235,7 +235,7 @@ const next = await res.json(); saveEtag(url, res.headers.get('ETag')); return ne
 | PATCH/DELETE | `/api/v1/contests/{id}/teams/{team_id}` |
 | GET/POST | `/api/v1/contests/{id}/participants` |
 | DELETE | `/api/v1/contests/{id}/participants/{user_id}` |
-| PUT | `/api/v1/contests/{id}/participants/{user_id}/exceptional-tiebreak` (ADMIN, allowed when locked) |
+| PUT | `/api/v1/contests/{id}/participants/{user_id}/exceptional-tiebreak` (Support (ADMIN), allowed when locked) |
 
 ### 5.4 Public / User (contest-scoped)
 | Method | Path | Role |
@@ -256,8 +256,8 @@ const next = await res.json(); saveEtag(url, res.headers.get('ETag')); return ne
 | POST | `/api/v1/contests/{id}/admin/rounds/{rid}/activate\|close\|calculate\|publish` |
 | PUT | `/api/v1/contests/{id}/admin/matches/{mid}/result` |
 | PATCH | `/api/v1/contests/{id}/admin/matches/{mid}/status` |
-| POST | `/api/v1/contests/{id}/admin/recalculate` (ADMIN) |
-| POST | `/api/v1/admin/users/supervisor` (ADMIN, global) |
+| POST | `/api/v1/contests/{id}/admin/recalculate` (Support (ADMIN)) |
+| POST | `/api/v1/admin/users/supervisor` (Support (ADMIN), global) |
 
 ---
 
@@ -292,7 +292,7 @@ Helper: `resolveDefaultContestId()` — reads env, validates number, used by Vis
 
 ```ts
 // UserOut
-{ id:number; login:string; role:'SUPERVISOR'|'ADMIN'|'USER'; first_name:string; last_name:string; is_temp_password:boolean }
+{ id:number; login:string; role:'SUPERVISOR'|'ADMIN'|'USER'; /* ADMIN = support */ first_name:string; last_name:string; is_temp_password:boolean }
 
 // ContestOut
 { id:number; name:string; slug:string|null; is_locked:boolean;

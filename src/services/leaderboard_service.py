@@ -30,7 +30,7 @@ from services.team_display import match_team_fields
 
 logger = logging.getLogger(__name__)
 
-_STAFF_ROLES: frozenset[str] = frozenset({"SUPERVISOR", "ADMIN"})
+_STAFF_ROLES: frozenset[str] = frozenset({"SUPERVISOR", "SUPPORT"})
 LeaderboardScope = frozenset({"round", "total"})
 
 

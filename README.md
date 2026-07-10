@@ -41,7 +41,7 @@ Full-stack приложение: участники сдают прогнозы 
 
 ```bash
 uv sync
-cp .env.example .env                    # SEED_ADMIN_PASSWORD, SEED_SUPERVISOR_PASSWORD
+cp .env.example .env                    # SEED_SUPPORT_PASSWORD (support), SEED_SUPERVISOR_PASSWORD
 cp frontend/.env.local.example frontend/.env.local   # API URL, Europe/Moscow display TZ
 uv run python src/scripts/dev_setup.py --run   # БД + API (:8000) + UI (:3000)
 ```

@@ -180,7 +180,7 @@ On VOID or result change: re-run the full round in one atomic transaction.
 4. `correct_diffs_count DESC` — sum of `count_diff`
 5. `manual_override DESC` — `contest_participants.exceptional_tiebreak_points` (admin-set per contest; default 0) [UPDATED]
 
-**Before → After:** Criterion 5 was on `users.exceptional_tiebreak_points` (Stage 1.2.1). Stage 1.4 moved it to `contest_participants.exceptional_tiebreak_points` — per-user **per-contest**, updatable by ADMIN at any time (even when contest is locked). `LeaderboardService` loads participants for the contest and passes `manual_overrides` to `build_standings()`.
+**Before → After:** Criterion 5 was on `users.exceptional_tiebreak_points` (Stage 1.2.1). Stage 1.4 moved it to `contest_participants.exceptional_tiebreak_points` — per-user **per-contest**, updatable by Support (ADMIN) at any time (even when contest is locked). `LeaderboardService` loads participants for the contest and passes `manual_overrides` to `build_standings()`.
 
 `tiebreaker_status = "manual_override"` is set on rows whose position was decided by criterion 5.
 

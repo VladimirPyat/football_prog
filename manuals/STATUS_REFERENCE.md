@@ -17,7 +17,7 @@
 | `DRAFT` | Черновик / «Настройка» | Конкурс создан, но ещё не запущен. Можно менять параметры, команды, приглашать участников. |
 | `RUNNING` | Идёт | Рабочий режим: прогнозы, туры, результаты, расчёт очков. |
 | `PAUSED` | Приостановлен | Все изменяющие операции заблокированы; публичное чтение (таблица, туры) доступно. Нужен перед безопасным удалением конкурса. |
-| `FINISHED` | Завершён | Конкурс досрочно завершён; мутации запрещены (кроме ADMIN-пересчёта по политике API). |
+| `FINISHED` | Завершён | Конкурс досрочно завершён; мутации запрещены (кроме Support-пересчёта по политике API). |
 
 ### Переходы
 
@@ -40,7 +40,7 @@ DRAFT ──(первая активация тура)──► RUNNING ──pa
 | Создание | `src/services/contest_setup_service.py` | Новый конкурс всегда в `DRAFT` |
 | Фронт — типы | `frontend/src/types/api.ts` → `ContestStatus` | TypeScript union |
 | Фронт — список | `frontend/src/components/contest/ContestList.tsx` → `STATUS_LABELS` | Подписи в списке конкурсов |
-| Фронт — админка | `frontend/src/lib/admin/deriveAdminUiMode.ts` | Баннеры паузы/завершения, блокировка кнопок |
+| Фронт — панель организатора | `frontend/src/lib/admin/deriveAdminUiMode.ts` | Баннеры паузы/завершения, блокировка кнопок |
 | Фронт — действия | `frontend/src/components/admin/ContestLifecycleActions.tsx` | Пауза / возобновление |
 | Фронт — баннер | `frontend/src/components/admin/ContestStatusBanner.tsx` | «Конкурс на паузе» / завершён |
 
@@ -91,7 +91,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 
 | Слой | Файл | Правило |
 |------|------|---------|
-| Backend | `src/services/leaderboard_service.py` | `_allowed_round_statuses`: публичный GET — только `PUBLISHED`; для `SUPERVISOR`/`ADMIN` — также `CALCULATED` (preview) |
+| Backend | `src/services/leaderboard_service.py` | `_allowed_round_statuses`: публичный GET — только `PUBLISHED`; для `SUPERVISOR`/Support (ADMIN) — также `CALCULATED` (preview) |
 | Backend | `get_global_leaderboard` | Агрегировать только туры `PUBLISHED` |
 | Backend | `contest_ops.py`, `admin_misc.py` | Optional Bearer → `viewer_role` на round LB/results |
 | Frontend | `frontend/src/lib/contest/roundPublicVisibility.ts` | `isRoundPubliclyVisible(status) => status === 'PUBLISHED'` |
@@ -117,7 +117,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Перенос времени (несколько часов) | До `date_time` матча | `datetime-local` + «Сохранить»; предупреждение при сдвиге ≥ 7 суток |
 | Отмена (`CANCELED`) | Пока матч не `CANCELED`/`FINISHED`/`VOID` | Статус в `<select>` → подтверждение → PATCH |
 | Перенос (`POSTPONED`) | Из `SCHEDULED` | Статус в `<select>` → подтверждение → PATCH → модалка свободного тура |
-| Восстановление (`SCHEDULED`) | Только `ADMIN` из `CANCELED`/`POSTPONED` | Статус в `<select>` → подтверждение |
+| Восстановление (`SCHEDULED`) | Только **Support (ADMIN)** из `CANCELED`/`POSTPONED` | Статус в `<select>` → подтверждение |
 
 Правила: `frontend/src/lib/admin/matchScheduleEdit.ts`. Ввод счёта на «Результаты»: пустые поля ≠ 0 (`matchResultSchema` без `z.coerce` на пустую строку).
 
@@ -137,10 +137,10 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 
 ### Что можно делать в каждой фазе (кратко)
 
-| Статус | Прогнозы участников | Редактирование тура (админка) | Результаты |
+| Статус | Прогнозы участников | Редактирование тура (панель организатора) | Результаты |
 |--------|---------------------|------------------------------|------------|
 | `DRAFT` | Нет | Полное (матчи, команды, дедлайн) | Нет |
-| `ACTIVE` | Да, пока `now < deadline` | **Frontend [UPDATED]:** состав матчей (команды) **не редактируется** — только расписание: перенос времени до начала матча (независимо от дедлайна прогнозов), отмена (с подтверждением), статус «Перенесён» + свободный тур; восстановление `CANCELED`/`POSTPONED` → `SCHEDULED` — только **ADMIN**. Кнопка «Сохранить» не блокируется 24h lockout дедлайна, если меняли только матчи. **Backend:** PATCH по-прежнему может принять смену команд до дедлайна прогнозов (см. todo). | Нет |
+| `ACTIVE` | Да, пока `now < deadline` | **Frontend [UPDATED]:** состав матчей (команды) **не редактируется** — только расписание: перенос времени до начала матча (независимо от дедлайна прогнозов), отмена (с подтверждением), статус «Перенесён» + свободный тур; восстановление `CANCELED`/`POSTPONED` → `SCHEDULED` — только **Support (ADMIN)**. Кнопка «Сохранить» не блокируется 24h lockout дедлайна, если меняли только матчи. **Backend:** PATCH отклоняет смену команд на ACTIVE туре. | Нет |
 | `CLOSED` | Нет | Только просмотр на «Туры» | Ввод счёта |
 | `CALCULATED` | Нет | Только просмотр | Правка счёта + авто-пересчёт, публикация / VOID |
 | `PUBLISHED` | Нет | Только просмотр | Только VOID (с пересчётом) |
@@ -214,7 +214,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 
 ## 4. Сводка: API ↔ UI (туры и матчи)
 
-Единый источник подписей для админки — **`frontend/src/lib/admin/format.ts`**.
+Единый источник подписей для панели организатора — **`frontend/src/lib/admin/format.ts`**.
 
 ### Туры — текущее и целевое
 
@@ -243,7 +243,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Объект | Поле | Значения | Где подписи |
 |--------|------|----------|-------------|
 | Участник конкурса | `contest_participants.status` | `PENDING`, `ACCEPTED` | `participantStatusLabel()` в `format.ts` |
-| Глобальная роль | `users.role` | `USER`, `SUPERVISOR`, `ADMIN` | Не статусная машина; RBAC в API |
+| Глобальная роль | `users.role` | `USER`, `SUPERVISOR`, `ADMIN` (support) | Не статусная машина; RBAC в API |
 
 ---
 

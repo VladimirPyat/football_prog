@@ -27,7 +27,7 @@ from services.scoring_persistence import calculate_round
 
 router = APIRouter(prefix="/admin/rounds", tags=["legacy (deprecated)", "admin (supervisor)"])
 
-_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
+_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.SUPPORT))
 
 
 @router.post("", dependencies=[_supervisor], deprecated=True)

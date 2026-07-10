@@ -6,7 +6,7 @@
 - `id`: INTEGER PRIMARY KEY
 - `login`: VARCHAR UNIQUE NOT NULL
 - `password_hash`: VARCHAR NOT NULL
-- `role`: VARCHAR NOT NULL (Enum: 'SUPERVISOR', 'ADMIN', 'USER')
+- `role`: VARCHAR NOT NULL (Enum: 'SUPERVISOR', 'ADMIN' (support), 'USER')
 - `first_name`: VARCHAR NOT NULL
 - `last_name`: VARCHAR NOT NULL
 - `is_temp_password`: BOOLEAN NOT NULL DEFAULT FALSE

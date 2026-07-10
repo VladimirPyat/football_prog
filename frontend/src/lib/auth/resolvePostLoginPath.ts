@@ -7,7 +7,7 @@ export function resolvePostLoginPath(user: Pick<UserOut, "role" | "is_temp_passw
       return "/profile";
     case "SUPERVISOR":
       return "/admin/settings/parameters";
-    case "ADMIN":
+    case "SUPPORT":
       return "/admin";
     default:
       return "/";

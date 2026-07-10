@@ -35,7 +35,7 @@ From the repository root:
 ```bash
 # 1. Environment (once)
 cp .env.example .env
-# Edit .env: set SEED_ADMIN_PASSWORD and SEED_SUPERVISOR_PASSWORD (see .env.example)
+# Edit .env: set SEED_SUPPORT_PASSWORD and SEED_SUPERVISOR_PASSWORD (see .env.example)
 
 # 2. Bootstrap DB + start API & UI (one command)
 uv run python src/scripts/dev_setup.py --run
@@ -120,7 +120,7 @@ uv run python src/scripts/dev_setup.py --check-ports
 2. Warn if `.env` missing (copy from `.env.example` manually)
 3. `alembic upgrade head`
 4. `load_test_data.py --reset` — contest **id=1**, 16 teams, 10 users (`user`/`user`, …), rounds 1–10 from CSV
-5. `bootstrap_users.py` — **after loader** (loader `--reset` deletes all `users`; bootstrap restores `admin` / `supervisor` from `.env`)
+5. `bootstrap_users.py` — **after loader** (loader `--reset` deletes all `users`; bootstrap restores `support` / `supervisor` from `.env`)
 6. **Dev contest state** — contest `1` → `RUNNING` + `is_locked=true`
 7. **`finalize_dev_fixture`** (manual profile, default) — rounds **1–9** `PUBLISHED` with `scores` (90 rows ≡ `expected_scores.csv`), round **10** `CALCULATED` (10 scores, not published), round **11** `CLOSED` (awaiting results entry)
 
@@ -231,7 +231,7 @@ Use `127.0.0.1` consistently (matches Playwright `baseURL` in tester instruction
 |------|-------|----------|--------|
 | USER (contracted) | `shutov` (or any CSV login) | `user` | `load_test_data.py` — all contracted users share dev password `user` |
 | SUPERVISOR | `supervisor` | value from `.env` `SEED_SUPERVISOR_PASSWORD` | `bootstrap_users.py` |
-| ADMIN | `admin` | value from `.env` `SEED_ADMIN_PASSWORD` | `bootstrap_users.py` |
+| Support | `support` | value from `.env` `SEED_SUPPORT_PASSWORD` | `bootstrap_users.py` |
 
 > **Note:** For new participants use supervisor invite UI (`/admin/settings/participants`) or `dev_invite_setup.py confirm-all`. Playwright E2E provisions a dedicated user via `playwright.global-setup.ts`.
 
@@ -275,7 +275,7 @@ Lint IDs for tester reports: `[LINT-ESLINT]`, `[LINT-TSC]`, `[LINT-PRETTIER]` �
 
 | Symptom | Fix |
 |---------|-----|
-| `bootstrap_users` skips / no admin | Set `SEED_ADMIN_PASSWORD` in `.env` |
+| `bootstrap_users` skips / no support user | Set `SEED_SUPPORT_PASSWORD` in `.env` |
 | `GET /contests/public` returns `[]` | Re-run `dev_setup.py` (contest must be **RUNNING**) |
 | CORS errors from `:3000` | Ensure `CORS_ORIGINS` includes frontend origin or `["*"]` |
 | `load_test_data` unique constraint | Use `--reset` or run full `dev_setup.py` |
@@ -307,7 +307,7 @@ Legacy automated login in tests only: `ENFORCE_PASSWORD_SETUP=false` via **shell
 
 1. Start stack: `uv run python src/scripts/dev_setup.py --run-only` (or `--run` on fresh DB).
 2. Log in as **supervisor** → **Настройки** → **Участники** (`/admin/settings/participants`).
-3. Select the target contest (multi-contest: switch contest in admin shell).
+3. Select the target contest (multi-contest: switch contest in supervisor shell).
 4. Fill invite form (email, name) → **Пригласить**.
 5. Modal shows **login**, **temporary password**, and **`setup_url`** — copy all three (button «Скопировать»).
 6. **Confirm the participant** (pick one):
@@ -504,7 +504,7 @@ E2E (`admin_setup`, `supervisor_create_round`, …) creates many **DRAFT** and *
 | **PAUSED** | **Удалить конкурс** (after grace if delete button was disabled) |
 | **FINISHED** | No delete in supervisor UI — skip or full DB reset below |
 
-Soft-deleted contests disappear from `GET /contests` but remain in DB until purged. ADMIN may **restore** within the training window on `/admin/lifecycle`.
+Soft-deleted contests disappear from `GET /contests` but remain in DB until purged. Support (ADMIN) may **restore** within the training window on `/admin/lifecycle`.
 
 There is **no bulk script** for deleting many active DRAFT/RUNNING rows — loop in UI or reset DB.
 
@@ -530,7 +530,7 @@ Use when the picker has dozens of E2E leftovers and you do not need to keep cust
 | Goal | Action |
 |------|--------|
 | Hide a draft from lists (soft delete) | UI: «Удалить конкурс» on parameters (DRAFT/PAUSED) |
-| Restore within window | ADMIN: `/admin/lifecycle` → «Восстановить» |
+| Restore within window | Support (ADMIN): `/admin/lifecycle` → «Восстановить» |
 | **Hard-delete** soft-deleted rows from DB | `purge_deleted_contests.py --all-deleted` (see above) |
 | Purge by retention TTL only | `uv run python src/scripts/purge_deleted_contests.py` |
 | Reset everything to dev fixture | `uv run python src/scripts/dev_setup.py` |

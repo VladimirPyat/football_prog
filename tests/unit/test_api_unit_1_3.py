@@ -75,22 +75,22 @@ class TestSchemas:
 class TestRoleChecker:
     @pytest.mark.asyncio
     async def test_allowed_role_passes(self) -> None:
-        checker = RoleChecker(UserRole.ADMIN)
+        checker = RoleChecker(UserRole.SUPPORT)
         user = User(
             id=1,
             login="admin",
             password_hash="h",
-            role=UserRole.ADMIN,
+            role=UserRole.SUPPORT,
             first_name="A",
             last_name="B",
             is_temp_password=False,
         )
         result = await checker(user)
-        assert result.role == UserRole.ADMIN
+        assert result.role == UserRole.SUPPORT
 
     @pytest.mark.asyncio
     async def test_forbidden_role_raises_403(self) -> None:
-        checker = RoleChecker(UserRole.ADMIN)
+        checker = RoleChecker(UserRole.SUPPORT)
         user = User(
             id=2,
             login="user",

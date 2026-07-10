@@ -38,8 +38,8 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:800
 export const SUPERVISOR_LOGIN = rootEnv.SEED_SUPERVISOR_LOGIN ?? "supervisor";
 export const SUPERVISOR_PASSWORD = rootEnv.SEED_SUPERVISOR_PASSWORD ?? "";
 
-export const ADMIN_LOGIN = rootEnv.SEED_ADMIN_LOGIN ?? "admin";
-export const ADMIN_PASSWORD = rootEnv.SEED_ADMIN_PASSWORD ?? "";
+export const ADMIN_LOGIN = rootEnv.SEED_SUPPORT_LOGIN ?? "support";
+export const ADMIN_PASSWORD = rootEnv.SEED_SUPPORT_PASSWORD ?? "";
 
 export const CONTRACTED_E2E_USER_LOGIN = "shutov";
 export const CONTRACTED_E2E_USER_PASSWORD = "user";

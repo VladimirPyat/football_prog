@@ -18,7 +18,7 @@ from services.match_service import change_status, set_result
 
 router = APIRouter(prefix="/admin/matches", tags=["legacy (deprecated)", "admin (supervisor)"])
 
-_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
+_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.SUPPORT))
 
 
 @router.put("/{match_id}/result", response_model=MatchResultResponse, dependencies=[_supervisor], deprecated=True)

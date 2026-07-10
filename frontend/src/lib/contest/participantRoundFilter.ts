@@ -1,6 +1,6 @@
 import type { RoundOut, UserRole } from "@/types/api";
 
-const PRIVILEGED_ROLES = new Set<UserRole>(["ADMIN", "SUPERVISOR"]);
+const PRIVILEGED_ROLES = new Set<UserRole>(["SUPPORT", "SUPERVISOR"]);
 
 /** Hide DRAFT rounds from participants and visitors; staff see all rounds. */
 export function filterParticipantVisibleRounds(

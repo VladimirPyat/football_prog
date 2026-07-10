@@ -25,7 +25,7 @@ SCORE_RANGE_CHECK = (
 
 class UserRole(StrEnum):
     SUPERVISOR = "SUPERVISOR"
-    ADMIN = "ADMIN"
+    SUPPORT = "SUPPORT"
     USER = "USER"
 
 

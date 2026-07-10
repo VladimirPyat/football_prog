@@ -18,7 +18,7 @@ DRAFT ──(first round activate)──► RUNNING ──(POST pause)──► 
 | `DRAFT` | SETUP | `false` | Contest being configured; structural CRUD allowed |
 | `RUNNING` | OPERATIONAL | `true` (after first activate) | Predictions, rounds, results, calculate |
 | `PAUSED` | OPERATIONAL (frozen) | `true` | No mutating ops; public GET OK; required before safe delete |
-| `FINISHED` | TERMINAL | `true` | Read-only; recalculate (ADMIN) still allowed |
+| `FINISHED` | TERMINAL | `true` | Read-only; recalculate (Support (ADMIN)) still allowed |
 
 **First activation side effects:** `contests.is_locked = true`, `contests.status: DRAFT → RUNNING`.
 
@@ -26,7 +26,7 @@ DRAFT ──(first round activate)──► RUNNING ──(POST pause)──► 
 
 | Operation | SETUP (`DRAFT`, `!is_locked`) | RUNNING / PAUSED / FINISHED (`is_locked`) |
 |-----------|--------------------------------|-------------------------------------------|
-| `POST /contests` | ✅ ADMIN/SUPERVISOR | ✅ (new contest starts in DRAFT) |
+| `POST /contests` | ✅ Support (ADMIN)/SUPERVISOR | ✅ (new contest starts in DRAFT) |
 | `PATCH /contests/{id}` (structure, `rules_json`) | ✅ | ❌ 403 ContestLocked |
 | CRUD teams | ✅ | ❌ 403 |
 | CRUD participants, send invite | ✅ | ❌ 403 |
@@ -39,7 +39,7 @@ DRAFT ──(first round activate)──► RUNNING ──(POST pause)──► 
 | POST calculate | ❌ | ✅ round must be CLOSED |
 | POST publish | ❌ | ✅ round CALCULATED |
 | PUT exceptional-tiebreak on participant | ✅ (no effect until scored) | ✅ **allowed** (operational, not rules) |
-| POST pause / resume / finish | ❌ from DRAFT (finish → 409) | ✅ ADMIN |
+| POST pause / resume / finish | ❌ from DRAFT (finish → 409) | ✅ Support (ADMIN) |
 | DELETE contest (safe delete) | ❌ | ✅ PAUSED + grace |
 
 \*If round still ACTIVE at deadline, **auto-close** (sync hook) or explicit **close** must run first so status becomes CLOSED before results.
@@ -99,7 +99,7 @@ Illegal: skip states (e.g. ACTIVE → CALCULATED), mutate PUBLISHED round struct
 | `now < round.deadline` | Allowed |
 | Any of above fails | 403 |
 
-GET predictions visibility: pre-deadline — own scores only for USER and SUPERVISOR; ADMIN sees all (support). Anonymous callers receive **403** `PREDICTIONS_NOT_PUBLIC`. Post-deadline — full table for everyone (including anonymous). Aligns with `docs/03_user_scenarios.md` §4.
+GET predictions visibility: pre-deadline — own scores only for USER and SUPERVISOR; Support (ADMIN) sees all (troubleshooting). Anonymous callers receive **403** `PREDICTIONS_NOT_PUBLIC`. Post-deadline — full table for everyone (including anonymous). Aligns with `docs/03_user_scenarios.md` §4.
 
 ### 3.4 Results window
 
@@ -152,6 +152,6 @@ Shims are **deprecated**; new clients must use contest-scoped paths.
 ## 7. Exceptional tie-break (unchanged semantics from 1.3)
 
 - **Not** contest rules; stored on `contest_participants.exceptional_tiebreak_points`.
-- ADMIN may set **after** `is_locked = true`.
+- Support (ADMIN) may set **after** `is_locked = true`.
 - Criterion 5 when keys 1–4 tie; see `leaderboard_tiebreakers.md`.
 - API: `PUT .../contests/{contest_id}/participants/{user_id}/exceptional-tiebreak`.

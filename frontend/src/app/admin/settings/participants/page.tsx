@@ -49,7 +49,7 @@ export default function AdminSettingsParticipantsPage() {
         <ParticipantsTable
           participants={participants}
           readonly={uiMode.setupReadonly}
-          isAdmin={role === "ADMIN"}
+          isAdmin={role === "SUPPORT"}
           onDelete={async (userId) => {
             try {
               await remove(userId);

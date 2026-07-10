@@ -35,20 +35,20 @@ from services.contest_setup_service import create_contest, update_contest
 
 router = APIRouter(prefix="/contests", tags=["contests"])
 
-_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
-_admin = Depends(RoleChecker(UserRole.ADMIN))
+_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.SUPPORT))
+_support = Depends(RoleChecker(UserRole.SUPPORT))
 
 
 async def require_delete_role(user: CurrentUser) -> User:
     """SUPERVISOR and ADMIN may delete contests (subject to lifecycle rules)."""
-    if user.role not in {UserRole.ADMIN.value, UserRole.SUPERVISOR.value}:
+    if user.role not in {UserRole.SUPPORT.value, UserRole.SUPERVISOR.value}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     return user
 
 
 async def require_finish_role(user: CurrentUser) -> User:
     """ADMIN may finish; SUPERVISOR only in training mode."""
-    if user.role == UserRole.ADMIN.value:
+    if user.role == UserRole.SUPPORT.value:
         return user
     settings = get_settings()
     if user.role == UserRole.SUPERVISOR.value and settings.supervisor_training_mode:
@@ -58,7 +58,7 @@ async def require_finish_role(user: CurrentUser) -> User:
 
 async def require_restore_role(user: CurrentUser) -> User:
     """Only ADMIN may restore soft-deleted contests."""
-    if user.role != UserRole.ADMIN.value:
+    if user.role != UserRole.SUPPORT.value:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     return user
 
@@ -93,7 +93,7 @@ async def list_contests(session: DbSession) -> list[ContestOut]:
     return [ContestOut.model_validate(c) for c in contests]
 
 
-@router.get("/deleted", response_model=list[DeletedContestOut], dependencies=[_admin])
+@router.get("/deleted", response_model=list[DeletedContestOut], dependencies=[_support])
 async def list_deleted(session: DbSession) -> list[DeletedContestOut]:
     """Soft-deleted contests (ADMIN) — for restore within snapshot window."""
     from sqlalchemy import select  # noqa: PLC0415

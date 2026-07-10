@@ -162,7 +162,7 @@ async def visible_predictions(
         deadline = deadline.replace(tzinfo=UTC)
 
     after_deadline = now >= deadline
-    is_privileged = viewer_role == UserRole.ADMIN
+    is_privileged = viewer_role == UserRole.SUPPORT
 
     predictions = (
         await session.scalars(

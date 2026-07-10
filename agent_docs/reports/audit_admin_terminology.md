@@ -488,5 +488,40 @@ No code changes made. After your review, typical split:
 ## 15. Status
 
 - **2026-07-02:** Audit complete incl. `docs/` specs; §13–14 added for role/path rename planning.
-- **No files modified** except this report.
+- **2026-07-11:** Documentation pass (§16) + **env rename in code** (`SEED_SUPPORT_*`, `seed_support_*`, `seed_support_user()`). `docs/` updated manually. API paths `/admin/*` unchanged; `users.role=ADMIN` enum unchanged.
+
+---
+
+## 16. Applied documentation changes (2026-07-11)
+
+| Area | Files updated | Notes |
+|------|---------------|-------|
+| **Contracts** | `api_v1.yaml`, `frontend_api_integration.md`, `contest_lifecycle_flow.md`, `db_schema.md`, `admin_ui_status_matrix.md`, `leaderboard_tiebreakers.md`, `ERROR_LOGGING.md` | Tags `support (system)`, `support (platform)`; RBAC prose → Support (ADMIN); **paths unchanged** |
+| **Manuals** | `README.md` (glossary), `API_GUIDE.md`, `CONFIG.md`, `BOOTSTRAP_USERS.md`, `DEV_SETUP.md`, `FRONTEND_REFERENCE.md`, `SUPERVISOR_TESTING_SCENARIOS.md`, `STATUS_REFERENCE.md`, `ARCHITECTURE.md`, `DB_REFERENCE.md`, `DEPLOYMENT.md`, `SCORING_LOGIC.md` | «админка» → панель организатора; ADMIN role → Support (ADMIN) |
+| **Env** | `.env.example`, `frontend/.env.local.example`, `config/settings.py`, `bootstrap_users.py`, `seed.py`, `dev_setup.py`, E2E fixtures | `SEED_ADMIN_*` → `SEED_SUPPORT_*` |
+| **Root** | `README.md` | Support bootstrap note |
+
+**Не трогали:** `docs/` (human), `agent_docs/instructions/*` (исторические), API paths, компоненты `AdminTopNav` и т.д.
+
+### API contract — support endpoints (implemented)
+
+| Endpoint | Role | Status |
+|----------|------|--------|
+| `POST /api/v1/admin/users/supervisor` | Support (ADMIN) only | ✅ `admin_users.py` |
+| `POST /api/v1/contests/{id}/admin/recalculate` | Support (ADMIN) only | ✅ `contest_ops.py` |
+| `GET /api/v1/contests/deleted` | Support (ADMIN) | ✅ |
+| `POST /api/v1/contests/{id}/restore` | Support (ADMIN) | ✅ |
+| `POST /api/v1/contests/{id}/finish` | Support (ADMIN) (+ training mode) | ✅ |
+| `PUT …/exceptional-tiebreak` | Support (ADMIN) | ✅ |
+| `…/admin/rounds/*` etc. | SUPERVISOR+ (organizer) | ✅ Paths unchanged — historical «admin» = supervisor ops |
+
+### Контекст путаницы (зафиксировано)
+
+Пути `…/admin/rounds` и UI `/admin/*` — **организатор (supervisor)**, не support. Переименование путей отложено (риск регрессии); в документах добавлен глоссарий в `manuals/README.md`.
+
+### Still deferred
+
+- ~~`users.role` enum `ADMIN` → `SUPPORT` in code/DB~~ — **done 2026-07-11** (`UserRole.SUPPORT`, migration `h9i0j1k2l3m4`, default login `support`)
+- API path rename `/admin/users` → `/support/users` (optional, P1)
+- `agent_docs/instructions/*`, `agent_docs/ui/*` — historical, intentionally unchanged
 

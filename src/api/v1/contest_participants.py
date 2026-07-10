@@ -18,8 +18,8 @@ from services.contest_setup_service import add_participant, list_participants, r
 
 router = APIRouter(prefix="/contests/{contest_id}/participants", tags=["contest setup"])
 
-_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.ADMIN))
-_admin = Depends(RoleChecker(UserRole.ADMIN))
+_supervisor = Depends(RoleChecker(UserRole.SUPERVISOR, UserRole.SUPPORT))
+_support = Depends(RoleChecker(UserRole.SUPPORT))
 
 
 @router.get("", response_model=list[ParticipantOut], dependencies=[_supervisor])
@@ -69,7 +69,7 @@ async def delete_participant(
 @router.put(
     "/{user_id}/exceptional-tiebreak",
     response_model=ExceptionalTiebreakResponse,
-    dependencies=[_admin],
+    dependencies=[_support],
 )
 async def set_exceptional_tiebreak(
     contest_id: int,

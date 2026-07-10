@@ -107,8 +107,8 @@ def check_prerequisites(*, require_frontend: bool = False) -> list[str]:
     env_file = PROJECT_ROOT / ".env"
     if not env_file.exists():
         warnings.append(".env missing — copy .env.example and set SEED_*_PASSWORD")
-    elif env_file.read_text(encoding="utf-8").find("your-admin-password-here") >= 0:
-        warnings.append(".env still has placeholder SEED_ADMIN_PASSWORD — edit before bootstrap")
+    elif env_file.read_text(encoding="utf-8").find("your-support-password-here") >= 0:
+        warnings.append(".env still has placeholder SEED_SUPPORT_PASSWORD — edit before bootstrap")
     if require_frontend:
         if shutil.which("node") is None:
             warnings.append("node not found — required for --run")
