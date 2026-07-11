@@ -25,7 +25,7 @@ from database.models import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CONTEST_DEFAULTS_PATH = PROJECT_ROOT / "docs" / "test_data" / "config" / "contest_defaults.json"
+CONTEST_DEFAULTS_PATH = PROJECT_ROOT / "config" / "contest_defaults.json"
 
 
 @pytest_asyncio.fixture

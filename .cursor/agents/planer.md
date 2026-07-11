@@ -33,7 +33,7 @@ Translate requirements from `docs/` into actionable artifacts that @Coder and @T
 
 ## PHASE A: Drafts & Review (Always start here)
 
-1. Read relevant files from `docs/` (e.g. `01_tech_regulations.md`, `02_project_structure.md`, `03_user_scenarios.md`, `04_supervisor_scenario.md`, `test_data/config/contest_defaults.json`) and any user-specified docs.
+1. Read relevant files from `docs/` (e.g. `01_tech_regulations.md`, `02_project_structure.md`, `03_user_scenarios.md`, `04_supervisor_scenario.md`) and `config/contest_defaults.json`, plus any user-specified docs.
 2. Generate draft artifacts in:
    - `agent_docs/contracts/` — API contracts, data schemas, validation rules
    - `agent_docs/plans/` — architecture decisions, stage breakdowns, dependency notes

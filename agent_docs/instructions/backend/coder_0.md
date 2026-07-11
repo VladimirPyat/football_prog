@@ -25,7 +25,7 @@ Create the models in `src/database/models.py` (or a similar structure) according
 - Generate the initial migration: `alembic revision --autogenerate -m "Initial schema"`.
 
 ### 3.3 Seed Script
-- Create a script (e.g., `src/scripts/seed.py`) that reads `docs/test_data/config/contest_defaults.json`.
+- Create a script (e.g., `src/scripts/seed.py`) that reads `config/contest_defaults.json`.
 - Insert the JSON data into the `contest_settings` table.
 - Create an initial ADMIN user (from configuration or hardcoded defaults for dev).
 

@@ -1,0 +1,64 @@
+# Football Predictions Contest — Docker Compose (web_dev / web_prod).
+#
+# Server `.env` (gitignored) holds APP_MODE, secrets, and public URLs.
+# Persistent data lives under ./data/ (also gitignored) — survives rebuilds.
+#
+# APP_MODE=web_dev  → SQLite in ./data/football.db (no PostgreSQL container)
+# APP_MODE=web_prod → PostgreSQL (`docker compose --profile prod up`)
+#
+# First deploy:  manuals/DEPLOYMENT.md
+# Update deploy:  git pull && docker compose build && docker compose up -d
+
+services:
+  db:
+    profiles: ["prod"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: football
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env for web_prod}
+      POSTGRES_DB: football
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U football -d football"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./data/uploads:/app/uploads
+      - ./data/logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?Set PUBLIC_API_URL in .env}
+        NEXT_PUBLIC_API_TIMESTAMP_TIMEZONE: ${NEXT_PUBLIC_API_TIMESTAMP_TIMEZONE:-UTC}
+        NEXT_PUBLIC_DISPLAY_TIMEZONE: ${NEXT_PUBLIC_DISPLAY_TIMEZONE:-Europe/Moscow}
+        NEXT_PUBLIC_DATETIME_LOCALE: ${NEXT_PUBLIC_DATETIME_LOCALE:-ru-RU}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  pgdata:

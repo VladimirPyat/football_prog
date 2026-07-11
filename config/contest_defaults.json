@@ -1,0 +1,54 @@
+{
+  "_meta": {
+    "version": "4.0",
+    "purpose": "Стартовая конфигурация конкурса. Загружается в БД при инициализации.",
+    "rule": "Все поля редактируемы Supervisor до старта. После is_locked=true изменения запрещены."
+  },
+  "contest_structure": {
+    "total_teams": 16,
+    "matches_per_round": 8,
+    "total_rounds": 30,
+    "is_round_robin": true,
+    "deadline_rule_hours": 24,
+    "max_score_value": 20
+  },
+  "scoring_rules": {
+    "base_points": {
+      "exact_high_score": 16,
+      "exact_score": 12,
+      "diff_plus_outcome": 8,
+      "outcome_only": 4,
+      "miss": 0
+    },
+    "bonuses": {
+      "bonus_1_unique_multiplier_pct": 200.0,
+      "bonus_2_thresholds": [
+        {"min_correct_outcomes": 6, "points": 8},
+        {"min_correct_outcomes": 7, "points": 12},
+        {"min_correct_outcomes": 8, "points": 16}
+      ],
+      "bonus_3_rank_points": {
+        "1st": 12,
+        "2nd": 8,
+        "3rd": 4
+      },
+      "bonus_3_base_threshold_extra": 50,
+      "bonus_3_extra_points": 4
+    }
+  },
+  "tiebreakers": {
+    "priority_order": [
+      "total_points DESC",
+      "exact_scores_count DESC",
+      "total_without_bonuses DESC",
+      "correct_diffs_count DESC",
+      "manual_override"
+    ]
+  },
+  "constraints": {
+    "allow_partial_prediction_save": false,
+    "require_all_matches_per_round": true,
+    "score_validation_range": [0, 20],
+    "max_teams_per_round_usage": 1
+  }
+}

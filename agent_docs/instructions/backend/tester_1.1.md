@@ -4,7 +4,7 @@
 > `READY_FOR_TEST` for 1.1. Language: tests/reports in English; user verdict in Russian.
 > Reference data (read-only): `docs/test_data/contracted/` —
 > `predictions.csv`, `matches.csv`, `users.csv`, `teams.csv`, `expected_scores.csv`,
-> `leaderboard.csv`; config `docs/test_data/config/contest_defaults.json`.
+> `leaderboard.csv`; config `config/contest_defaults.json`.
 > Source of truth for rules: `agent_docs/contracts/bonus_rules.md`,
 > `agent_docs/contracts/leaderboard_tiebreakers.md`.
 

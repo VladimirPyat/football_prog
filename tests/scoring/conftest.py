@@ -22,7 +22,7 @@ from src.scoring.types import MatchResult, UserPrediction, UserRoundScore, Stand
 # ---------------------------------------------------------------------------
 
 DATA_DIR = Path("docs/test_data/contracted")
-CONFIG_PATH = Path("docs/test_data/config/contest_defaults.json")
+CONFIG_PATH = Path("config/contest_defaults.json")
 
 PREDICTIONS_CSV = DATA_DIR / "predictions.csv"
 MATCHES_CSV = DATA_DIR / "matches.csv"

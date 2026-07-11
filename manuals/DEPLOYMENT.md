@@ -1,21 +1,19 @@
 # Server Deployment Guide
 
-How to deploy the Football Predictions Contest stack on a server: API (FastAPI) + frontend (Next.js).
+How to deploy the Football Predictions Contest stack: API (FastAPI) + frontend (Next.js).
 
 **Related docs:** [CONFIG.md](CONFIG.md) (full settings table), [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md) (first Support/SUPERVISOR), [API_GUIDE.md](API_GUIDE.md) (invite `setup_url`), [DEV_SETUP.md](DEV_SETUP.md) (local dev only).
 
 ## Table of Contents
 
+- [Deployment modes (`APP_MODE`)](#deployment-modes-app_mode)
+- [What to change where](#what-to-change-where)
+- [Docker deploy (recommended)](#docker-deploy-recommended)
+- [First deploy checklist (Docker)](#first-deploy-checklist-docker)
+- [Update deploy (git pull)](#update-deploy-git-pull)
 - [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Configuration map (URLs & CORS)](#configuration-map-urls--cors)
-- [Backend `.env` (secrets)](#backend-env-secrets)
-- [Backend deployment env (non-secrets)](#backend-deployment-env-non-secrets)
-- [Frontend env (build-time)](#frontend-env-build-time)
-- [Production install — exclude dev/QA](#production-install--exclude-devqa)
-- [Database: SQLite → PostgreSQL](#database-sqlite--postgresql)
-- [First deploy checklist](#first-deploy-checklist)
-- [Running services](#running-services)
+- [Local dev (no Docker)](#local-dev-no-docker)
+- [Manual / systemd deploy](#manual--systemd-deploy)
 - [Reverse proxy (typical)](#reverse-proxy-typical)
 - [Persistent data](#persistent-data)
 - [Invite links & SMTP](#invite-links--smtp)
@@ -24,339 +22,309 @@ How to deploy the Football Predictions Contest stack on a server: API (FastAPI) 
 
 ---
 
+## Deployment modes (`APP_MODE`)
+
+The server keeps its own **gitignored** `.env`. Code updates via `git pull` must **not** overwrite production URLs, CORS, or secrets.
+
+Set one mode in `.env`:
+
+| `APP_MODE` | When | Database | URLs / CORS |
+|------------|------|----------|-------------|
+| `local` | Laptop (`uv run`, `npm run dev`) | SQLite (`./football.db`) | `127.0.0.1`, CORS `*` |
+| `web_dev` | Server/docker staging | SQLite (`./data/football.db`) | `PUBLIC_*` or `localhost` defaults |
+| `web_prod` | Production | PostgreSQL (compose `--profile prod`) | **`PUBLIC_FRONTEND_URL` required** |
+
+Presets live in ``resolve_app_mode_preset()`` (`config/settings.py`) — one readable block per mode. Server secrets and URLs stay in gitignored ``.env``.
+
+**Rule:** on a server, edit **only** `.env` (and `data/` volumes). Do not commit server URLs into the repo.
+
+---
+
+## What to change where
+
+| What | File / location | `local` | `web_dev` / `web_prod` |
+|------|-----------------|---------|------------------------|
+| Mode | root `.env` → `APP_MODE` | `local` | `web_dev` or `web_prod` |
+| Public UI URL (invites, CORS) | root `.env` → `PUBLIC_FRONTEND_URL` | — | `https://app.example.com` |
+| Public API URL (browser) | root `.env` → `PUBLIC_API_URL` | — | `https://api.example.com` |
+| DB password (Docker) | root `.env` → `POSTGRES_PASSWORD` | — | `web_prod` only |
+| JWT / seed passwords | root `.env` | dev placeholders | production secrets |
+| Custom DB URL | root `.env` → `DATABASE_URL` | optional | overrides mode default |
+| SQLite file (`web_dev`) | host `./data/football.db` | `./football.db` | Docker volume `./data` |
+| Frontend API URL at build | Docker build arg from `PUBLIC_API_URL` | `frontend/.env.local` | `.env` → rebuild frontend |
+| Uploads & logs | host `./data/uploads`, `./data/logs` | `./uploads`, `./logs` | Docker volumes |
+| PostgreSQL files | Docker volume `pgdata` | — | automatic |
+
+**Critical:** `PUBLIC_API_URL` is embedded at **`docker compose build`** (Next.js). Changing it requires **rebuild** of the `frontend` service.
+
+**Critical:** invite `setup_url` uses `PUBLIC_FRONTEND_URL` (via `FRONTEND_BASE_URL` preset) on the **API** at invite time.
+
+---
+
+## Docker deploy (recommended)
+
+Stack files (committed):
+
+| File | Role |
+|------|------|
+| [`docker-compose.yml`](../docker-compose.yml) | `db` + `api` + `frontend` |
+| [`Dockerfile`](../Dockerfile) | API image (`uv`, Alembic on start) |
+| [`frontend/Dockerfile`](../frontend/Dockerfile) | Next.js multi-stage build |
+| [`.env.example`](../.env.example) | Template for server `.env` |
+
+### Prerequisites (server)
+
+| Tool | Version |
+|------|---------|
+| Docker Engine | 24+ |
+| Docker Compose | v2 (`docker compose`) |
+| Git | clone/pull repo |
+| Reverse proxy (prod) | nginx / Caddy / Traefik + TLS |
+
+### 1. Clone and create persistent layout
+
+```bash
+sudo mkdir -p /opt/football_prog
+sudo chown "$USER":"$USER" /opt/football_prog
+git clone <repo-url> /opt/football_prog
+cd /opt/football_prog
+
+mkdir -p data/uploads data/logs
+cp .env.example .env
+chmod 600 .env
+```
+
+### 2. Configure server `.env`
+
+Example for **production**:
+
+```env
+APP_MODE=web_prod
+
+PUBLIC_FRONTEND_URL=https://app.example.com
+PUBLIC_API_URL=https://api.example.com
+
+POSTGRES_PASSWORD=replace-with-strong-db-password
+JWT_SECRET_KEY=replace-with-64-plus-char-random-string
+
+SEED_SUPPORT_PASSWORD=your-support-password
+SEED_SUPERVISOR_PASSWORD=your-supervisor-password
+
+# Optional host port mapping (defaults 8000 / 3000)
+# API_PORT=8000
+# FRONTEND_PORT=3000
+```
+
+Example for **staging on the same machine** (`web_dev`):
+
+```env
+APP_MODE=web_dev
+PUBLIC_FRONTEND_URL=http://localhost:3000
+PUBLIC_API_URL=http://localhost:8000
+POSTGRES_PASSWORD=staging-db-password
+JWT_SECRET_KEY=staging-jwt-secret
+```
+
+Compose reads `.env` for variable substitution **and** passes it to the API container (`env_file`). This file is **never** in git — safe across `git pull`.
+
+### 3. Build and start
+
+```bash
+cd /opt/football_prog
+docker compose build
+
+# web_dev (SQLite, no PostgreSQL container):
+docker compose up -d
+
+# web_prod (adds PostgreSQL):
+docker compose --profile prod up -d
+```
+
+On first start the API container runs `alembic upgrade head` automatically (`docker/entrypoint-api.sh`).
+
+### 4. Bootstrap users (once per empty database)
+
+```bash
+docker compose exec api uv run python src/scripts/seed.py
+docker compose exec api uv run python src/scripts/bootstrap_users.py
+```
+
+See [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md). **Do not** re-run on every deploy.
+
+### 5. Smoke test
+
+```bash
+curl -s http://127.0.0.1:8000/health
+# → {"status":"ok"}
+
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/
+# → 200
+```
+
+Then configure TLS reverse proxy (below) and test login + invite flow in the browser.
+
+### 6. Production reverse proxy
+
+Point public hostnames at container ports (default `127.0.0.1:3000` and `:8000`):
+
+| Public URL | Upstream |
+|------------|----------|
+| `https://app.example.com` | `http://127.0.0.1:3000` |
+| `https://api.example.com` | `http://127.0.0.1:8000` |
+
+Ensure `PUBLIC_FRONTEND_URL` / `PUBLIC_API_URL` in `.env` match the **HTTPS** URLs users see in the browser.
+
+---
+
+## First deploy checklist (Docker)
+
+1. Install Docker + Compose on server
+2. Clone repo to `/opt/football_prog`
+3. `mkdir -p data/uploads data/logs`
+4. Copy `.env.example` → `.env`; set `APP_MODE=web_prod`, `PUBLIC_*`, `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, seed passwords
+5. `docker compose build && docker compose up -d`
+6. `docker compose exec api uv run python src/scripts/seed.py`
+7. `docker compose exec api uv run python src/scripts/bootstrap_users.py`
+8. Configure TLS reverse proxy
+9. Smoke test: `/health`, frontend login, invite → `setup_url` → user setup
+
+---
+
+## Update deploy (git pull)
+
+Server `.env` and `data/` volumes are **outside git** — they survive updates.
+
+```bash
+cd /opt/football_prog
+git pull
+
+# Rebuild when code or frontend PUBLIC_API_URL changed
+docker compose build
+
+docker compose up -d
+```
+
+| Changed | Action |
+|---------|--------|
+| API / Python code | `docker compose build api && docker compose up -d api` |
+| Frontend code | `docker compose build frontend && docker compose up -d frontend` |
+| `PUBLIC_API_URL` in `.env` | **Must** rebuild frontend |
+| `PUBLIC_FRONTEND_URL` only | Restart API: `docker compose up -d api` |
+| Alembic migrations in repo | Automatic on API container start |
+| `.env` secrets only | `docker compose up -d` (recreate if needed) |
+
+Migrations run before uvicorn on each API start. For zero-downtime at scale, run migrations in a one-off job instead — not required for a single-server deploy.
+
+Useful commands:
+
+```bash
+docker compose ps
+docker compose logs -f api
+docker compose logs -f frontend
+docker compose down          # stop (volumes kept)
+docker compose down -v       # ⚠ removes PostgreSQL volume
+```
+
+---
+
 ## Architecture
 
-Two processes in production:
+Three containers in Docker production:
 
-| Service | Default dev port | Role |
-|---------|------------------|------|
-| **FastAPI** (`uvicorn main:app`) | `8000` | REST API, JWT auth, static team logos under `/static/` |
-| **Next.js** (`npm run build` + `npm start`) | `3000` | User/supervisor UI; browser calls API via `NEXT_PUBLIC_API_URL` |
+| Service | Image / build | Default port | Role |
+|---------|---------------|--------------|------|
+| **db** | `postgres:16-alpine` | internal `5432` | PostgreSQL (`pgdata` volume); **`--profile prod` only** |
+| **api** | `Dockerfile` | `8000` | FastAPI, JWT, static logos |
+| **frontend** | `frontend/Dockerfile` | `3000` | Next.js UI |
 
-The browser talks to **both** origins:
+The browser talks to **both** public origins:
 
-- UI pages → frontend host (e.g. `https://app.example.com`)
-- `fetch` / login / setup → API host (e.g. `https://api.example.com`)
-
-Invite links (`setup_url`) are built on the **backend** and must point at the **frontend** host (`FRONTEND_BASE_URL`), not the API.
-
----
-
-## Prerequisites
-
-| Tool | Version | Notes |
-|------|---------|-------|
-| Python | ≥ 3.12 | `uv sync` in repo root |
-| **uv** | latest | dependency lockfile in `pyproject.toml` |
-| Node.js | ≥ 20 LTS | for `frontend/` |
-| PostgreSQL | 14+ recommended | production DB (SQLite is dev-only) |
-| Reverse proxy | nginx / Caddy / Traefik | TLS termination, optional path routing |
+- UI → `PUBLIC_FRONTEND_URL`
+- API calls → `PUBLIC_API_URL`
 
 ---
 
-## Configuration map (URLs & CORS)
-
-Use this table when moving from local dev to a real server.
-
-| What | Where to set | Dev default | Production example |
-|------|--------------|-------------|------------------|
-| **API base URL (browser → API)** | `frontend/.env.local` or build env: `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:8000` | `https://api.example.com` |
-| **Frontend base URL (invite `setup_url`)** | Backend env: `FRONTEND_BASE_URL` → `config/settings.py` `frontend_base_url` | `http://127.0.0.1:3000` | `https://app.example.com` |
-| **CORS allowed origins** | Backend env: `CORS_ORIGINS` → `cors_origins` | `["*"]` | `["https://app.example.com"]` |
-| **Database** | Root `.env`: `DATABASE_URL` | `sqlite+aiosqlite:///./football.db` | `postgresql+asyncpg://user:pass@host:5432/football` |
-| **JWT signing** | Root `.env`: `JWT_SECRET_KEY` | dev placeholder | long random secret, **stable across restarts** |
-| **Display timezone (UI)** | `frontend`: `NEXT_PUBLIC_DISPLAY_TIMEZONE` | `Europe/Moscow` | same or browser-local |
-
-**Critical:** `NEXT_PUBLIC_*` variables are embedded at **`npm run build`** time. Changing them on the server **after** build has no effect until you rebuild.
-
-**Critical:** `FRONTEND_BASE_URL` is read when the **API** creates an invite. Old invites keep the URL that was active at invite time.
-
----
-
-## Backend `.env` (secrets)
-
-On the server, in the **project root** (gitignored):
+## Local dev (no Docker)
 
 ```bash
 cp .env.example .env
-```
+# APP_MODE=local (default)
 
-Minimum for production:
-
-```env
-# PostgreSQL (see below for URL format)
-DATABASE_URL=postgresql+asyncpg://football:STRONG_PASSWORD@127.0.0.1:5432/football
-
-# Required — generate a long random string; never rotate casually (invalidates JWTs)
-JWT_SECRET_KEY=replace-with-64-plus-char-random-string
-
-# One-time bootstrap (see First deploy)
-SEED_SUPPORT_PASSWORD=your-support-password
-SEED_SUPERVISOR_PASSWORD=your-supervisor-password
-```
-
-Full reference: [CONFIG.md — `.env`](CONFIG.md#env--secrets--deployment).
-
-Do **not** put `FRONTEND_BASE_URL` or `CORS_ORIGINS` in `.env` unless your deployment policy allows it — they are non-secret and usually set in systemd/K8s/docker env. See next section.
-
----
-
-## Backend deployment env (non-secrets)
-
-Set these in the **API process environment** (systemd unit, docker-compose, K8s manifest, etc.). They override `config/settings.py` via pydantic-settings.
-
-| Env var | Production example | Purpose |
-|---------|-------------------|---------|
-| `FRONTEND_BASE_URL` | `https://app.example.com` | Invite link: `{base}/auth/setup?token=…` |
-| `CORS_ORIGINS` | `["https://app.example.com"]` | JSON array; **do not use `*`** with `allow_credentials=true` in production |
-| `LOG_LEVEL` | `INFO` | Logging verbosity |
-| `LOG_TO_FILE` | `true` | Write `app.log` |
-| `UPLOAD_DIR` | `/var/lib/football/uploads` | Persistent team logos |
-| `ENFORCE_PASSWORD_SETUP` | `true` | Keep `true` in production |
-| `SETUP_TOKEN_EXPIRE_HOURS` | `72` | Invite token TTL |
-
-**CORS example** (systemd `Environment=` or shell):
-
-```bash
-export CORS_ORIGINS='["https://app.example.com"]'
-export FRONTEND_BASE_URL='https://app.example.com'
-```
-
-If frontend and API share one domain (e.g. `example.com` + `/api` proxy), CORS may be unnecessary for same-origin requests — but `NEXT_PUBLIC_API_URL` must match how the browser reaches the API.
-
-Full table: [CONFIG.md — Application defaults](CONFIG.md#application-defaults-configsettingspy).
-
----
-
-## Frontend env (build-time)
-
-Create `frontend/.env.production` (or export vars before build):
-
-```env
-NEXT_PUBLIC_API_URL=https://api.example.com
-NEXT_PUBLIC_API_TIMESTAMP_TIMEZONE=UTC
-NEXT_PUBLIC_DISPLAY_TIMEZONE=Europe/Moscow
-
-# Optional — remove or set per contest in multi-contest prod
-# NEXT_PUBLIC_DEFAULT_CONTEST_ID=1
-```
-
-Build and run:
-
-```bash
-cd frontend
-npm ci              # full deps required for `next build` (TypeScript, Tailwind, etc.)
-npm run build
-npm prune --omit=dev   # drop devDependencies after build (Playwright, Vitest, ESLint, …)
-npm run start   # listens on :3000 by default; set PORT=3000 in process manager
-```
-
-> **Do not** run `npm run playwright:install` on the server — browsers (~800 MiB) are for local/CI E2E only.  
-> See [Production install — exclude dev/QA](#production-install--exclude-devqa).
-
-Template: [`frontend/.env.local.example`](../frontend/.env.local.example).
-
-**Same host, different paths** (nginx serves app on `/`, API on `/api`):
-
-- Proxy `/api` → uvicorn
-- `NEXT_PUBLIC_API_URL=https://app.example.com` (no `/api` suffix if Next calls `/api/v1/...` — check `frontend/src/lib/api/endpoints.ts`; paths are absolute under `/api/v1`)
-
-Verify in browser DevTools: login and `/auth/setup` must reach the API without CORS errors.
-
----
-
-## Production install — exclude dev/QA
-
-Production needs **API + built Next.js** only. Test runners, linters, and E2E browsers are **not** deployed.
-
-### Backend (Python)
-
-Install **runtime** dependencies only:
-
-```bash
-cd /path/to/football_prog
-uv sync --no-dev
-```
-
-This skips the `[dependency-groups] dev` packages (`pytest`, `ruff`, `mypy`, `bandit`, …). They are not in `requires-python` runtime and are **not** pulled by `uv sync --no-dev`.
-
-| Include on server | Exclude (dev/QA) |
-|-------------------|------------------|
-| `uvicorn`, FastAPI, SQLAlchemy, Alembic, … | `pytest`, `httpx` (test client), `ruff`, `mypy`, `bandit` |
-| `uv run alembic upgrade head` | `uv run pytest` |
-| `uv run python src/scripts/bootstrap_users.py` (once) | `load_test_data.py --reset` (dev fixture) |
-
-### Frontend (Node)
-
-| Phase | Command | Notes |
-|-------|---------|-------|
-| **Build** | `npm ci` then `npm run build` | Needs devDependencies (TypeScript, Tailwind, PostCSS) |
-| **Runtime** | `npm prune --omit=dev` then `npm run start` | Removes test/lint tooling from `node_modules` |
-
-**Never on production:**
-
-| Artifact | Why |
-|----------|-----|
-| `npm run playwright:install` | Downloads Chromium + headless shell (~800 MiB); only for E2E |
-| `frontend/.playwright-browsers/` | Gitignored local E2E cache — not in repo, do not create on server |
-| `npm run test:e2e` | Playwright E2E — run in CI or dev machine only |
-| `npm run test:unit` / `npm run lint` | Dev/CI gates, not runtime |
-
-`@playwright/test` lives in `devDependencies`. It is **not** installed if you `npm prune --omit=dev` after build. There is **no** `postinstall` hook that downloads browsers — they appear only after an explicit `playwright:install`.
-
-### Optional — omit from deploy artifact
-
-Not required for serving traffic (safe to exclude from tarball/Docker context to save space):
-
-- `tests/`, `frontend/e2e/`, `agent_docs/`, `docs/` (specs)
-- `.venv` from dev machine — recreate on server with `uv sync --no-dev`
-- `football.db` (SQLite dev DB)
-- `frontend/.next/` from dev — **rebuild** on server or in CI with production `NEXT_PUBLIC_*`
-
-### CI vs server (recommended split)
-
-| Step | Where |
-|------|-------|
-| `uv run pytest`, `npm run test:unit`, `npm run test:e2e` | CI or developer machine |
-| `npm run playwright:install` (once) | CI runner or dev (`frontend/.playwright-browsers/`) |
-| `uv sync --no-dev`, `npm ci` + `build` + `prune --omit=dev` | Production server or release image |
-
----
-
-## Database: SQLite → PostgreSQL
-
-### 1. Create database and user
-
-```sql
-CREATE USER football WITH PASSWORD 'your-db-password';
-CREATE DATABASE football OWNER football;
-```
-
-### 2. Set URL in `.env`
-
-```env
-DATABASE_URL=postgresql+asyncpg://football:your-db-password@127.0.0.1:5432/football
-```
-
-Driver is **asyncpg** (already in project dependencies). Format must use the `postgresql+asyncpg://` scheme.
-
-### 3. Run migrations
-
-```bash
-cd /path/to/football_prog
 uv sync
 uv run alembic upgrade head
-```
-
-Alembic reads `DATABASE_URL` from settings (`.env`).
-
-### 4. Bootstrap users (once per empty DB)
-
-```bash
 uv run python src/scripts/seed.py
 uv run python src/scripts/bootstrap_users.py
+uv run uvicorn main:app --reload --port 8000
+
+cd frontend
+cp .env.local.example .env.local
+npm ci && npm run dev
 ```
 
-See [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md). **Do not** re-run bootstrap on every deploy.
+See [DEV_SETUP.md](DEV_SETUP.md).
 
-### 5. Optional test data
-
-`load_test_data.py` is for **dev/QA**, not typical production. Use supervisor UI to create contests, or import via admin flows.
+Optional: run Docker stack locally with `APP_MODE=web_dev` in `.env` to mirror server DB layout.
 
 ---
 
-## First deploy checklist
+## Manual / systemd deploy
 
-1. Clone repo on server; `uv sync --no-dev`; configure frontend env (step 6) then build (step 7)
-2. Configure root `.env` (PostgreSQL, `JWT_SECRET_KEY`, seed passwords)
-3. Set deployment env: `FRONTEND_BASE_URL`, `CORS_ORIGINS`
-4. `uv run alembic upgrade head`
-5. `uv run python src/scripts/seed.py` + `bootstrap_users.py`
-6. Configure `frontend/.env.production` with `NEXT_PUBLIC_API_URL`
-7. `cd frontend && npm ci && npm run build && npm prune --omit=dev`
-8. Start API + frontend (systemd/docker)
-9. Configure TLS reverse proxy
-10. Smoke test:
-    - `curl -s https://api.example.com/health` → `{"status":"ok"}`
-    - Open frontend, login as supervisor
-    - Invite a test user → copy `setup_url` → complete setup → login as user
-
----
-
-## Running services
-
-### API (development-style — not for high load)
+If you prefer bare-metal (no Docker):
 
 ```bash
-cd /path/to/football_prog
-uv run uvicorn main:app --host 127.0.0.1 --port 8000
+uv sync --no-dev
+uv run alembic upgrade head
+# set APP_MODE=web_prod + PUBLIC_* in .env
+cd frontend && npm ci && npm run build && npm prune --omit=dev
 ```
 
-### API (production)
-
-Use a process manager with multiple workers, e.g. **gunicorn** + uvicorn workers (install via `uv add gunicorn` when approved), or systemd:
+Run API and frontend via systemd — example API unit:
 
 ```ini
-# /etc/systemd/system/football-api.service (example)
+# /etc/systemd/system/football-api.service
 [Service]
 WorkingDirectory=/opt/football_prog
-Environment=FRONTEND_BASE_URL=https://app.example.com
-Environment=CORS_ORIGINS=["https://app.example.com"]
 EnvironmentFile=/opt/football_prog/.env
 ExecStart=/opt/football_prog/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
 Restart=always
 ```
 
-Bind to `127.0.0.1` if only nginx talks to the API.
+With `APP_MODE=web_prod`, set `PUBLIC_FRONTEND_URL` in `.env` instead of separate `FRONTEND_BASE_URL` / `CORS_ORIGINS`.
 
-### Frontend
-
-```bash
-cd /path/to/football_prog/frontend
-PORT=3000 npm run start
-```
-
-Or systemd unit for `npm run start` after build.
+PostgreSQL: create DB/user manually ([CONFIG.md — Database URL](CONFIG.md#database-url)).
 
 ---
 
 ## Reverse proxy (typical)
 
-Example layout (two subdomains):
-
-| Public URL | Upstream |
-|------------|----------|
-| `https://app.example.com` | `http://127.0.0.1:3000` (Next.js) |
-| `https://api.example.com` | `http://127.0.0.1:8000` (uvicorn) |
-
 nginx must forward:
 
 - `Authorization` header (JWT)
-- WebSocket if you add it later (not required today)
-- Large enough `client_max_body_size` for team logo uploads (default API limit 2 MiB — see `MAX_LOGO_BYTES` in [CONFIG.md](CONFIG.md))
+- `client_max_body_size` ≥ 2 MiB (team logo uploads)
 
-Static files: team logos are served by FastAPI from `UPLOAD_DIR` at `/static/teams/...`. Ensure `uploads/` is on persistent disk.
+Static team logos: served by API from `/static/teams/...` (`UPLOAD_DIR` → `data/uploads` in Docker).
 
 ---
 
 ## Persistent data
 
-| Path | Git | Backup |
-|------|-----|--------|
-| PostgreSQL data | — | DB dumps |
-| `uploads/` (team logos) | gitignored | copy volume |
-| `app.log`, `logs/archive/` | gitignored | optional log shipping |
-| `football.db` | gitignored | SQLite dev only — use PostgreSQL in prod |
+| Path / volume | Git | Survives `compose up` | Backup |
+|---------------|-----|------------------------|--------|
+| `.env` | ignored | yes (host file) | secure copy |
+| `data/uploads/` | ignored | yes (bind mount) | copy volume |
+| `data/logs/` | ignored | yes (bind mount) | optional log shipping |
+| Docker volume `pgdata` | — | yes | `pg_dump` |
+| `data/football.db` | ignored | yes (`web_dev` SQLite) | copy file |
+
+Create host dirs before first start: `mkdir -p data/uploads data/logs`.
 
 ---
 
 ## Invite links & SMTP
 
-- **SMTP is not configured** in v1. Invite `setup_url` is shown in the supervisor UI modal after `POST …/participants`.
-- Links are **real** signed JWTs; base URL = `FRONTEND_BASE_URL` at invite time.
-- When SMTP is added later, it will reuse `build_setup_url()` in `src/core/setup_tokens.py` — only `FRONTEND_BASE_URL` must be correct on the API host.
-
-Dev workflow without mail: [DEV_SETUP.md — confirm participants](DEV_SETUP.md#new-contest-confirm-participants-without-email-stage-112).
+- **SMTP is not configured** in v1. Invite `setup_url` is shown in the supervisor UI after `POST …/participants`.
+- Links use `PUBLIC_FRONTEND_URL` (via mode preset) at invite time.
+- When SMTP is added, it will reuse `build_setup_url()` — keep `PUBLIC_FRONTEND_URL` correct on the server.
 
 ---
 
@@ -364,17 +332,18 @@ Dev workflow without mail: [DEV_SETUP.md — confirm participants](DEV_SETUP.md#
 
 | Item | Action |
 |------|--------|
-| `JWT_SECRET_KEY` | Strong random value; backup securely |
-| `DATABASE_URL` | PostgreSQL, not SQLite |
-| `CORS_ORIGINS` | Explicit frontend origin(s), not `*` |
-| `FRONTEND_BASE_URL` | Public HTTPS frontend URL |
-| `NEXT_PUBLIC_API_URL` | Set before `npm run build`; matches live API |
-| `ENFORCE_PASSWORD_SETUP` | `true` |
-| `SEED_*_PASSWORD` | Strong; bootstrap once, then remove from deploy secrets if desired |
-| TLS | HTTPS on both app and API (or same-origin proxy) |
-| Migrations | `alembic upgrade head` on each deploy **before** restarting API |
-| Uploads | Persistent `UPLOAD_DIR` |
-| Dev/QA excluded | `uv sync --no-dev`; no Playwright install; `npm prune --omit=dev` after frontend build |
+| `APP_MODE` | `web_prod` on server |
+| `PUBLIC_FRONTEND_URL` | Public HTTPS UI URL |
+| `PUBLIC_API_URL` | Public HTTPS API URL; rebuild frontend after change |
+| `POSTGRES_PASSWORD` | Strong; only in server `.env` |
+| `JWT_SECRET_KEY` | Long random; stable across restarts |
+| `DATABASE_URL` | PostgreSQL (compose sets automatically unless overridden) |
+| CORS | Derived from `PUBLIC_FRONTEND_URL` — no `*` in prod |
+| `ENFORCE_PASSWORD_SETUP` | `true` (forced in `web_prod`) |
+| Bootstrap passwords | Run once; remove from `.env` later if desired |
+| TLS | HTTPS on app + API (or same-origin proxy) |
+| Volumes | `data/uploads`, `data/logs`, `pgdata` |
+| `.dockerignore` | Docs/tests excluded from images |
 
 ---
 
@@ -382,14 +351,15 @@ Dev workflow without mail: [DEV_SETUP.md — confirm participants](DEV_SETUP.md#
 
 | Symptom | Likely cause |
 |---------|----------------|
-| CORS error in browser | `CORS_ORIGINS` missing frontend URL; or API URL mismatch |
-| Invite link points to `127.0.0.1:3000` | `FRONTEND_BASE_URL` not set on **API** process |
-| Setup page loads but API fails | Wrong `NEXT_PUBLIC_API_URL` at build time — rebuild frontend |
-| `setup_url` works once, then “invalid token” | Token expired (`SETUP_TOKEN_EXPIRE_HOURS`) or `JWT_SECRET_KEY` changed |
-| Login 403 `PASSWORD_SETUP_REQUIRED` | User must open `setup_url`, not temp password (when `ENFORCE_PASSWORD_SETUP=true`) |
-| Logos disappear after redeploy | `uploads/` not on persistent volume |
-| Alembic errors on PostgreSQL | Check `postgresql+asyncpg://` URL; DB user permissions |
+| CORS error | Wrong `PUBLIC_FRONTEND_URL`; restart API |
+| Invite link → `127.0.0.1:3000` | `APP_MODE=local` or missing `PUBLIC_FRONTEND_URL` on API |
+| UI loads, API calls fail | Wrong `PUBLIC_API_URL` at **build** time — `docker compose build frontend` |
+| Config reset after `git pull` | Edited committed files instead of `.env` |
+| Logos gone after redeploy | `data/uploads` not mounted |
+| DB empty after redeploy | Ran `docker compose down -v` (drops `pgdata`) |
+| `PUBLIC_FRONTEND_URL is required` | Set it for `APP_MODE=web_prod` |
+| Alembic / DB connection errors | Check `POSTGRES_PASSWORD`, `docker compose ps`, db health |
 
 ---
 
-*Last updated: 2026-07-08 — production install excludes dev/QA (Playwright, pytest, prune devDeps).*
+*Last updated: 2026-07-11 — APP_MODE presets, Docker Compose deploy, persistent volumes.*

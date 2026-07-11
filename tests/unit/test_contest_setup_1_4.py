@@ -36,6 +36,25 @@ async def session() -> AsyncSession:
 
 
 @pytest.mark.asyncio
+async def test_create_contest_derives_round_robin_from_total_teams(session: AsyncSession) -> None:
+    contest = await create_contest(session, "Small Cup", total_teams=4)
+    assert contest.total_teams == 4
+    assert contest.matches_per_round == 2
+    assert contest.total_rounds == 6
+
+
+@pytest.mark.asyncio
+async def test_update_contest_derives_round_robin_from_total_teams(session: AsyncSession) -> None:
+    contest = await create_contest(session, "Patch Cup")
+    await session.flush()
+
+    patched = await update_contest(session, contest.id, {"total_teams": 18})
+    assert patched.total_teams == 18
+    assert patched.matches_per_round == 9
+    assert patched.total_rounds == 34
+
+
+@pytest.mark.asyncio
 async def test_create_contest_draft_and_patch_rules(session: AsyncSession) -> None:
     contest = await create_contest(session, "Cup 2026", rules_from_defaults=True)
     await session.commit()

@@ -28,7 +28,7 @@ Contest scoring rules, bonuses, tie-breakers, and engine implementation.
 
 ## Configuration Source [UPDATED]
 
-Default values from `docs/test_data/config/contest_defaults.json`, persisted by `src/scripts/seed.py` into `contests.rules_json`.
+Default values from `config/contest_defaults.json`, persisted by `src/scripts/seed.py` into `contests.rules_json`.
 
 Runtime access path:
 

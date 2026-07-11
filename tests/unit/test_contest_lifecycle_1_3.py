@@ -187,7 +187,7 @@ async def test_delete_instant_allowed(session: AsyncSession) -> None:
     contest.paused_at = datetime.now(timezone.utc)
     await session.commit()
 
-    test_settings = Settings(contest_allow_instant_delete=True)
+    test_settings = get_settings().model_copy(update={"contest_allow_instant_delete": True})
     with patch("services.contest_lifecycle_service.get_settings", return_value=test_settings):
         result = await assert_deletable(session, CONTEST_ID)
         assert result.status == ContestLifecycleStatus.PAUSED

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -10,12 +11,17 @@ from starlette.testclient import TestClient
 
 from core.auth_audit import AuthAuditMiddleware, setup_auth_audit_logging
 
+_AUTH_AUDIT_LOGGER_NAME = "auth.audit"
+
 
 @pytest.fixture
 def auth_log_path(tmp_path: Path) -> Path:
     path = tmp_path / "auth.log"
+    logger = logging.getLogger(_AUTH_AUDIT_LOGGER_NAME)
+    logger.handlers.clear()
     setup_auth_audit_logging(path)
-    return path
+    yield path
+    logger.handlers.clear()
 
 
 def _build_login_app():

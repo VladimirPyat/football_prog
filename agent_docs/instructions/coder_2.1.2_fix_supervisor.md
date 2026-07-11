@@ -217,7 +217,7 @@ Place fixed bottom-right (or below form) per mockup:
 
 **Lock banner:** keep `LockBanner` when `is_locked`; extend copy to match screenshot: «Изменение правил scoring или состава команд невозможно.»
 
-**Tests:** unit test `rulesDisplay.ts` with fixture from `docs/test_data/config/contest_defaults.json` shape.
+**Tests:** unit test `rulesDisplay.ts` with fixture from `config/contest_defaults.json` shape.
 
 ---
 

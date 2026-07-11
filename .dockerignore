@@ -1,48 +1,62 @@
-# User-specific stuff
+# Git & IDE
+.git/
+.gitignore
 .idea/
 .gigaide/
-
-# Gradle
-.gradle/
-/build/
-
-
-# IDE-specific files
+.cursor/
 *.iml
 *.ipr
 *.iws
 
-# OS generated files
+# OS
 .DS_Store
 Thumbs.db
 
-# Logs and databases
+# Documentation & specs (not needed at runtime)
+docs/
+agent_docs/
+manuals/
+*.md
+
+# Tests & QA
+tests/
+frontend/e2e/
+frontend/.playwright-browsers/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs, databases, local data (mounted as volumes on server)
 *.log
 *.sql
 *.sqlite
+football.db
+logs/
+uploads/
+data/
 
 # Node.js
 node_modules/
+frontend/node_modules/
 .next/
-
+frontend/.next/
 
 # Python
-__pycache__
+__pycache__/
 *.pyc
-.pytest_cache
-
-#cursor
-.cursor/indexing.db
-.cursor/*.tmp
-.cursor/*.lock
-
-docs/
-
-# environment
 .venv/
+.mypy_cache/
+.ruff_cache/
 
-# secrets
+# Secrets & local env (mounted from host on server, never baked into image)
 .env
+.env.*
+!.env.example
+frontend/.env.local
+frontend/.env.production
 
-_data
-_out
+# Misc local artifacts
+_data/
+_out/
+.gradle/
+/build/

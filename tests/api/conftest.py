@@ -42,7 +42,7 @@ API_PREFIX = "/api/v1"
 DEFAULT_CONTEST_ID = 1
 PROJECT_ROOT = _ROOT
 CONTRACTED = PROJECT_ROOT / "docs" / "test_data" / "contracted"
-CONTEST_DEFAULTS = PROJECT_ROOT / "docs" / "test_data" / "config" / "contest_defaults.json"
+CONTEST_DEFAULTS = PROJECT_ROOT / "config" / "contest_defaults.json"
 DT_FORMAT = "%d.%m.%Y|%H:%M"
 
 

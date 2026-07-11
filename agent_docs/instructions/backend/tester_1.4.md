@@ -140,7 +140,7 @@ Technical terms (table/column names, CLI commands) may stay in English/latin.
    - `docs/test_data/contracted/matches.csv` — результаты матчей
    - `docs/test_data/contracted/expected_scores.csv` — ожидаемые очки (90 строк, раунды 1–9)
    - `docs/test_data/contracted/leaderboard.csv` — итоговый рейтинг (10 игроков)
-   - `docs/test_data/config/contest_defaults.json` — правила scoring
+   - `config/contest_defaults.json` — правила scoring
 
 3. **Быстрая автоматическая проверка (рекомендуется перед ручным прогоном)**
    ```bash

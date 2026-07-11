@@ -13,7 +13,7 @@ from database.models import Contest
 from scripts.seed import build_rules_json, load_contest_defaults, run_seed
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULTS_PATH = PROJECT_ROOT / "docs" / "test_data" / "config" / "contest_defaults.json"
+DEFAULTS_PATH = PROJECT_ROOT / "config" / "contest_defaults.json"
 
 
 @pytest_asyncio.fixture

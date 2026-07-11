@@ -78,6 +78,25 @@ def validate_contest_structure(
         raise ValidationError("Число туров должно быть = (команды − 1) × 2")
 
 
+def _sync_round_robin_structure(
+    *,
+    total_teams: int,
+    matches_per_round: int,
+    total_rounds: int,
+    is_round_robin: bool,
+    fields_set: set[str],
+) -> tuple[int, int, int]:
+    """Derive matches/rounds from team count when round-robin and not explicitly set."""
+    if not is_round_robin or "total_teams" not in fields_set:
+        return total_teams, matches_per_round, total_rounds
+
+    if "matches_per_round" not in fields_set:
+        matches_per_round = total_teams // 2
+    if "total_rounds" not in fields_set:
+        total_rounds = (total_teams - 1) * 2
+    return total_teams, matches_per_round, total_rounds
+
+
 async def create_contest(
     session: AsyncSession,
     name: str,
@@ -91,33 +110,52 @@ async def create_contest(
     is_round_robin: bool | None = None,
 ) -> Contest:
     """Create a DRAFT contest."""
+    fields_set: set[str] = set()
+    if total_teams is not None:
+        fields_set.add("total_teams")
+    if matches_per_round is not None:
+        fields_set.add("matches_per_round")
+    if total_rounds is not None:
+        fields_set.add("total_rounds")
+    if is_round_robin is not None:
+        fields_set.add("is_round_robin")
+
     if rules_from_defaults or rules_json is None:
         data = _load_contest_defaults(get_settings().contest_defaults_path)
         structure = data["contest_structure"]
         rules = _build_rules_json(data)
-        contest = Contest(
-            name=name,
-            slug=slug,
-            is_locked=False,
-            status=ContestLifecycleStatus.DRAFT,
-            total_teams=total_teams or structure["total_teams"],
-            matches_per_round=matches_per_round or structure["matches_per_round"],
-            total_rounds=total_rounds or structure["total_rounds"],
-            is_round_robin=is_round_robin if is_round_robin is not None else structure["is_round_robin"],
-            rules_json=rules,
+        resolved_teams = total_teams or structure["total_teams"]
+        resolved_matches = matches_per_round or structure["matches_per_round"]
+        resolved_rounds = total_rounds or structure["total_rounds"]
+        resolved_round_robin = (
+            is_round_robin if is_round_robin is not None else structure["is_round_robin"]
         )
     else:
-        contest = Contest(
-            name=name,
-            slug=slug,
-            is_locked=False,
-            status=ContestLifecycleStatus.DRAFT,
-            total_teams=total_teams or 16,
-            matches_per_round=matches_per_round or 8,
-            total_rounds=total_rounds or 30,
-            is_round_robin=is_round_robin if is_round_robin is not None else True,
-            rules_json=rules_json,
-        )
+        rules = rules_json
+        resolved_teams = total_teams or 16
+        resolved_matches = matches_per_round or 8
+        resolved_rounds = total_rounds or 30
+        resolved_round_robin = is_round_robin if is_round_robin is not None else True
+
+    resolved_teams, resolved_matches, resolved_rounds = _sync_round_robin_structure(
+        total_teams=resolved_teams,
+        matches_per_round=resolved_matches,
+        total_rounds=resolved_rounds,
+        is_round_robin=resolved_round_robin,
+        fields_set=fields_set,
+    )
+
+    contest = Contest(
+        name=name,
+        slug=slug,
+        is_locked=False,
+        status=ContestLifecycleStatus.DRAFT,
+        total_teams=resolved_teams,
+        matches_per_round=resolved_matches,
+        total_rounds=resolved_rounds,
+        is_round_robin=resolved_round_robin,
+        rules_json=rules,
+    )
 
     validate_contest_structure(
         total_teams=contest.total_teams,
@@ -147,6 +185,22 @@ async def update_contest(
     ):
         if field in patch and patch[field] is not None:
             setattr(contest, field, patch[field])
+
+    fields_set = {
+        field
+        for field in ("total_teams", "matches_per_round", "total_rounds", "is_round_robin")
+        if field in patch and patch[field] is not None
+    }
+    synced_teams, synced_matches, synced_rounds = _sync_round_robin_structure(
+        total_teams=contest.total_teams,
+        matches_per_round=contest.matches_per_round,
+        total_rounds=contest.total_rounds,
+        is_round_robin=contest.is_round_robin,
+        fields_set=fields_set,
+    )
+    contest.total_teams = synced_teams
+    contest.matches_per_round = synced_matches
+    contest.total_rounds = synced_rounds
 
     validate_contest_structure(
         total_teams=contest.total_teams,

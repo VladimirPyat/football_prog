@@ -4,6 +4,7 @@ Environment variables, application settings, seed workflow, and contest defaults
 
 ## Table of Contents
 
+- [Deployment modes (`APP_MODE`)](#deployment-modes-app_mode)
 - [Settings Module](#settings-module)
 - [`.env` — secrets & deployment](#env--secrets--deployment)
 - [Application defaults](#application-defaults-configsettingspy)
@@ -12,6 +13,30 @@ Environment variables, application settings, seed workflow, and contest defaults
 - [Bootstrap Users Script](#bootstrap-users-script)
 - [Database URL](#database-url)
 - [Project Dependencies](#project-dependencies)
+
+## Deployment modes (`APP_MODE`) [UPDATED]
+
+**Env var:** `APP_MODE` in root `.env` (gitignored on the server — survives `git pull`).
+
+| Value | Use case | Database default | URLs / CORS |
+|-------|----------|------------------|-------------|
+| `local` | Laptop dev (`uv run`, `npm run dev`) | SQLite (`./football.db`) | `http://127.0.0.1:3000`, CORS `*` |
+| `web_dev` | Server/docker staging | SQLite (`./data/football.db`) unless `DATABASE_URL` set | `PUBLIC_FRONTEND_URL` or `http://localhost:3000` |
+| `web_prod` | Production server | PostgreSQL unless `DATABASE_URL` set | **`PUBLIC_FRONTEND_URL` required**; CORS = that origin only |
+
+**Server-only URL vars** (set in `.env`, not committed):
+
+| Variable | Required when | Purpose |
+|----------|---------------|---------|
+| `PUBLIC_FRONTEND_URL` | `web_prod`; optional for `web_dev` | Invite `setup_url` base; CORS origin |
+| `PUBLIC_API_URL` | Docker frontend build | Baked into Next.js as `NEXT_PUBLIC_API_URL` |
+| `POSTGRES_PASSWORD` | `web_prod` + `--profile prod` | PostgreSQL password in mode preset URL |
+
+Mode presets are defined in ``resolve_app_mode_preset()`` (`config/settings.py`) — one `if/elif` branch per mode, all mode-controlled fields listed explicitly. After loading ``.env``, the validator applies that bundle. Explicit ``DATABASE_URL`` in ``.env`` always overrides the mode default.
+
+Full Docker workflow: [DEPLOYMENT.md](DEPLOYMENT.md).
+
+---
 
 ## Settings Module [UPDATED]
 
@@ -40,6 +65,10 @@ Copy [`.env.example`](../.env.example) → `.env` and fill in **before first boo
 
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `APP_MODE` | recommended | `local` \| `web_dev` \| `web_prod` — see [Deployment modes](#deployment-modes-app_mode) |
+| `PUBLIC_FRONTEND_URL` | `web_prod` | Public HTTPS URL of the Next.js UI |
+| `PUBLIC_API_URL` | Docker build | Public URL of the API (frontend `NEXT_PUBLIC_*`) |
+| `POSTGRES_PASSWORD` | Docker | DB password for compose `db` service |
 | `DATABASE_URL` | dev: has default | Async SQLAlchemy URL; use PostgreSQL in production |
 | `JWT_SECRET_KEY` | **prod: yes** | HS256 signing key for access tokens |
 | `SEED_SUPPORT_PASSWORD` | **bootstrap: yes** | Plaintext support password (hashed at runtime) |
@@ -59,6 +88,9 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 
 | Setting field | Env override | Default | Description |
 |---------------|--------------|---------|-------------|
+| `app_mode` | `APP_MODE` | `local` | Deployment preset bundle |
+| `public_frontend_url` | `PUBLIC_FRONTEND_URL` | — | Public UI URL (web modes) |
+| `public_api_url` | `PUBLIC_API_URL` | — | Public API URL (frontend build / docs) |
 | `seed_support_login` | `SEED_SUPPORT_LOGIN` | `support` | Bootstrap Support login |
 | `seed_support_first_name` | `SEED_SUPPORT_FIRST_NAME` | `Support` | Support first name |
 | `seed_support_last_name` | `SEED_SUPPORT_LAST_NAME` | `User` | Support last name |
@@ -90,7 +122,7 @@ Change in code for dev; override via env in production (Kubernetes, etc.) if nee
 | `max_logo_bytes` | `MAX_LOGO_BYTES` | `2097152` | Max logo upload (2 MiB) |
 | `team_logo_target_px` | `TEAM_LOGO_TARGET_PX` | `64` | Logo resize target (px) |
 | `default_team_logo_url` | `DEFAULT_TEAM_LOGO_URL` | `/static/assets/default-team-logo.jpg` | Fallback logo URL |
-| `contest_defaults_path` | — | `docs/test_data/config/contest_defaults.json` | Seed JSON path (code only) |
+| `contest_defaults_path` | — | `config/contest_defaults.json` | Default contest rules template (code only) |
 | `api_timestamp_timezone` | `API_TIMESTAMP_TIMEZONE` | `UTC` | Canonical zone for DB/API timestamps (only `UTC` supported) |
 
 ### Datetime policy (backend + frontend)
@@ -150,11 +182,11 @@ Production keeps `enforce_password_setup=true` and `supervisor_training_mode=fal
 
 Directories `uploads/` and `static/assets/` are created at app startup (`main.py`). See [API_GUIDE.md — Team logos](API_GUIDE.md#multi-contest-api).
 
-> `contest_defaults_path` is a code default pointing to `docs/test_data/config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
+> `contest_defaults_path` is a code default pointing to `config/contest_defaults.json`. Override via seed CLI `--defaults-path` if needed.
 
 ## Contest Defaults [NEW]
 
-**Source file:** `docs/test_data/config/contest_defaults.json`
+**Source file:** `config/contest_defaults.json`
 
 Loaded at seed time into `contests` table. The `_meta` block is **not** stored in the database.
 
@@ -208,7 +240,7 @@ Uses `SEED_SUPPORT_PASSWORD` when set (hashed at runtime); else `SEED_SUPPORT_PA
 ```bash
 uv run python src/scripts/seed.py
 uv run python src/scripts/seed.py --database-url "sqlite+aiosqlite:///./football.db"
-uv run python src/scripts/seed.py --defaults-path docs/test_data/config/contest_defaults.json
+uv run python src/scripts/seed.py --defaults-path config/contest_defaults.json
 ```
 
 ### Idempotency

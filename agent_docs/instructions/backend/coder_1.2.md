@@ -4,7 +4,7 @@
 > `TEST_PASS` (this stage depends on the engine). Code/comments English; user report Russian.
 > Contracts: `agent_docs/contracts/db_schema.md`, `dataflow/scoring_flow.md`,
 > `contracts/leaderboard_tiebreakers.md`. Source data: `docs/test_data/contracted/`
-> (read-only), config `docs/test_data/config/contest_defaults.json` (read-only).
+> (read-only), config `config/contest_defaults.json` (read-only).
 
 ## 1. Objective
 Build the data/persistence layer around the pure engine (1.1): a CSV loader (by id,

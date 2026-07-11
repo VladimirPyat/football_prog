@@ -29,7 +29,7 @@ Test the schema with actual data patterns that Stage 1 will use. Use `sqlite+aio
 
 ### 2.4 Seed Data Verification
 - Run the seed script (`python -m src.scripts.seed` or equivalent).
-- Query the `contest_settings` table to verify that `rules_json` exactly matches the contents of `docs/test_data/config/contest_defaults.json`.
+- Query the `contest_settings` table to verify that `rules_json` exactly matches the contents of `config/contest_defaults.json`.
 - Verify that structural limits (`total_teams`, `matches_per_round`, etc.) are correctly populated.
 
 ## 3. Reporting

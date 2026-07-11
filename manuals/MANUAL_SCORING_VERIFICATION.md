@@ -22,7 +22,7 @@
 | `docs/test_data/contracted/matches.csv` | Результаты матчей |
 | `docs/test_data/contracted/expected_scores.csv` | Ожидаемые очки (**90 строк**, раунды 1–9) |
 | `docs/test_data/contracted/leaderboard.csv` | Итоговый рейтинг (**10 игроков**) |
-| `docs/test_data/config/contest_defaults.json` | Правила scoring |
+| `config/contest_defaults.json` | Правила scoring |
 
 ## 3. Быстрая автоматическая проверка (рекомендуется)
 
