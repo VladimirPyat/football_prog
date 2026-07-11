@@ -81,7 +81,7 @@ football_prog/
 ├── src/                    # Backend: api, services, scoring, scripts
 ├── frontend/               # Next.js UI (participant + /admin)
 ├── alembic/, tests/
-├── manuals/                # Техдоки (INDEX.md): setup/, testing/, dev/
+├── manuals/                # Техдоки (INDEX.md): user/, setup/, testing/, dev/
 ├── agent_docs/contracts/   # Контракты API, БД, scoring, UI matrix
 └── docs/                   # Продуктовые спеки (read-only)
 ```
@@ -90,10 +90,12 @@ football_prog/
 
 ## Документация
 
-**Оглавление:** [manuals/INDEX.md](manuals/INDEX.md) — разделы `setup/`, `testing/`, `dev/`
+**Оглавление:** [manuals/INDEX.md](manuals/INDEX.md) — разделы `user/`, `setup/`, `testing/`, `dev/`
 
 | Тема | Документ |
 |------|----------|
+| Инструкция участника | [USER_GUIDE.md](manuals/user/USER_GUIDE.md) |
+| Инструкция организатора | [SUPERVISOR_GUIDE.md](manuals/user/SUPERVISOR_GUIDE.md) |
 | Локальная разработка | [DEV_SETUP.md](manuals/setup/DEV_SETUP.md) |
 | Настройки, env, datetime UTC/display | [CONFIG.md](manuals/setup/CONFIG.md) |
 | HTTP API, RBAC, auto-close | [API_GUIDE.md](manuals/dev/API_GUIDE.md) |
