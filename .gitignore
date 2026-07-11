@@ -49,7 +49,6 @@ uploads/
 data/
 !data/.gitkeep
 
-docs/
 
 # environment
 .venv/

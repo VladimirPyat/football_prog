@@ -1,0 +1,11 @@
+login;full_name;email;role;is_temp_password
+volchenko;Волченко;mail1@example.com;USER;false
+kuznetsov;Кузнецов;mail2@example.com;USER;false
+kurakov;Кураков;mail3@example.com;USER;false
+larin;Ларин;mail4@example.com;USER;false
+nikitin;Никитин;mail5@example.com;USER;false
+russkov;Руссков;mail6@example.com;USER;false
+serov;Серов;mail7@example.com;USER;false
+starchenkov_r;Старченков_Р;mail8@example.com;USER;false
+starchenkov_c;Старченков_C;mail9@example.com;USER;false
+shutov;Шутов;mail10@example.com;USER;false
