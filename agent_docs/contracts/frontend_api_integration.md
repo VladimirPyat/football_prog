@@ -1,7 +1,7 @@
 # Frontend ↔ API Integration Contract (Stage 2)
 
 > **Living document** — see update log at the bottom.
-> **Authoritative API spec:** `agent_docs/contracts/api_v1.yaml` (v1.1.0) + `manuals/API_GUIDE.md`, `manuals/ERROR_LOGGING.md`.
+> **Authoritative API spec:** `agent_docs/contracts/api_v1.yaml` (v1.1.0) + `manuals/dev/API_GUIDE.md`, `manuals/ERROR_LOGGING.md`.
 > **Plan:** `agent_docs/plans/draft_2.md` (§7, §12, §13).
 > **Rule:** No mocks. Frontend integrates the real backend. Where an endpoint is missing it is a Stage-2 prerequisite (B1–B6, §9), with a documented fallback.
 
@@ -84,13 +84,13 @@ POST /api/v1/contests/{id}/participants (SUPERVISOR+)
 
 UI `/auth/setup`: `password_form` → form + `new_password`; `confirm_only` → confirm button only. Success → redirect to login (no auto-JWT).
 
-Config field names (`enforce_password_setup`, `frontend_base_url`, `supervisor_training_mode`, …) — defaults in `config/settings.py`; override via deployment env or shell prefix for tests. **Root `.env` = secrets only.** See `manuals/CONFIG.md`.
+Config field names (`enforce_password_setup`, `frontend_base_url`, `supervisor_training_mode`, …) — defaults in `config/settings.py`; override via deployment env or shell prefix for tests. **Root `.env` = secrets only.** See `manuals/setup/CONFIG.md`.
 
 ### 2.2 Rules
 
 - Attach `Authorization: Bearer <token>` to every authenticated request.
 - While `is_temp_password=true`, backend allows only `/auth/change-password` and `/auth/me`; all mutations return `403`. UI must hard-gate to `/change-password`.
-- Test credentials (seed/bootstrap, `manuals/BOOTSTRAP_USERS.md`): `admin/…`, `supervisor/…`; demo participant `user/user` from `bootstrap_users.py` (2.1.1, **TEMPORARY** until 2.3 invite UI).
+- Test credentials (seed/bootstrap, `manuals/setup/BOOTSTRAP_USERS.md`): `admin/…`, `supervisor/…`; demo participant `user/user` from `bootstrap_users.py` (2.1.1, **TEMPORARY** until 2.3 invite UI).
 - Roles: `Support (ADMIN) ⊃ SUPERVISOR ⊃ USER`; Visitor = no token.
 
 ### 2.4 Post-login routing by role
@@ -174,7 +174,7 @@ Backend has two error shapes (`manuals/ERROR_LOGGING.md`):
 
 ## 4. Caching / ETag
 
-Public GET leaderboard & results return (`manuals/API_GUIDE.md`):
+Public GET leaderboard & results return (`manuals/dev/API_GUIDE.md`):
 
 ```
 Cache-Control: public, max-age=300, stale-while-revalidate=60

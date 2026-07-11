@@ -56,7 +56,7 @@ uv run python tests/manual/verify_via_api.py --bootstrap load --database-url sql
 uv run python tests/manual/verify_via_api.py --bootstrap empty --database-url sqlite+aiosqlite:///./football_e2e.db
 ```
 
-Переменные окружения: `DATABASE_URL`, `CONTEST_ID`, `API_BASE_URL`, `VERIFY_BOOTSTRAP` — см. [tests/manual/README.md](../tests/manual/README.md).
+Переменные окружения: `DATABASE_URL`, `CONTEST_ID`, `API_BASE_URL`, `VERIFY_BOOTSTRAP` — см. [tests/manual/README.md](../../tests/manual/README.md).
 
 ### Фаза 1 — Script 1 (`verify_via_api.py`)
 
@@ -133,7 +133,7 @@ uv run python tests/manual/compare_db_vs_reference.py --contest-id 1 --database-
 
 ## Связанные документы
 
-- [SCORING_LOGIC.md](SCORING_LOGIC.md)
-- [DB_REFERENCE.md](DB_REFERENCE.md)
-- [API_GUIDE.md](API_GUIDE.md)
-- [tests/manual/README.md](../tests/manual/README.md)
+- [SCORING_LOGIC.md](../dev/SCORING_LOGIC.md)
+- [DB_REFERENCE.md](../dev/DB_REFERENCE.md)
+- [API_GUIDE.md](../dev/API_GUIDE.md)
+- [tests/manual/README.md](../../tests/manual/README.md)

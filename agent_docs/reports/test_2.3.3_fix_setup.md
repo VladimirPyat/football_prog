@@ -32,7 +32,7 @@
 | `[LINT-FORMAT]` | FAIL | `format:check` — 7 files (Coder components + `admin.test.ts`); pre-existing |
 | `[BUILD]` | SKIP | not run this session |
 | `[DOC-SCENARIOS]` | PASS | S0.6, S1.11, S1.12 rows present in `SUPERVISOR_TESTING_SCENARIOS.md` |
-| `[DOC-API]` | FAIL | `POST /contests/{id}/start` not listed in `manuals/API_GUIDE.md` contest table |
+| `[DOC-API]` | FAIL | `POST /contests/{id}/start` not listed in `manuals/dev/API_GUIDE.md` contest table |
 | `[DOC-LIFECYCLE]` | FAIL | `contest_lifecycle_flow.md` has no DRAFT→RUNNING via `/start` row |
 | Manual S1.1–S1.4, S0.6, S1.11 | SKIP | not executed this session |
 | BLOCKED.md | OK | no new blockers |
@@ -55,7 +55,7 @@
 
 ## Defects for @Coder (non-blocking automated PASS)
 
-1. **`[DOC-API]`** — Document `POST /contests/{id}/start` in `manuals/API_GUIDE.md` (SUPERVISOR+, DRAFT→RUNNING, sets `is_locked`, purges PENDING).
+1. **`[DOC-API]`** — Document `POST /contests/{id}/start` in `manuals/dev/API_GUIDE.md` (SUPERVISOR+, DRAFT→RUNNING, sets `is_locked`, purges PENDING).
 2. **`[DOC-LIFECYCLE]`** — Add start transition to `agent_docs/contracts/contest_lifecycle_flow.md`.
 3. **`[E2E-ACTIVATE-COPY]`** — Add Playwright test for activate modal copy after contest already locked (T8).
 4. **`[E2E-DELETE-RESTORE]`** — Optional UI spec with `NEXT_PUBLIC_SUPERVISOR_TRAINING_MODE=true`.

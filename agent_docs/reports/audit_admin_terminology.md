@@ -150,18 +150,18 @@ When you give the go-ahead, treat each hit as one of:
 
 | File | ~hits | Primary issue | Tags |
 |------|-------|---------------|------|
-| [API_GUIDE.md](../../manuals/API_GUIDE.md) | 69 | RBAC mixes `SUPERVISOR+` with `/admin/*` paths; L174 “or **admin UI**” = organizer; L157 already says “support/troubleshooting” for ADMIN | A, B, C |
-| [SUPERVISOR_TESTING_SCENARIOS.md](../../manuals/SUPERVISOR_TESTING_SCENARIOS.md) | 51 | “админка”, `/admin/*` everywhere; X-rows correctly say **ADMIN** for lifecycle | A, C, B |
-| [FRONTEND_REFERENCE.md](../../manuals/FRONTEND_REFERENCE.md) | 45 | “Admin top nav”, “Supervisor **admin UI**”, route table `/admin/*` | C, A |
-| [STATUS_REFERENCE.md](../../manuals/STATUS_REFERENCE.md) | 29 | “админка”, `/admin/…` API examples, `lib/admin/*` paths | A, C, E |
-| [CONFIG.md](../../manuals/CONFIG.md) | 29 | `SEED_ADMIN_*`, `seed_admin_login`, bootstrap ADMIN | B |
-| [DEV_SETUP.md](../../manuals/DEV_SETUP.md) | 21 | login table `admin` + `SEED_ADMIN_PASSWORD`; “admin shell” = organizer | B, C |
-| [BOOTSTRAP_USERS.md](../../manuals/BOOTSTRAP_USERS.md) | 21 | §4 title “organizer API” but “Login as **admin**” = correct **support** login; L101 “admin UI” = organizer product UI | B, C |
-| [ARCHITECTURE.md](../../manuals/ARCHITECTURE.md) | 11 | diagram “admin router”, “SUPERVISOR — admin ops”, lifecycle “ADMIN pause” | A, B |
-| [DEPLOYMENT.md](../../manuals/DEPLOYMENT.md) | 5 | `SEED_ADMIN_PASSWORD`; “admin UI modal” = organizer invite modal | B, C |
-| [DB_REFERENCE.md](../../manuals/DB_REFERENCE.md) | 3 | Correct: SUPERVISOR = organizer, ADMIN = technical | B (label only) |
-| [SCORING_LOGIC.md](../../manuals/SCORING_LOGIC.md) | 2 | “admin-set” tiebreak = **ADMIN/support** | B |
-| [MANUAL_SCORING_VERIFICATION.md](../../manuals/MANUAL_SCORING_VERIFICATION.md) | 1 | `POST …/admin/rounds/…/calculate` path | A |
+| [API_GUIDE.md](../../manuals/dev/API_GUIDE.md) | 69 | RBAC mixes `SUPERVISOR+` with `/admin/*` paths; L174 “or **admin UI**” = organizer; L157 already says “support/troubleshooting” for ADMIN | A, B, C |
+| [SUPERVISOR_TESTING_SCENARIOS.md](../../manuals/testing/SUPERVISOR_TESTING_SCENARIOS.md) | 51 | “админка”, `/admin/*` everywhere; X-rows correctly say **ADMIN** for lifecycle | A, C, B |
+| [FRONTEND_REFERENCE.md](../../manuals/dev/FRONTEND_REFERENCE.md) | 45 | “Admin top nav”, “Supervisor **admin UI**”, route table `/admin/*` | C, A |
+| [STATUS_REFERENCE.md](../../manuals/dev/STATUS_REFERENCE.md) | 29 | “админка”, `/admin/…` API examples, `lib/admin/*` paths | A, C, E |
+| [CONFIG.md](../../manuals/setup/CONFIG.md) | 29 | `SEED_ADMIN_*`, `seed_admin_login`, bootstrap ADMIN | B |
+| [DEV_SETUP.md](../../manuals/setup/DEV_SETUP.md) | 21 | login table `admin` + `SEED_ADMIN_PASSWORD`; “admin shell” = organizer | B, C |
+| [BOOTSTRAP_USERS.md](../../manuals/setup/BOOTSTRAP_USERS.md) | 21 | §4 title “organizer API” but “Login as **admin**” = correct **support** login; L101 “admin UI” = organizer product UI | B, C |
+| [ARCHITECTURE.md](../../manuals/dev/ARCHITECTURE.md) | 11 | diagram “admin router”, “SUPERVISOR — admin ops”, lifecycle “ADMIN pause” | A, B |
+| [DEPLOYMENT.md](../../manuals/setup/DEPLOYMENT.md) | 5 | `SEED_ADMIN_PASSWORD`; “admin UI modal” = organizer invite modal | B, C |
+| [DB_REFERENCE.md](../../manuals/dev/DB_REFERENCE.md) | 3 | Correct: SUPERVISOR = organizer, ADMIN = technical | B (label only) |
+| [SCORING_LOGIC.md](../../manuals/dev/SCORING_LOGIC.md) | 2 | “admin-set” tiebreak = **ADMIN/support** | B |
+| [MANUAL_SCORING_VERIFICATION.md](../../manuals/testing/MANUAL_SCORING_VERIFICATION.md) | 1 | `POST …/admin/rounds/…/calculate` path | A |
 | [README.md](../../manuals/README.md) | 1 | pointer to SUPERVISOR doc | — |
 
 **Highest-impact manual:** `SUPERVISOR_TESTING_SCENARIOS.md` + `API_GUIDE.md` + `FRONTEND_REFERENCE.md` — most QA copy uses “админка” for organizer workspace.
@@ -224,7 +224,7 @@ Historical test reports (`test_2.3.md`, `test_1.*.md`, `bug_*.md`, `progress/sta
 
 - [instructions/coder_2.2.md](../instructions/coder_2.2.md) — “ADMIN \| All scores (**support**)”
 - [instructions/coder_1.16_fix_public_predictions.md](../instructions/coder_1.16_fix_public_predictions.md) — “Admin/**support**”
-- [manuals/API_GUIDE.md](../../manuals/API_GUIDE.md) L157 — “support/troubleshooting”
+- [manuals/dev/API_GUIDE.md](../../manuals/dev/API_GUIDE.md) L157 — “support/troubleshooting”
 
 ---
 
@@ -260,7 +260,7 @@ Historical test reports (`test_2.3.md`, `test_1.*.md`, `bug_*.md`, `progress/sta
 ## 9. Suggested execution order (when approved)
 
 1. **`docs/` immutable specs** (human sync) — 8 строк **B** + 2 строки **C** per §2.2–2.6; paths untouched.
-2. **Glossary** — [manuals/README.md](../../manuals/README.md) + [API_GUIDE.md](../../manuals/API_GUIDE.md#role-based-access-control), mirror [01_tech_regulations.md](../../docs/01_tech_regulations.md) §1.
+2. **Glossary** — [manuals/README.md](../../manuals/README.md) + [API_GUIDE.md](../../manuals/dev/API_GUIDE.md#role-based-access-control), mirror [01_tech_regulations.md](../../docs/01_tech_regulations.md) §1.
 3. **Env rename** (separate commit) — `.env.example`, `frontend/.env.local.example`, `CONFIG.md`, `settings.py`, bootstrap scripts.
 4. **Manuals** — **B** in CONFIG/BOOTSTRAP/DEV_SETUP; **C** for «админка» in SUPERVISOR_TESTING_SCENARIOS; **A-path** unchanged.
 5. **agent_docs contracts** — glossaries; filename `admin_ui_status_matrix.md` optional rename later.
@@ -458,11 +458,11 @@ No code changes made. After your review, typical split:
 
 | Pri | File | Что править |
 |-----|------|-------------|
-| **P0** | [manuals/API_GUIDE.md](../../manuals/API_GUIDE.md) | Таблица RBAC L152–157: строка **ADMIN** → **Support (ADMIN)**; exclusive endpoints §contests/deleted, restore, recalculate |
-| **P0** | [manuals/CONFIG.md](../../manuals/CONFIG.md) + [.env.example](../../.env.example) | `SEED_ADMIN_*` → `SEED_SUPPORT_*`, комментарии |
-| **P0** | [manuals/BOOTSTRAP_USERS.md](../../manuals/BOOTSTRAP_USERS.md) | «Login as admin» → «Login as **support**»; таблица `admin` → `ADMIN (support)` |
-| **P1** | [manuals/SUPERVISOR_TESTING_SCENARIOS.md](../../manuals/SUPERVISOR_TESTING_SCENARIOS.md) | Строки X1, X3–X7: **ADMIN** → **support**; «админка» → «панель организатора (supervisor)»; `/admin/` не трогать |
-| **P1** | [manuals/FRONTEND_REFERENCE.md](../../manuals/FRONTEND_REFERENCE.md) | «Supervisor admin UI» → «Supervisor UI»; `/admin/lifecycle`, `/admin/users` — пометить **(support only)** |
+| **P0** | [manuals/dev/API_GUIDE.md](../../manuals/dev/API_GUIDE.md) | Таблица RBAC L152–157: строка **ADMIN** → **Support (ADMIN)**; exclusive endpoints §contests/deleted, restore, recalculate |
+| **P0** | [manuals/setup/CONFIG.md](../../manuals/setup/CONFIG.md) + [.env.example](../../.env.example) | `SEED_ADMIN_*` → `SEED_SUPPORT_*`, комментарии |
+| **P0** | [manuals/setup/BOOTSTRAP_USERS.md](../../manuals/setup/BOOTSTRAP_USERS.md) | «Login as admin» → «Login as **support**»; таблица `admin` → `ADMIN (support)` |
+| **P1** | [manuals/testing/SUPERVISOR_TESTING_SCENARIOS.md](../../manuals/testing/SUPERVISOR_TESTING_SCENARIOS.md) | Строки X1, X3–X7: **ADMIN** → **support**; «админка» → «панель организатора (supervisor)»; `/admin/` не трогать |
+| **P1** | [manuals/dev/FRONTEND_REFERENCE.md](../../manuals/dev/FRONTEND_REFERENCE.md) | «Supervisor admin UI» → «Supervisor UI»; `/admin/lifecycle`, `/admin/users` — пометить **(support only)** |
 
 ### 14.3 Glossary blurb (вставить в manuals/README или API_GUIDE)
 

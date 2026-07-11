@@ -369,7 +369,7 @@ def _print_manual_qa_cheatsheet() -> None:
     print("  uv run python src/scripts/purge_deleted_contests.py --all-deleted")
     print("  # UI: supervisor «Удалить конкурс» hides draft; ADMIN restores at /admin/lifecycle")
     print("")
-    print("Full reference: manuals/DEV_SETUP.md#manual-qa-cheatsheet")
+    print("Full reference: manuals/setup/DEV_SETUP.md#manual-qa-cheatsheet")
 
 
 def _print_manual_start_hint() -> None:

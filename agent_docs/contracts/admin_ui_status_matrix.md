@@ -2,7 +2,7 @@
 
 > **Purpose:** single place linking **backend statuses**, **frontend-derived statuses**, **display-only labels**, **scoring/visibility rules**, and **cross-page dependencies** (Туры, Результаты, прогнозы, таблицы, ДопТур).  
 > **Audience:** frontend/backend developers and QA — avoid re-reading `api_v1.yaml` for UI gating rules.  
-> **Not a replacement for:** API transition guards (`contest_lifecycle_flow.md`), scoring math (`scoring_flow.md`, `bonus_rules.md`), or human manual (`manuals/STATUS_REFERENCE.md`).
+> **Not a replacement for:** API transition guards (`contest_lifecycle_flow.md`), scoring math (`scoring_flow.md`, `bonus_rules.md`), or human manual (`manuals/dev/STATUS_REFERENCE.md`).
 
 ## Related documents
 
@@ -13,8 +13,8 @@
 | [bonus_rules.md](bonus_rules.md) | Bonus 1/2/3, deferred bonuses (`bonuses_pending`) |
 | [leaderboard_tiebreakers.md](leaderboard_tiebreakers.md) | Standings order, count columns |
 | [frontend_api_integration.md](frontend_api_integration.md) | HTTP paths, types, auth, errors |
-| [manuals/STATUS_REFERENCE.md](../../manuals/STATUS_REFERENCE.md) | Russian labels, product meaning, public visibility |
-| [manuals/API_GUIDE.md](../../manuals/API_GUIDE.md) | Endpoint behaviour, error codes |
+| [manuals/dev/STATUS_REFERENCE.md](../../manuals/dev/STATUS_REFERENCE.md) | Russian labels, product meaning, public visibility |
+| [manuals/dev/API_GUIDE.md](../../manuals/dev/API_GUIDE.md) | Endpoint behaviour, error codes |
 | **This file** | UI: derived status, per-page capabilities, **results → scores → visibility** |
 
 ### Industry pattern (what we follow)

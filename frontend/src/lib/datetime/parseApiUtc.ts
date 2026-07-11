@@ -3,7 +3,7 @@ import { assertApiStorageIsUtc } from "@/lib/datetime/config";
 /**
  * Parse API/DB timestamps as UTC instants.
  *
- * Policy: `getApiStorageTimeZone()` (default UTC). See `config.ts` and manuals/CONFIG.md.
+ * Policy: `getApiStorageTimeZone()` (default UTC). See `config.ts` and manuals/setup/CONFIG.md.
  * Naive ISO from API is UTC wall clock — not the supervisor display zone.
  */
 export function parseApiUtc(iso: string): number {

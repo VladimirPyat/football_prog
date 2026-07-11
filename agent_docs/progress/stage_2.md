@@ -48,7 +48,7 @@
 - Scope: /admin settings, rounds, results, lifecycle, B5 logo upload
 - UI rules: is_locked readonly, ACTIVE round restrictions, 24h, newsletter stub
 - Verified: npm run build (0), npm run test:unit (36 passed)
-- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.3
+- Docs updated: ui/*, frontend_api_integration.md, manuals/dev/FRONTEND_REFERENCE.md §2.3
 - Next: agent_docs/instructions/tester_2.3.md
 
 ## 2026-06-25 — Tester (2.3)
@@ -135,7 +135,7 @@
 
 ## 2026-06-27 — Coder (2.3.2 backend calculated edit)
 - STATUS: READY_FOR_TEST
-- Files: `src/services/match_service.py` (set_result CLOSED|CALCULATED + auto recalc), `tests/api/test_results_calculated_edit_2_3_2.py`, `manuals/API_GUIDE.md`, `manuals/STATUS_REFERENCE.md`
+- Files: `src/services/match_service.py` (set_result CLOSED|CALCULATED + auto recalc), `tests/api/test_results_calculated_edit_2_3_2.py`, `manuals/dev/API_GUIDE.md`, `manuals/dev/STATUS_REFERENCE.md`
 - Verified: `pytest tests/api/test_results_calculated_edit_2_3_2.py -q` 4/4; `pytest tests/api/test_calculate_leaderboard_1_4.py -q` 8/8 (+1 skip); `ruff check src/services/match_service.py` OK
 - Tag: [API-RESULT-CALCULATED]
 - Next: @Tester → `agent_docs/instructions/tester_2.3.2_fix_tours.md` or `tester_2.3.2_backend_calculated_edit.md`; frontend B3 unlock (`coder_2.3.2_fix_tours.md` §5)
@@ -175,7 +175,7 @@
   - `lib/validation/admin.test.ts` — round-robin derive tests
   - `e2e/admin_setup.spec.ts` — E2E-ADMIN-START, CREATE-MODAL, PARAMS-ROUND-ROBIN
   - `e2e/fixtures/adminApi.ts` — `startContest()`, flexible `createDraftContest`
-  - `manuals/SUPERVISOR_TESTING_SCENARIOS.md` — S1.11, S0.6/S0.7, S1.12
+  - `manuals/testing/SUPERVISOR_TESTING_SCENARIOS.md` — S1.11, S0.6/S0.7, S1.12
 - Verified: lint/tsc OK; Vitest 94/94
 
 ## 2026-06-28 — Tester (2.3.3 fix setup)
@@ -220,7 +220,7 @@
 - UI rules: batch-only, 0..maxScore, **empty≠0 (no coerce)**, NULL≠0, 24h warning, privacy pre/post deadline
 - Key paths: `frontend/src/components/predictions/*`, `frontend/src/app/contest/[contestId]/*`, `frontend/src/lib/privacy/*`, `frontend/src/lib/validation/{score,prediction}.ts`
 - Verified: npm run test:unit (150 passed), lint/tsc OK; prettier fixed
-- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.2
+- Docs updated: ui/*, frontend_api_integration.md, manuals/dev/FRONTEND_REFERENCE.md §2.2
 - Next: agent_docs/instructions/tester_2.2.md
 
 ## 2026-06-28 — Planner (2.2.1 visitor public predictions)
@@ -235,7 +235,7 @@
 - Instruction: `agent_docs/instructions/backend/coder_1.16_fix_public_predictions.md`
 - Scope: OptionalUser on GET predictions; 403 `PREDICTIONS_NOT_PUBLIC` pre-deadline anonymous; full table post-deadline; legacy shim aligned
 - Key files: contest_ops.py, predictions.py, handlers/predictions.py, prediction_service.py, test_predictions_public_1_16.py
-- Contracts: api_v1.yaml, frontend_api_integration.md §5.4, contest_lifecycle_flow.md §3.3, manuals/API_GUIDE.md
+- Contracts: api_v1.yaml, frontend_api_integration.md §5.4, contest_lifecycle_flow.md §3.3, manuals/dev/API_GUIDE.md
 - Verified: pytest predictions 9/9; ruff on touched files
 
 ## 2026-06-28 — Coder (2.2.1 visitor public predictions — frontend)
@@ -276,7 +276,7 @@
 - Scope: replace contestDisplayMock with useLeaderboard/useRoundResults; PUBLISHED gate; existing UI preserved
 - Backend dep: coder_1.17_leaderboard_fix (results[].points)
 - Verified: npm run build, test:unit, lint/tsc/format; checklist §9
-- Docs updated: ui/*, frontend_api_integration.md, manuals/FRONTEND_REFERENCE.md §2.4
+- Docs updated: ui/*, frontend_api_integration.md, manuals/dev/FRONTEND_REFERENCE.md §2.4
 - Deferred (if any): ETag caching, global «Общий» leaderboard selector
 - Next: agent_docs/instructions/tester_2.4.md
 

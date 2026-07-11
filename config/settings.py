@@ -8,7 +8,7 @@ values only: database URL, JWT signing key, bootstrap passwords, ``APP_MODE``.
 ``APP_MODE`` selects a preset bundle (URLs, CORS, database driver defaults) so the
 server ``.env`` survives ``git pull`` without being overwritten by repo defaults.
 
-See ``manuals/CONFIG.md`` for the full reference.
+See ``manuals/setup/CONFIG.md`` for the full reference.
 """
 
 from __future__ import annotations

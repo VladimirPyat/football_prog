@@ -10,7 +10,7 @@
 
 Фронтенд Stage 2.1 прошёл полный цикл автоматической верификации: 18 unit-тестов (Vitest), 10 E2E smoke (Playwright), lint/type-check/prettier/build — все с exit code 0. UI auth, discovery, profile/contacts, RBAC guards, temp-password gate и supervisor contest picker работают против live API на `:8000`.
 
-**Важно:** документированный логин `user/user` из `manuals/DEV_SETUP.md` **не работает** на стандартном `dev_setup.py` (см. дефект `[ENV-LOADER-AUTH]`). E2E используют provisioning через API (global setup) — это не ослабление assertions, а обход бага данных.
+**Важно:** документированный логин `user/user` из `manuals/setup/DEV_SETUP.md` **не работает** на стандартном `dev_setup.py` (см. дефект `[ENV-LOADER-AUTH]`). E2E используют provisioning через API (global setup) — это не ослабление assertions, а обход бага данных.
 
 ---
 
@@ -79,10 +79,10 @@
 
 ### `[ENV-LOADER-AUTH]` — loader users cannot login
 
-- **Expected:** после `dev_setup.py --full` логин `shutov`/`user` с паролем `user` (per `manuals/DEV_SETUP.md`) → 200 + JWT.
+- **Expected:** после `dev_setup.py --full` логин `shutov`/`user` с паролем `user` (per `manuals/setup/DEV_SETUP.md`) → 200 + JWT.
 - **Actual:** `POST /api/v1/auth/login` с `user/user` → `{"detail":"Неверный логин или пароль"}`; `shutov/user` → `500 INTERNAL_ERROR` (bcrypt verify on placeholder hash `test-data-placeholder-hash-not-for-auth`).
 - **Root cause:** `src/scripts/load_test_data.py` sets `_PLACEHOLDER_PASSWORD_HASH` for all CSV users; login `user` отсутствует в `docs/test_data/contracted/users.csv`.
-- **Action:** в `load_test_data.py` или `dev_setup.py` — хешировать пароль `user` для loader users; исправить `manuals/DEV_SETUP.md` (логин `shutov`, не `user`).
+- **Action:** в `load_test_data.py` или `dev_setup.py` — хешировать пароль `user` для loader users; исправить `manuals/setup/DEV_SETUP.md` (логин `shutov`, не `user`).
 
 ### `[ENV-LOCKED-INVITE]` — invite on contest id=1 fails
 

@@ -111,7 +111,7 @@ Newsletters, contacts/profile, Playwright E2E, audit log — вне Stage 1 API 
 | `tests/api/reference_compare.py` | Shared CSV ↔ DB compare |
 | `tests/manual/verify_via_api.py` | Script 1 |
 | `tests/manual/compare_db_vs_reference.py` | Script 2 |
-| `manuals/MANUAL_SCORING_VERIFICATION.md` | RU sign-off guide |
+| `manuals/testing/MANUAL_SCORING_VERIFICATION.md` | RU sign-off guide |
 
 ## Команды
 

@@ -49,7 +49,7 @@
 | Нет per-router `try/except` эвристик | `rg 'except (ValueError\|PermissionError\|ContestLockedError)' src/api/v1/` | **PASS** — 0 совпадений |
 | Нет substring HTTP mapping | `rg 'out of range.*in msg\|deadline.*in msg' src/api/` | **PASS** — 0 совпадений |
 | Единый дом для `ContestLockedError` | `rg 'class ContestLockedError' src/` | **PASS** — только `src/core/exceptions.py` |
-| `manuals/API_GUIDE.md` Error Response Format | ручная проверка §324 | **PASS** — секция присутствует |
+| `manuals/dev/API_GUIDE.md` Error Response Format | ручная проверка §324 | **PASS** — секция присутствует |
 
 ### Выборочный обзор docstrings (ручной)
 

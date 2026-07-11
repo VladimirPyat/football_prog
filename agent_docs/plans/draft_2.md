@@ -1,7 +1,7 @@
 # Stage 2 — Frontend Development Plan
 
 > **Status:** Phase 1 draft — awaiting user approval before agent instructions (Phase 2).
-> **Sources:** `docs/roadmap.csv`, `docs/05_frontend.md`, `docs/01_tech_regulations.md`, `docs/02_project_structure.md`, `docs/03_user_scenarios.md`, `docs/04_supervisor_scenario.md`, `agent_docs/contracts/api_v1.yaml`, backend implementation in `src/`, `manuals/API_GUIDE.md`.
+> **Sources:** `docs/roadmap.csv`, `docs/05_frontend.md`, `docs/01_tech_regulations.md`, `docs/02_project_structure.md`, `docs/03_user_scenarios.md`, `docs/04_supervisor_scenario.md`, `agent_docs/contracts/api_v1.yaml`, backend implementation in `src/`, `manuals/dev/API_GUIDE.md`.
 > **Backend prerequisite:** Stage 1 complete (API v1.1.0, multi-contest, auth, scoring, lifecycle).
 
 ---
@@ -67,7 +67,7 @@ Build a **Next.js 14+ (App Router) + TypeScript + Tailwind CSS** single-page app
 | Area | Status |
 |------|--------|
 | `frontend/` directory | **Does not exist** — greenfield |
-| Backend API | ✅ Implemented — see `manuals/API_GUIDE.md` |
+| Backend API | ✅ Implemented — see `manuals/dev/API_GUIDE.md` |
 | OpenAPI contract | ✅ `agent_docs/contracts/api_v1.yaml` v1.1.0 |
 | CORS | ✅ Configured via `CORS_ORIGINS` in `config/settings.py` (default `["*"]`) |
 | Reference screenshots | ✅ **Available** in `docs/screens/` (`user_leaderboard.jpg`, `user_predict.jpg`, `user_result.jpg`, `supervisor_settings.jpg`, `supervisor_settings2.jpg`, `supervisor_settings3.jpg`, `supervisor_tours.jpg`, `supervisor_results.jpg`). Analyzed in §11. |
@@ -497,7 +497,7 @@ Data from `RoundPredictionsView`:
 
 **API endpoints:** `POST /auth/login`, `POST /auth/change-password`, `GET /auth/me`, `GET /contests`, `GET /contests/{id}`
 
-**Dependencies:** Backend running (Stage 1.8+ for B1–B3); bootstrap users (`manuals/BOOTSTRAP_USERS.md`). **Blockers B1–B3 resolved** — see `agent_docs/reports/BLOCKED.md`.
+**Dependencies:** Backend running (Stage 1.8+ for B1–B3); bootstrap users (`manuals/setup/BOOTSTRAP_USERS.md`). **Blockers B1–B3 resolved** — see `agent_docs/reports/BLOCKED.md`.
 
 **Frontend fallbacks (no mocks):**
 
@@ -729,7 +729,7 @@ Known `code` values (optional): `SCORE_OUT_OF_RANGE`, `RESULTS_NOT_AVAILABLE`, `
 
 ### 7.5 Caching Integration
 
-Public endpoints return `Cache-Control` + `ETag` (`manuals/API_GUIDE.md`):
+Public endpoints return `Cache-Control` + `ETag` (`manuals/dev/API_GUIDE.md`):
 
 - `GET .../leaderboard` — cache 300s
 - `GET .../rounds/{id}/results` — cache when published

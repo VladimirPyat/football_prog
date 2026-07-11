@@ -6,7 +6,7 @@
 # APP_MODE=web_dev  → SQLite in ./data/football.db (no PostgreSQL container)
 # APP_MODE=web_prod → PostgreSQL (`docker compose --profile prod up`)
 #
-# First deploy:  manuals/DEPLOYMENT.md
+# First deploy:  manuals/setup/DEPLOYMENT.md
 # Update deploy:  git pull && docker compose build && docker compose up -d
 
 services:

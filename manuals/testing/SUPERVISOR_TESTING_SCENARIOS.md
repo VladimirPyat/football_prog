@@ -2,7 +2,7 @@
 
 Чек-лист для роли **SUPERVISOR**: что проверить в панели организатора (`/admin/*`), на каком маршруте и какое поведение ожидается. Использовать перед релизом или после крупных изменений фронта/бэка.
 
-**Источники:** `docs/04_supervisor_scenario.md`, `docs/01_tech_regulations.md`, [contest_lifecycle_flow.md](../agent_docs/contracts/contest_lifecycle_flow.md), [frontend_api_integration.md](../agent_docs/contracts/frontend_api_integration.md), [STATUS_REFERENCE.md](STATUS_REFERENCE.md).
+**Источники:** `docs/04_supervisor_scenario.md`, `docs/01_tech_regulations.md`, [contest_lifecycle_flow.md](../../agent_docs/contracts/contest_lifecycle_flow.md), [frontend_api_integration.md](../../agent_docs/contracts/frontend_api_integration.md), [STATUS_REFERENCE.md](../dev/STATUS_REFERENCE.md).
 
 **Скриншоты (эталон):** `docs/screens/supervisor_*.jpg`
 
@@ -23,9 +23,9 @@
 
 - **SETUP (настройка)** — `contest.status = DRAFT`, `is_locked = false`
 - **RUNNING (идёт)** — после первой активации тура, `is_locked = true`
-- **Fixture (dev)** — после `dev_setup.py` + `finalize_dev_fixture`: туры 1–9 `PUBLISHED`, 10 `CALCULATED`, 11 `CLOSED` ([DEV_SETUP.md](DEV_SETUP.md))
+- **Fixture (dev)** — после `dev_setup.py` + `finalize_dev_fixture`: туры 1–9 `PUBLISHED`, 10 `CALCULATED`, 11 `CLOSED` ([DEV_SETUP.md](../setup/DEV_SETUP.md))
 
-**Вход (dev):** организатор — пароль `SEED_SUPERVISOR_PASSWORD`, см. [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md).
+**Вход (dev):** организатор — пароль `SEED_SUPERVISOR_PASSWORD`, см. [BOOTSTRAP_USERS.md](../setup/BOOTSTRAP_USERS.md).
 
 **Сброс фикстуры после прохода по «Турам» / «Результатам»:**
 
@@ -45,8 +45,8 @@ uv run python src/scripts/dev_setup.py --finalize-fixture-only
 | S0.3 | Верхнее меню организатора          | `/admin/*`                                                                             | Вкладки: Настройки, Туры, Рассылки, Результаты; «+ Новый конкурс»                                            |                          |        |                                                    |
 | S0.4 | Выбор конкурса                     | шапка / `/contests`                                                                    | Id активного конкурса сохраняется; API с префиксом `contest_id`                                              |                          |        |                                                    |
 | S0.5 | Баннер блокировки                  | настройки при `is_locked`                                                              | «Конкурс уже запущен» — параметры только для чтения                                                          | unit `deriveAdminUiMode` |        |                                                    |
-| S0.6 | Удаление / восстановление конкурса | `/admin/settings/parameters` (кнопка «Удалить конкурс») или `/admin/lifecycle` (Support) | SUPERVISOR: удаление DRAFT/PAUSED; конкурс скрывается из списка; Support (ADMIN): «Восстановить» в течение окна снимка | E2E                      |        | без доп. env-флагов                                |
-| S0.7 | Баннер паузы / завершения          | любая страница `/admin/*` при PAUSED/FINISHED                                               | Баннер; мутации отключены                                                                                    | unit                     |        | Пауза/завершение — **Support (ADMIN)** на `/admin/lifecycle` |
+| S0.6 | Удаление / восстановление конкурса | `/admin/settings/parameters` (кнопка «Удалить конкурс») или `/admin/lifecycle` (Support) | SUPERVISOR: удаление DRAFT/PAUSED; конкурс скрывается из списка; Support: «Восстановить» в течение окна снимка | E2E                      |        | без доп. env-флагов                                |
+| S0.7 | Баннер паузы / завершения          | любая страница `/admin/*` при PAUSED/FINISHED                                               | Баннер; мутации отключены                                                                                    | unit                     |        | Пауза/завершение — **Support** на `/admin/lifecycle` |
 
 
 ---
@@ -68,7 +68,7 @@ uv run python src/scripts/dev_setup.py --finalize-fixture-only
 | S1.8  | Добавление команды                      | `/admin/settings/teams` → `POST …/teams`               | Команда в таблице                                                                                                                                                  |            |        | UC-2                                                                                                                                                                                                                                          |
 | S1.9  | Загрузка логотипа                       | то же → `POST …/teams/{id}/logo`                       | Обновлён `logo_url` (multipart)                                                                                                                                    |            |        | B5                                                                                                                                                                                                                                            |
 | S1.10 | Редактирование/удаление команды (SETUP) | `PATCH/DELETE …/teams/{id}`                            | CRUD работает                                                                                                                                                      |            |        | После RUNNING — заблокировано                                                                                                                                                                                                                 |
-| S1.11 | Подтверждение участника (dev script)    | invite → `dev_invite_setup.py confirm-all`             | После скрипта статус «Принято» (`ACCEPTED`) в таблице участников                                                                                                   | manual     | —      | [DEV_SETUP.md](DEV_SETUP.md) Workflow B: 1) `list-pending` — найти `contest_id` 2) `confirm-all --contest-id {id}` (пароль из `SEED_SUPERVISOR_PASSWORD`) 3) reload participants → «Принято» 4) до S1.12 start — PENDING удаляются при старте |
+| S1.11 | Подтверждение участника (dev script)    | invite → `dev_invite_setup.py confirm-all`             | После скрипта статус «Принято» (`ACCEPTED`) в таблице участников                                                                                                   | manual     | —      | [DEV_SETUP.md](../setup/DEV_SETUP.md) Workflow B: 1) `list-pending` — найти `contest_id` 2) `confirm-all --contest-id {id}` (пароль из `SEED_SUPERVISOR_PASSWORD`) 3) reload participants → «Принято» 4) до S1.12 start — PENDING удаляются при старте |
 | S1.12 | Запуск конкурса                         | `/admin/settings/parameters` → `POST …/start`          | Кнопка «Запустить конкурс» активна только при `teams === total_teams` и ≥2 участников «Принято»; индикатор готовности; `RUNNING` + `is_locked`; параметры readonly | E2E        |        | Туры — позже на вкладке «Туры»; бэкенд `VALIDATION_ERROR` при нарушении                                                                                                                                                                       |
 
 
@@ -100,7 +100,7 @@ uv run python src/scripts/dev_setup.py --finalize-fixture-only
 | S2.10 | Подсказка о длинном переносе              | сдвиг ≥ 7 суток             | Жёлтая подсказка → статус POSTPONED + свободный тур                                | unit             |        |                                                                             |
 | S2.11 | Отмена матча                              | статус → «Отменён»          | Диалог подтверждения → PATCH `CANCELED`                                            |                  |        | В любой момент, пока не терминальный статус                                 |
 | S2.12 | Перенос в свободный тур                   | статус → «Перенесён»        | Подтверждение → PATCH `POSTPONED` → модалка свободного тура                        | E2E active       |        |                                                                             |
-| S2.13 | Восстановление матча                      | статус → «Запланирован»     | Только **Support (ADMIN)** из CANCELED/POSTPONED                                             |                  |        | У супервизора: dropdown заблокирован для отменённого                        |
+| S2.13 | Восстановление матча                      | статус → «Запланирован»     | Только **Support** из CANCELED/POSTPONED                                             |                  |        | У супервизора: dropdown заблокирован для отменённого                        |
 | S2.14 | Одна кнопка «Сохранить» (T2)              | панель ACTIVE               | Одна «Сохранить изменения»; не блокируется 24h lockout при изменении только матчей |                  | ✅ авто |                                                                             |
 | S2.15 | Блокировка дедлайна за 24 ч               | поле дедлайна               | Disabled + сообщение при `now > deadline - 24h`                                    | Vitest + E2E 24h |        | UC-6; API `DEADLINE_CHANGE_CLOSED`                                          |
 | S2.16 | Подсказка о рассылке после смены дедлайна | сохранение дедлайна         | `NewsletterPromptModal` (заглушка этапа 3)                                         |                  |        | Только текст; отправки нет                                                  |
@@ -124,7 +124,7 @@ uv run python src/scripts/dev_setup.py --finalize-fixture-only
 | ID    | Сценарий                 | Маршрут / API                   | Ожидание                                                                                                              | Авто          | Статус | Замечания                       |
 | ----- | ------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------- | ------ | ------------------------------- |
 | S2.22 | Открытие модалки         | «+ Добавить свободный тур»      | Только матчи со статусом `POSTPONED`                                                                                  | E2E free_tour |        | UC + §5.3 регламента            |
-| S2.23 | Создание свободного тура | `POST …/admin/rounds/free-tour` | Новый ДопТур; матчи перенесены; `origin_round_id`; бонусы исходного тура — позже ([scoring_flow](scoring_flow.md) §6) | E2E free_tour |        | Матч исчезает из исходного тура |
+| S2.23 | Создание свободного тура | `POST …/admin/rounds/free-tour` | Новый ДопТур; матчи перенесены; `origin_round_id`; бонусы исходного тура — позже ([scoring_flow](../../agent_docs/contracts/scoring_flow.md) §6) | E2E free_tour |        | Матч исчезает из исходного тура |
 
 
 ---
@@ -193,12 +193,12 @@ uv run python src/scripts/dev_setup.py --finalize-fixture-only
 
 | ID  | Возможность                                 | Роль                          | Маршрут                                             |
 | --- | ------------------------------------------- | ----------------------------- | --------------------------------------------------- |
-| X1  | Пауза / возобновление / завершение конкурса | Support (ADMIN)               | `/admin/lifecycle`                                  |
-| X2  | Удаление конкурса (safe delete)             | SUPERVISOR (training) / Support (ADMIN) | Parameters или lifecycle                            |
-| X3  | Глобальный пересчёт                         | Support (ADMIN)                         | `POST …/admin/recalculate`                          |
-| X4  | Создание другого SUPERVISOR                 | Support (ADMIN)                         | `/admin/users`                                      |
-| X5  | Исключительные tie-break очки               | Support (ADMIN)                         | `PUT …/exceptional-tiebreak` (разрешено и при lock) |
-| X6  | Восстановление CANCELED-матча на ACTIVE     | Support (ADMIN)                         | dropdown статуса на `/admin/rounds`                 |
+| X1  | Пауза / возобновление / завершение конкурса | Support               | `/admin/lifecycle`                                  |
+| X2  | Удаление конкурса (safe delete)             | SUPERVISOR (training) / Support | Parameters или lifecycle                            |
+| X3  | Глобальный пересчёт                         | Support                         | `POST …/admin/recalculate`                          |
+| X4  | Создание другого SUPERVISOR                 | Support                         | `/admin/users`                                      |
+| X5  | Исключительные tie-break очки               | Support                         | `PUT …/exceptional-tiebreak` (разрешено и при lock) |
+| X6  | Восстановление CANCELED-матча на ACTIVE     | Support                         | dropdown статуса на `/admin/rounds`                 |
 
 
 ---
@@ -253,7 +253,7 @@ cd frontend && npm run test:e2e   # нужен dev_setup --run-only
 uv run pytest tests/api/test_results_calculated_edit_2_3_2.py tests/api/test_leaderboard_published_only_2_3_1.py -q
 ```
 
-Шаблон отчёта: [test_2.3.2_fix_tours.md](../agent_docs/reports/test_2.3.2_fix_tours.md).
+Шаблон отчёта: [test_2.3.2_fix_tours.md](../../agent_docs/reports/test_2.3.2_fix_tours.md).
 
 ### Маршрут D — кросс-проверка организатора и участников (~45–60 мин)
 
@@ -270,18 +270,18 @@ uv run pytest tests/api/test_results_calculated_edit_2_3_2.py tests/api/test_lea
 
 | Тема                         | Спека (`04_supervisor`) | Текущий продукт                                 | Действие                                                                                                  |
 | ---------------------------- | ----------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Смена команд на ACTIVE       | Разрешена до дедлайна   | **Фронт:** состав заблокирован после активации  | [STATUS_REFERENCE §2.5](STATUS_REFERENCE.md); ужесточение бэка — [todo.md](../agent_docs/reports/todo.md) |
-| Дедлайн vs первый матч −24 ч | Старое правило в §5     | **Размещение:** только `deadline < first_match` | Спека устарела; см. [API_GUIDE](API_GUIDE.md)                                                             |
+| Смена команд на ACTIVE       | Разрешена до дедлайна   | **Фронт:** состав заблокирован после активации  | [STATUS_REFERENCE §2.5](../dev/STATUS_REFERENCE.md); ужесточение бэка — [todo.md](../../agent_docs/reports/todo.md) |
+| Дедлайн vs первый матч −24 ч | Старое правило в §5     | **Размещение:** только `deadline < first_match` | Спека устарела; см. [API_GUIDE](../dev/API_GUIDE.md)                                                             |
 | Загрузка туров по API        | §5 сценарий             | Не реализовано                                  | 🔲 будущее                                                                                                |
 | Рассылки                     | §4 полностью            | Заглушка этапа 3                                | 🔲                                                                                                        |
-| Подпись CLOSED в UI          | «Закрыт»                | Планируется «Дедлайн»                           | [STATUS_REFERENCE](STATUS_REFERENCE.md)                                                                   |
+| Подпись CLOSED в UI          | «Закрыт»                | Планируется «Дедлайн»                           | [STATUS_REFERENCE](../dev/STATUS_REFERENCE.md)                                                                   |
 
 
 ### 10.1 Очистка лишних конкурсов (dev / E2E)
 
 E2E и ручные прогоны создают много черновиков и «E2E Setup …» в списке конкурсов. Перед §11 (и вообще перед QA на свежем конкурсе) имеет смысл подчистить список.
 
-**Полная инструкция:** [DEV_SETUP.md — Remove extra / deleted contests](DEV_SETUP.md#remove-extra--deleted-contests).
+**Полная инструкция:** [DEV_SETUP.md — Remove extra / deleted contests](../setup/DEV_SETUP.md#remove-extra--deleted-contests).
 
 
 | Статус конкурса | Как убрать из списка                                                                                           |
@@ -323,8 +323,8 @@ uv run python src/scripts/dev_setup.py
 **Важно:**
 
 - Организатор **не может** вводить прогнозы за участников — только войти под их логином (`USER`) или вызвать API с их токеном.
-- У одного логина одна глобальная роль: для игры нужны отдельные аккаунты участников, не `supervisor`. См. [API_GUIDE — Organizer vs participant](API_GUIDE.md#organizer-vs-participant-same-person).
-- До дедлайна чужие счета скрыты у `USER` и `SUPERVISOR`; полная матрица до дедлайна — только у **Support (ADMIN)**.
+- У одного логина одна глобальная роль: для игры нужны отдельные аккаунты участников, не `supervisor`. См. [API_GUIDE — Organizer vs participant](../dev/API_GUIDE.md#organizer-vs-participant-same-person).
+- До дедлайна чужие счета скрыты у `USER` и `SUPERVISOR`; полная матрица до дедлайна — только у **Support**.
 
 ### 11.0. Подготовка
 
@@ -354,7 +354,7 @@ uv run python src/scripts/dev_setup.py --run-only
 
 ### 11.1. Организатор: конкурс, команды, участники, старт
 
-**Браузер A** — вход как `supervisor` (пароль из `SEED_SUPERVISOR_PASSWORD`, см. [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
+**Браузер A** — вход как `supervisor` (пароль из `SEED_SUPERVISOR_PASSWORD`, см. [BOOTSTRAP_USERS.md](../setup/BOOTSTRAP_USERS.md)).
 
 
 | Шаг | Действие               | Маршрут / UI                                       | Ожидание                                                                                                                         |
@@ -470,9 +470,9 @@ uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id <ID> --pa
 | `/contest/<id>` (если открыть как организатор) | **Те же правила приватности**, что у USER: чужие прогнозы скрыты (организатор не видит «все ставки» до дедлайна) |
 
 
-#### Support (ADMIN) (опционально, для контраста)
+#### Support (опционально, для контраста)
 
-Войти как `admin` → `/contest/<id>` → «Прогнозы», тур 1: видны **все** счета всех участников (единственная роль с полной матрицей до дедлайна).
+Войти как `support` → `/contest/<id>` → «Прогнозы», тур 1: видны **все** счета всех участников (единственная роль с полной матрицей до дедлайна).
 
 **Зафиксировать время:** сделать скриншоты или отметить в колонке «Статус» чек-листа: `✅ до дедлайна`.
 
@@ -543,7 +543,7 @@ curl -s "http://127.0.0.1:8000/api/v1/contests/<ID>/rounds/<ROUND1_ID>/predictio
 | X4  | Редактирование прогноза                 | да                | нет             |        |
 | X5  | Тур DRAFT не в форме прогноза           | только ACTIVE     | —               |        |
 | X6  | SUPERVISOR ≠ полная матрица до дедлайна | как USER          | как USER        |        |
-| X7  | Support (ADMIN) видит всё до дедлайна             | опционально       | —               |        |
+| X7  | Support видит всё до дедлайна             | опционально       | —               |        |
 | X8  | `/admin/results` для тура 1             | недоступен / рано | доступен CLOSED |        |
 | X9  | LB/Results без публикации               | заглушка          | заглушка        |        |
 
@@ -552,7 +552,7 @@ curl -s "http://127.0.0.1:8000/api/v1/contests/<ID>/rounds/<ROUND1_ID>/predictio
 
 ### 11.8. Очистка
 
-См. [§10.1](#101-очистка-лишних-конкурсов-dev--e2e) и [DEV_SETUP.md](DEV_SETUP.md#remove-extra--deleted-contests).
+См. [§10.1](#101-очистка-лишних-конкурсов-dev--e2e) и [DEV_SETUP.md](../setup/DEV_SETUP.md#remove-extra--deleted-contests).
 
 - Удалить тестовый конкурс: `/admin/settings/parameters` → «Удалить конкурс» (DRAFT сразу; RUNNING — сначала «Остановить», пауза 10 с).
 - После серии удалений: `purge_deleted_contests.py --all-deleted`.
@@ -600,7 +600,7 @@ uv run python src/scripts/dev_setup.py --run-only   # API :8000 + UI :3000
 
 ### 12.1. Организатор: конкурс, команды, участники, старт
 
-**Браузер A** — вход как `supervisor` (пароль из `SEED_SUPERVISOR_PASSWORD`, см. [BOOTSTRAP_USERS.md](BOOTSTRAP_USERS.md)).
+**Браузер A** — вход как `supervisor` (пароль из `SEED_SUPERVISOR_PASSWORD`, см. [BOOTSTRAP_USERS.md](../setup/BOOTSTRAP_USERS.md)).
 
 
 | Шаг | Действие          | Маршрут / UI                                       | Ожидание                                                                      | Сцен.     |
@@ -702,7 +702,7 @@ uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id <ID> --pa
 
 Открыть **«Результаты участников»** на туре 1 (`CALCULATED`, кнопка на `/admin/results`, S3.8) — модалка с таблицей тура. Сверить с ожидаемым расчётом.
 
-**Разбор по правилам** ([SCORING_LOGIC.md](SCORING_LOGIC.md)). Матч 1 итог `2:1` (исход П1), Матч 2 итог `3:0` (исход П1):
+**Разбор по правилам** ([SCORING_LOGIC.md](../dev/SCORING_LOGIC.md)). Матч 1 итог `2:1` (исход П1), Матч 2 итог `3:0` (исход П1):
 
 
 | Участник  | Матч 1 (`2:1`)                           | Матч 2 (`3:0`)                        | База |
@@ -732,7 +732,7 @@ uv run python src/scripts/dev_invite_setup.py confirm-all --contest-id <ID> --pa
 - У Вики (без прогноза) — **0 очков**, строка присутствует (отсутствие прогноза ≠ `0:0`).
 - Итоги совпадают с таблицей выше (допускается сверка через API: `GET …/rounds/<round1_id>/leaderboard` с токеном supervisor, S4.2).
 
-> Если числа не сходятся — это дефект расчёта/движка: зафиксировать матч, прогнозы и полученные очки, сверить с [SCORING_LOGIC.md](SCORING_LOGIC.md) (база/бонусы), не «подгонять» прогнозы.
+> Если числа не сходятся — это дефект расчёта/движка: зафиксировать матч, прогнозы и полученные очки, сверить с [SCORING_LOGIC.md](../dev/SCORING_LOGIC.md) (база/бонусы), не «подгонять» прогнозы.
 
 ---
 

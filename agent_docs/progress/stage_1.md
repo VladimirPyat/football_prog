@@ -117,7 +117,7 @@
 - Updated: tester_1.3.md (narrow scope), api_v1.yaml, db_schema.md
 - Note: full HTTP integration test → Stage 1.4
 - Next: @Tester runs 1.3 (narrow), then @Coder 1.4
-- Note: tester_1.4.md §8a — deliverable `manuals/MANUAL_SCORING_VERIFICATION.md` (RU, Stage 1 sign-off)
+- Note: tester_1.4.md §8a — deliverable `manuals/testing/MANUAL_SCORING_VERIFICATION.md` (RU, Stage 1 sign-off)
 
 ## 2026-06-21 — Tester (1.3)
 - STATUS: TEST_PASS
@@ -142,7 +142,7 @@
 
 ## 2026-06-21 — Tester (1.4 + 1.4.1)
 - STATUS: TEST_FAIL
-- Tests: tests/api/conftest.py, reference_compare.py, test_setup_phase_1_4.py, test_operational_phase_1_4.py, test_multi_contest_1_4.py, test_calculate_leaderboard_1_4.py, test_free_tour_1_4.py, test_contest_lifecycle_1_4.py, test_operational_gaps_1_4.py, test_canary_scoring_1_4.py, tests/manual/{verify_via_api.py,compare_db_vs_reference.py,README.md}, manuals/MANUAL_SCORING_VERIFICATION.md
+- Tests: tests/api/conftest.py, reference_compare.py, test_setup_phase_1_4.py, test_operational_phase_1_4.py, test_multi_contest_1_4.py, test_calculate_leaderboard_1_4.py, test_free_tour_1_4.py, test_contest_lifecycle_1_4.py, test_operational_gaps_1_4.py, test_canary_scoring_1_4.py, tests/manual/{verify_via_api.py,compare_db_vs_reference.py,README.md}, manuals/testing/MANUAL_SCORING_VERIFICATION.md
 - Executed: uv run pytest tests/api/ -v → 81 passed, 1 failed, 2 skipped; uv run pytest tests/integration/ -v → 36 passed
 - Verified: [API-RESULTS] 90/90, [API-LB-GLOBAL] 10/10, [CANARY-PYTEST-*] PASS, contest-scoped lifecycle/gaps/multi PASS; [OP-CLOSE] FAIL — auto_close + close handler conflict, no commit (see test_1.4.md)
 - Report: agent_docs/reports/test_1.4.md
@@ -150,7 +150,7 @@
 
 ## 2026-06-21 — Coder (1.5 cleanup)
 - STATUS: READY_FOR_TEST
-- Files: src/core/exceptions.py, src/core/logging_config.py, src/api/error_handlers.py, src/api/handlers/, src/services/notification_service.py, src/api/v1/*.py, src/services/*.py, config/settings.py, main.py, manuals/ERROR_LOGGING.md, manuals/API_GUIDE.md, tests/unit/test_exceptions_1_5.py, tests/api/test_errors_1_5.py, tests/unit/test_recoverable_1_5.py
+- Files: src/core/exceptions.py, src/core/logging_config.py, src/api/error_handlers.py, src/api/handlers/, src/services/notification_service.py, src/api/v1/*.py, src/services/*.py, config/settings.py, main.py, manuals/ERROR_LOGGING.md, manuals/dev/API_GUIDE.md, tests/unit/test_exceptions_1_5.py, tests/api/test_errors_1_5.py, tests/unit/test_recoverable_1_5.py
 - Verified: uv run pytest tests/ --ignore=tests/manual → 257 passed, 2 skipped
 - Notes: HTTP detail Russian; AppError JSON {detail, code}; notify_admin stub; centralized error handlers; Russian API docstrings
 - Next: agent_docs/instructions/tester_1.5.md
@@ -166,13 +166,13 @@
 ## 2026-06-21 — Planner (1.6 bootstrap users)
 - STATUS: INSTRUCTIONS_READY
 - Artifacts: plans/draft_1.6_bootstrap_users.md, instructions/coder_1.6.md, instructions/tester_1.6.md
-- Scope: POST /admin/users/supervisor, bootstrap_users.py, .env.example, manuals/BOOTSTRAP_USERS.md
+- Scope: POST /admin/users/supervisor, bootstrap_users.py, .env.example, manuals/setup/BOOTSTRAP_USERS.md
 - Prerequisite: Stage 1.5 TEST_PASS
 - Next: @Coder implements per coder_1.6.md (gap: ADMIN assigns SUPERVISOR; secrets via .env)
 
 ## 2026-06-21 — Coder (1.6 bootstrap users)
 - STATUS: READY_FOR_TEST
-- Files: src/services/user_admin_service.py, src/schemas/users.py, src/api/v1/admin_users.py, main.py, config/settings.py, src/scripts/bootstrap_users.py, src/scripts/seed.py, .env.example, manuals/BOOTSTRAP_USERS.md, manuals/{CONFIG,API_GUIDE,README}.md, agent_docs/contracts/api_v1.yaml, tests/api/test_admin_users.py
+- Files: src/services/user_admin_service.py, src/schemas/users.py, src/api/v1/admin_users.py, main.py, config/settings.py, src/scripts/bootstrap_users.py, src/scripts/seed.py, .env.example, manuals/setup/BOOTSTRAP_USERS.md, manuals/{CONFIG,API_GUIDE,README}.md, agent_docs/contracts/api_v1.yaml, tests/api/test_admin_users.py
 - Verified: uv run pytest tests/ --ignore=tests/manual → 276 passed, 2 skipped
 - Notes: SEED_ADMIN_PASSWORD plaintext preferred; supervisor CLI block documented for retirement when admin UI ships
 - Next: agent_docs/instructions/tester_1.6.md
@@ -180,7 +180,7 @@
 ## 2026-06-22 — Coder (1.8 discovery & contacts)
 - STATUS: READY_FOR_TEST
 - Blockers closed: B1, B2, B3
-- Files: src/api/v1/me.py, src/services/contest_discovery_service.py, src/services/contact_service.py, src/api/v1/auth.py (contacts), src/api/v1/contests.py (/public), src/schemas/{contest,auth}.py, main.py, agent_docs/contracts/api_v1.yaml, manuals/API_GUIDE.md, tests/api/{test_me_contests,test_contests_public,test_contacts}.py
+- Files: src/api/v1/me.py, src/services/contest_discovery_service.py, src/services/contact_service.py, src/api/v1/auth.py (contacts), src/api/v1/contests.py (/public), src/schemas/{contest,auth}.py, main.py, agent_docs/contracts/api_v1.yaml, manuals/dev/API_GUIDE.md, tests/api/{test_me_contests,test_contests_public,test_contacts}.py
 - Contract: api_v1.yaml v1.2.0-rc
 - Verified: pytest tests/api/test_me_contests.py tests/api/test_contests_public.py tests/api/test_contacts.py → 9 passed; pytest tests/ --ignore=tests/manual → 284 passed, 2 skipped, 1 failed (pre-existing test_migration_1_2_1.py downgrade)
 - Next: agent_docs/instructions/tester_1.8.md
@@ -199,7 +199,7 @@
 ## 2026-06-22 — Coder (1.7 counts & invite accept)
 - STATUS: READY_FOR_TEST
 - Blockers: B4, B6
-- Files: src/schemas/leaderboard.py, src/services/{leaderboard_service,participant_service,prediction_service}.py, src/api/v1/{auth,contest_ops,predictions}.py, src/core/exceptions.py, agent_docs/contracts/api_v1.yaml, manuals/API_GUIDE.md, tests/api/{test_leaderboard_counts,test_participant_accept}.py
+- Files: src/schemas/leaderboard.py, src/services/{leaderboard_service,participant_service,prediction_service}.py, src/api/v1/{auth,contest_ops,predictions}.py, src/core/exceptions.py, agent_docs/contracts/api_v1.yaml, manuals/dev/API_GUIDE.md, tests/api/{test_leaderboard_counts,test_participant_accept}.py
 - Verified: pytest tests/ --ignore=tests/manual → 300 passed, 2 skipped
 - Next: agent_docs/instructions/tester_1.7.md
 
@@ -257,7 +257,7 @@
 ## 2026-06-27 — Coder (1.12 fix — B11/B12 auth links + training mode)
 - STATUS: READY_FOR_TEST
 - Blockers targeted: B11, B12 (pending TEST_PASS)
-- Files: src/core/setup_tokens.py, src/services/auth_setup_service.py, src/services/contest_restore_service.py, src/scripts/dev_invite_setup.py, alembic/versions/e6f7a8b9c0d1_contest_restore_snapshots.py; edited auth.py, contests.py, contest_lifecycle_service.py, contest_setup_service.py, participant_service.py, models.py, schemas, config/settings.py, .env.example; frontend /auth/setup, LoginForm, ParticipantInviteModal, LifecyclePanel, lifecycle page; manuals/CONFIG.md, manuals/DEV_SETUP.md
+- Files: src/core/setup_tokens.py, src/services/auth_setup_service.py, src/services/contest_restore_service.py, src/scripts/dev_invite_setup.py, alembic/versions/e6f7a8b9c0d1_contest_restore_snapshots.py; edited auth.py, contests.py, contest_lifecycle_service.py, contest_setup_service.py, participant_service.py, models.py, schemas, config/settings.py, .env.example; frontend /auth/setup, LoginForm, ParticipantInviteModal, LifecyclePanel, lifecycle page; manuals/setup/CONFIG.md, manuals/setup/DEV_SETUP.md
 - Verified: alembic upgrade head (0); ruff on new files (0); test_contest_lifecycle_1_4.py (7 passed); frontend lint + type-check (0); legacy participant_accept tests fail under ENFORCE_PASSWORD_SETUP=true (expected — @Tester updates per tester_1.12_fix.md)
 - Next: tester_1.12_fix.md
 
@@ -271,7 +271,7 @@
 
 ## 2026-06-27 — Coder (1.14 data fix — dev fixture)
 - STATUS: READY_FOR_TEST
-- Files: src/scripts/finalize_dev_fixture.py, src/scripts/dev_setup.py (--e2e, --finalize-fixture-only); manuals/DEV_SETUP.md, STATUS_REFERENCE.md, MANUAL_SCORING_VERIFICATION.md
+- Files: src/scripts/finalize_dev_fixture.py, src/scripts/dev_setup.py (--e2e, --finalize-fixture-only); manuals/setup/DEV_SETUP.md, STATUS_REFERENCE.md, MANUAL_SCORING_VERIFICATION.md
 - Fixture: rounds 1–9 PUBLISHED (90 scores), 10 CALCULATED (10), 11 CLOSED (0)
 - Next: tester_1.14_data_fix.md
 

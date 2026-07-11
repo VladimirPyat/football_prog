@@ -20,7 +20,7 @@
 | B1 | **PASS** | `set_result` принимает `CLOSED` \| `CALCULATED` |
 | B2 | **PASS** | Auto `recalculate_round` после PUT на `CALCULATED` |
 | B4 tests | **PASS** | `test_results_calculated_edit_2_3_2.py` — 4/4 |
-| B4 docs | **PASS** | `manuals/API_GUIDE.md`, `manuals/STATUS_REFERENCE.md` |
+| B4 docs | **PASS** | `manuals/dev/API_GUIDE.md`, `manuals/dev/STATUS_REFERENCE.md` |
 
 ---
 

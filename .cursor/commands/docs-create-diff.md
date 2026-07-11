@@ -8,10 +8,10 @@ WORKFLOW:
 3. If the filtered list is empty → reply "No relevant source changes to document." and STOP.
 4. If list contains >20 files → focus ONLY on changes in src/, config/, alembic/.
 5. Read ONLY the filtered files. Map changes to the appropriate documentation file:
-   - Database models, migrations, enums, constraints → `manuals/DB_REFERENCE.md`
-   - FastAPI routes, Pydantic schemas, endpoints, auth → `manuals/API_GUIDE.md`
-   - Scoring logic, bonuses, tie-breakers, validators → `manuals/SCORING_LOGIC.md`
-   - Config, env vars, seed scripts, contest_defaults.json → `manuals/CONFIG.md`
+   - Database models, migrations, enums, constraints → `manuals/dev/DB_REFERENCE.md`
+   - FastAPI routes, Pydantic schemas, endpoints, auth → `manuals/dev/API_GUIDE.md`
+   - Scoring logic, bonuses, tie-breakers, validators → `manuals/dev/SCORING_LOGIC.md`
+   - Config, env vars, seed scripts, contest_defaults.json → `manuals/setup/CONFIG.md`
 6. CREATE or UPDATE the mapped files in `manuals/`. ALWAYS use your file-writing/editing tools. DO NOT output raw markdown to the chat.
 7. Mark changed sections with [UPDATED] or [NEW]. Include "Before → After" only when behavior or contract actually changed.
 8. If a target file does not exist, create it with a clear structure (title, overview, table of contents, sections).

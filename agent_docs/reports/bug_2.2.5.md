@@ -5,7 +5,7 @@ OPEN
 
 ## Triage
 - **Class**: BUG
-- **Rationale**: Three related defects across prediction UI and API handlers; no schema or API shape changes required beyond enriching `entries` with all ACCEPTED participants (already specified in `manuals/SUPERVISOR_TESTING_SCENARIOS.md` §11).
+- **Rationale**: Three related defects across prediction UI and API handlers; no schema or API shape changes required beyond enriching `entries` with all ACCEPTED participants (already specified in `manuals/testing/SUPERVISOR_TESTING_SCENARIOS.md` §11).
 
 ## Description
 
@@ -132,7 +132,7 @@ uv run pytest tests/api/test_predictions_flow_1_3.py -q
 # Add regression: GET predictions after deadline includes ACCEPTED participant with no predictions
 # Add regression: list rounds as USER excludes DRAFT
 
-# Manual (manuals/SUPERVISOR_TESTING_SCENARIOS.md §11)
+# Manual (manuals/testing/SUPERVISOR_TESTING_SCENARIOS.md §11)
 # X3, X5, save with 2 matches on «тест1»
 ```
 

@@ -4,7 +4,7 @@
 
 > **Важно:** в API и БД всегда используются **английские** значения (`ACTIVE`, `CLOSED`, …). На фронте они переводятся в подписи для супервайзера и участника. Менять значения в API не нужно — меняются только **подписи в UI**.
 
-См. также: [ARCHITECTURE.md](ARCHITECTURE.md#lifecycle-state-machines), [DB_REFERENCE.md](DB_REFERENCE.md), [API_GUIDE.md](API_GUIDE.md), контракт [contest_lifecycle_flow.md](../agent_docs/contracts/contest_lifecycle_flow.md).
+См. также: [ARCHITECTURE.md](ARCHITECTURE.md#lifecycle-state-machines), [DB_REFERENCE.md](DB_REFERENCE.md), [API_GUIDE.md](API_GUIDE.md), контракт [contest_lifecycle_flow.md](../../agent_docs/contracts/contest_lifecycle_flow.md).
 
 ---
 
@@ -91,7 +91,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 
 | Слой | Файл | Правило |
 |------|------|---------|
-| Backend | `src/services/leaderboard_service.py` | `_allowed_round_statuses`: публичный GET — только `PUBLISHED`; для `SUPERVISOR`/Support (ADMIN) — также `CALCULATED` (preview) |
+| Backend | `src/services/leaderboard_service.py` | `_allowed_round_statuses`: публичный GET — только `PUBLISHED`; для `SUPERVISOR`/Support — также `CALCULATED` (preview) |
 | Backend | `get_global_leaderboard` | Агрегировать только туры `PUBLISHED` |
 | Backend | `contest_ops.py`, `admin_misc.py` | Optional Bearer → `viewer_role` на round LB/results |
 | Frontend | `frontend/src/lib/contest/roundPublicVisibility.ts` | `isRoundPubliclyVisible(status) => status === 'PUBLISHED'` |
@@ -117,11 +117,11 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Перенос времени (несколько часов) | До `date_time` матча | `datetime-local` + «Сохранить»; предупреждение при сдвиге ≥ 7 суток |
 | Отмена (`CANCELED`) | Пока матч не `CANCELED`/`FINISHED`/`VOID` | Статус в `<select>` → подтверждение → PATCH |
 | Перенос (`POSTPONED`) | Из `SCHEDULED` | Статус в `<select>` → подтверждение → PATCH → модалка свободного тура |
-| Восстановление (`SCHEDULED`) | Только **Support (ADMIN)** из `CANCELED`/`POSTPONED` | Статус в `<select>` → подтверждение |
+| Восстановление (`SCHEDULED`) | Только **Support** из `CANCELED`/`POSTPONED` | Статус в `<select>` → подтверждение |
 
 Правила: `frontend/src/lib/admin/matchScheduleEdit.ts`. Ввод счёта на «Результаты»: пустые поля ≠ 0 (`matchResultSchema` без `z.coerce` на пустую строку).
 
-### Dev fixture (после `dev_setup` + `finalize_dev_fixture`, Stage 1.14)
+### Dev fixture (после [`dev_setup`](../setup/DEV_SETUP.md) + `finalize_dev_fixture`, Stage 1.14)
 
 Справочная дата для дедлайнов: **2026-06-27** UTC.
 
@@ -129,7 +129,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 |-----|-----------------|----------|---------------------------|
 | 1–9 | `PUBLISHED` | 10 × 9 = 90 | Публичная история / leaderboard |
 | 10 | `CALCULATED` | 10 | Предпросмотр супервайзера; публикация вручную |
-| 11 | `CLOSED` | 0 | Ввод результатов → «Рассчитать» (см. `coder_2.3.1_fix` §9.9) |
+| 11 | `CLOSED` | 0 | Ввод результатов → «Рассчитать» (см. [SUPERVISOR_TESTING_SCENARIOS.md](../testing/SUPERVISOR_TESTING_SCENARIOS.md) §9, маршрут B) |
 
 Скрипт: `src/scripts/finalize_dev_fixture.py`; вызывается из `dev_setup.py` (не из `load_test_data.py`, чтобы pytest оставался на `CLOSED` 1–9).
 
@@ -140,12 +140,12 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Статус | Прогнозы участников | Редактирование тура (панель организатора) | Результаты |
 |--------|---------------------|------------------------------|------------|
 | `DRAFT` | Нет | Полное (матчи, команды, дедлайн) | Нет |
-| `ACTIVE` | Да, пока `now < deadline` | **Frontend [UPDATED]:** состав матчей (команды) **не редактируется** — только расписание: перенос времени до начала матча (независимо от дедлайна прогнозов), отмена (с подтверждением), статус «Перенесён» + свободный тур; восстановление `CANCELED`/`POSTPONED` → `SCHEDULED` — только **Support (ADMIN)**. Кнопка «Сохранить» не блокируется 24h lockout дедлайна, если меняли только матчи. **Backend:** PATCH отклоняет смену команд на ACTIVE туре. | Нет |
+| `ACTIVE` | Да, пока `now < deadline` | **Frontend [UPDATED]:** состав матчей (команды) **не редактируется** — только расписание: перенос времени до начала матча (независимо от дедлайна прогнозов), отмена (с подтверждением), статус «Перенесён» + свободный тур; восстановление `CANCELED`/`POSTPONED` → `SCHEDULED` — только **Support**. Кнопка «Сохранить» не блокируется 24h lockout дедлайна, если меняли только матчи. **Backend:** PATCH отклоняет смену команд на ACTIVE туре. | Нет |
 | `CLOSED` | Нет | Только просмотр на «Туры» | Ввод счёта |
 | `CALCULATED` | Нет | Только просмотр | Правка счёта + авто-пересчёт, публикация / VOID |
 | `PUBLISHED` | Нет | Только просмотр | Только VOID (с пересчётом) |
 
-Подробная матрица операций: [contest_lifecycle_flow.md](../agent_docs/contracts/contest_lifecycle_flow.md).
+Подробная матрица операций: [contest_lifecycle_flow.md](../../agent_docs/contracts/contest_lifecycle_flow.md).
 
 ### Где в коде
 
@@ -243,7 +243,7 @@ DRAFT ──activate──► ACTIVE ──дедлайн прошёл + close�
 | Объект | Поле | Значения | Где подписи |
 |--------|------|----------|-------------|
 | Участник конкурса | `contest_participants.status` | `PENDING`, `ACCEPTED` | `participantStatusLabel()` в `format.ts` |
-| Глобальная роль | `users.role` | `USER`, `SUPERVISOR`, `ADMIN` (support) | Не статусная машина; RBAC в API |
+| Глобальная роль | `users.role` | `USER`, `SUPERVISOR`, `SUPPORT` | Не статусная машина; RBAC в API |
 
 ---
 

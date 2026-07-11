@@ -127,8 +127,8 @@ Update role strings and paths in:
 | Priority | Files |
 |----------|-------|
 | P0 | `docs/01_tech_regulations.md` §1.2, UC-13 |
-| P0 | `manuals/API_GUIDE.md`, `CONFIG.md`, `BOOTSTRAP_USERS.md` |
-| P1 | `manuals/SUPERVISOR_TESTING_SCENARIOS.md`, `FRONTEND_REFERENCE.md` |
+| P0 | `manuals/dev/API_GUIDE.md`, `CONFIG.md`, `BOOTSTRAP_USERS.md` |
+| P1 | `manuals/testing/SUPERVISOR_TESTING_SCENARIOS.md`, `FRONTEND_REFERENCE.md` |
 | P1 | `docs/03_user_scenarios.md`, `docs/04_supervisor_scenario.md`, `docs/06_front_tests.md` |
 
 Glossary blurb for `manuals/README.md` or `API_GUIDE.md`:

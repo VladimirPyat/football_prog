@@ -29,7 +29,7 @@ While planning Stage 2 (Frontend), six API gaps were identified when reconciling
 2. Split delivery into **three sequential sub-stages** (1.7 → 1.8 → 1.9) so frontend can start dependent work early.
 3. Bump OpenAPI to **v1.2.0** when 1.9 completes (or per sub-stage minor notes in progress log).
 4. Resolve **B6 product question** without a new endpoint (see §5.3).
-5. Update `manuals/API_GUIDE.md` and append `agent_docs/progress/stage_1.md` after each sub-stage.
+5. Update `manuals/dev/API_GUIDE.md` and append `agent_docs/progress/stage_1.md` after each sub-stage.
 
 ## 3. Non-goals
 
@@ -105,7 +105,7 @@ Add to `ScoreDetail` / `ScoreDetailOut`:
 1. On `change_password`, after clearing `is_temp_password`, run:
    - `UPDATE contest_participants SET status='ACCEPTED' WHERE user_id=:uid AND status='PENDING'`
 2. **Prediction guard:** `prediction_service.submit_batch()` must reject users who are not `ACCEPTED` participants in the contest (403 `CONTEST_RULE_VIOLATION` or new code `PARTICIPANT_NOT_ACCEPTED`). Today PENDING users can submit but are excluded from scoring — guard closes the loophole.
-3. Document flow in `manuals/API_GUIDE.md` §Authentication.
+3. Document flow in `manuals/dev/API_GUIDE.md` §Authentication.
 
 **No schema change.** `ParticipantOut.status` already exposes `PENDING | ACCEPTED`.
 
@@ -225,7 +225,7 @@ Invite flow already creates `Contact` row with email in `contest_setup_service.a
 
 **Default logo asset:**
 - Ship placeholder at `static/assets/default-team-logo.jpg` (repo path under project root, served via `StaticFiles`; source: `docs/screens/screen_team_default.jpg`).
-- Document in `config/settings.py` and `manuals/CONFIG.md`: target **64×64 px** square; backend resizes uploads to this size (Pillow, LANCZOS, preserve aspect ratio → center-crop or letterbox to square — **recommend center-crop** for uniform UI).
+- Document in `config/settings.py` and `manuals/setup/CONFIG.md`: target **64×64 px** square; backend resizes uploads to this size (Pillow, LANCZOS, preserve aspect ratio → center-crop or letterbox to square — **recommend center-crop** for uniform UI).
 - API behaviour: `TeamOut.logo_url` returns `DEFAULT_TEAM_LOGO_URL` when DB column is NULL (computed in serializer, not stored in DB).
 
 **Resize strategy (approved direction):**
@@ -259,7 +259,7 @@ src/api/v1/auth.py                      # accept hook in change_password
 src/services/participant_service.py     # NEW — accept_pending_participations()
 src/services/prediction_service.py      # guard ACCEPTED enrollment
 agent_docs/contracts/api_v1.yaml        # ScoreDetail + doc note on B6
-manuals/API_GUIDE.md
+manuals/dev/API_GUIDE.md
 tests/api/test_leaderboard_counts.py    # NEW
 tests/api/test_participant_accept.py    # NEW
 agent_docs/progress/stage_1.md          # append
@@ -277,7 +277,7 @@ src/schemas/contest.py                  # UserContestOut, PublicContestOut
 src/schemas/auth.py                     # ContactOut, ContactPatchRequest
 main.py                                 # register me router
 agent_docs/contracts/api_v1.yaml
-manuals/API_GUIDE.md
+manuals/dev/API_GUIDE.md
 tests/api/test_me_contests.py           # NEW
 tests/api/test_contests_public.py       # NEW
 tests/api/test_contacts.py              # NEW
@@ -292,8 +292,8 @@ src/api/v1/contest_teams.py             # POST .../logo
 src/services/team_logo_service.py       # NEW — validate, save, update url
 main.py                                 # StaticFiles mount
 agent_docs/contracts/api_v1.yaml
-manuals/API_GUIDE.md
-manuals/CONFIG.md                       # new env vars
+manuals/dev/API_GUIDE.md
+manuals/setup/CONFIG.md                       # new env vars
 .env.example                            # document upload settings
 tests/api/test_team_logo_upload.py      # NEW
 agent_docs/progress/stage_1.md

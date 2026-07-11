@@ -17,7 +17,7 @@
 1. **API:** `POST /api/v1/admin/users/supervisor` — ADMIN creates global SUPERVISOR (organizer) account.
 2. **CLI:** `src/scripts/bootstrap_users.py` — idempotent ADMIN + optional SUPERVISOR from `.env` (plaintext passwords hashed at runtime).
 3. **Config:** `SEED_ADMIN_PASSWORD`, `SEED_SUPERVISOR_*` env vars; `.env.example` with hash-generation one-liner.
-4. **Docs:** `manuals/BOOTSTRAP_USERS.md`; sync `CONFIG.md`, `API_GUIDE.md`; update `api_v1.yaml`.
+4. **Docs:** `manuals/setup/BOOTSTRAP_USERS.md`; sync `CONFIG.md`, `API_GUIDE.md`; update `api_v1.yaml`.
 
 ## 3. Non-goals
 
@@ -94,7 +94,7 @@ config/settings.py                       # new env fields
 src/scripts/bootstrap_users.py           # NEW
 src/scripts/seed.py                      # use SEED_ADMIN_PASSWORD when set
 .env.example                             # NEW (repo root)
-manuals/BOOTSTRAP_USERS.md               # NEW
+manuals/setup/BOOTSTRAP_USERS.md               # NEW
 manuals/{CONFIG,API_GUIDE,README}.md     # sync
 agent_docs/contracts/api_v1.yaml         # add endpoint + schemas
 tests/api/test_admin_users.py            # NEW

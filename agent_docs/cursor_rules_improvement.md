@@ -578,8 +578,8 @@ Instruction file **must** end with:
 
 ```markdown
 # Add to docs-create-diff mapping (future):
-- frontend/src/app/, routes, pages → manuals/FRONTEND_REFERENCE.md
-- frontend/src/components/ui/* → manuals/FRONTEND_REFERENCE.md § components
+- frontend/src/app/, routes, pages → manuals/dev/FRONTEND_REFERENCE.md
+- frontend/src/components/ui/* → manuals/dev/FRONTEND_REFERENCE.md § components
 - agent_docs/ui/* changes → do NOT sync to manuals automatically (living agent docs)
 ```
 
