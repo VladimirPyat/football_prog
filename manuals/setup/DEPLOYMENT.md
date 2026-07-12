@@ -245,6 +245,15 @@ docker compose down -v       # ⚠ удаляет том PostgreSQL
 | **api** | `Dockerfile` | `8000` | FastAPI, JWT, статические логотипы |
 | **frontend** | `frontend/Dockerfile` | `3000` | UI на Next.js |
 
+**Node.js и Python на хосте не нужны** при развёртывании через Docker — они внутри образов (`node:20-alpine`, `python:3.12-slim`). Playwright, Vitest и `e2e/` в продакшн-образ не попадают (см. `frontend/.dockerignore`).
+
+Проверить версию Node **в контейнере**:
+
+```bash
+docker compose exec frontend node -v
+# → v20.x
+```
+
 Браузер обращается к **обоим** публичным origin:
 
 - UI → `PUBLIC_FRONTEND_URL`

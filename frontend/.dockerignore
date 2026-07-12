@@ -3,6 +3,17 @@ node_modules/
 .env.local
 .env.production
 .env*.local
+
+# QA / E2E — not needed in production image
 e2e/
+playwright.config.ts
+playwright.global-setup.ts
+vitest.config.ts
 .playwright-browsers/
+test-results/
+
+# Unit tests (Vitest) — not part of Next.js runtime
+**/*.test.ts
+**/*.test.tsx
+
 *.md

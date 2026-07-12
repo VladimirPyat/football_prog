@@ -6,6 +6,9 @@
 # APP_MODE=web_dev  → SQLite in ./data/football.db (no PostgreSQL container)
 # APP_MODE=web_prod → PostgreSQL (`docker compose --profile prod up`)
 #
+# Note: `db` uses profile `prod`, but compose still parses its env at build time —
+# POSTGRES_PASSWORD has a dummy default; set a strong value in .env for web_prod.
+#
 # First deploy:  manuals/setup/DEPLOYMENT.md
 # Update deploy:  git pull && docker compose build && docker compose up -d
 
@@ -16,7 +19,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: football
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env for web_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-football}
       POSTGRES_DB: football
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -50,7 +53,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?Set PUBLIC_API_URL in .env}
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
         NEXT_PUBLIC_API_TIMESTAMP_TIMEZONE: ${NEXT_PUBLIC_API_TIMESTAMP_TIMEZONE:-UTC}
         NEXT_PUBLIC_DISPLAY_TIMEZONE: ${NEXT_PUBLIC_DISPLAY_TIMEZONE:-Europe/Moscow}
         NEXT_PUBLIC_DATETIME_LOCALE: ${NEXT_PUBLIC_DATETIME_LOCALE:-ru-RU}
