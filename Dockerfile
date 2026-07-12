@@ -17,7 +17,7 @@ COPY main.py ./
 COPY src ./src
 COPY static ./static
 COPY config/contest_defaults.json ./config/contest_defaults.json
-COPY docker/entrypoint-api.sh /entrypoint-api.sh
+COPY deploy/docker/entrypoint-api.sh /entrypoint-api.sh
 
 RUN uv sync --no-dev --frozen && chmod +x /entrypoint-api.sh
 

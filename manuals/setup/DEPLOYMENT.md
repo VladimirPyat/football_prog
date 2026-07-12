@@ -14,7 +14,8 @@
 - [Архитектура](#архитектура)
 - [Локальная разработка (без Docker)](#локальная-разработка-без-docker)
 - [Ручное развёртывание / systemd](#ручное-развёртывание--systemd)
-- [Обратный прокси (типовой случай)](#обратный-прокси-типовой-случай)
+- [Обратный прокси nginx (HTTP)](#обратный-прокси-nginx-http)
+- [TLS / HTTPS (позже)](#tls--https-позже)
 - [Постоянные данные](#постоянные-данные)
 - [Ссылки-приглашения и SMTP](#ссылки-приглашения-и-smtp)
 - [Чек-лист продакшена](#чек-лист-продакшена)
@@ -71,6 +72,7 @@
 | [`Dockerfile`](../../Dockerfile) | Образ API (`uv`, Alembic при старте) |
 | [`frontend/Dockerfile`](../../frontend/Dockerfile) | Многоэтапная сборка Next.js |
 | [`.env.example`](../../.env.example) | Шаблон для серверного `.env` |
+| [`deploy/`](../../deploy/) | nginx (HTTP) + Docker entrypoint |
 
 ### Предварительные требования (сервер)
 
@@ -115,7 +117,20 @@ SEED_SUPERVISOR_PASSWORD=your-supervisor-password
 # FRONTEND_PORT=3000
 ```
 
-Пример для **стейджинга на той же машине** (`web_dev`):
+Пример для **стейджинга на VDS с nginx** (`web_dev`, один IP, HTTP без TLS):
+
+```env
+APP_MODE=web_dev
+PUBLIC_FRONTEND_URL=http://10.0.0.1
+PUBLIC_API_URL=http://10.0.0.1
+JWT_SECRET_KEY=staging-jwt-secret
+SEED_SUPPORT_PASSWORD=your-support-password
+SEED_SUPERVISOR_PASSWORD=your-supervisor-password
+```
+
+Оба `PUBLIC_*` **без порта** — снаружи слушает nginx на `:80`. После правки `.env` пересоберите фронтенд: `docker compose build frontend`.
+
+Пример **без nginx** (прямой доступ к портам Docker):
 
 ```env
 APP_MODE=web_dev
@@ -140,7 +155,7 @@ docker compose up -d
 docker compose --profile prod up -d
 ```
 
-При первом старте контейнер API автоматически выполняет `alembic upgrade head` (`docker/entrypoint-api.sh`).
+При первом старте контейнер API автоматически выполняет `alembic upgrade head` (`deploy/docker/entrypoint-api.sh`).
 
 ### 4. Начальная загрузка пользователей (один раз для пустой БД)
 
@@ -161,18 +176,11 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/
 # → 200
 ```
 
-Затем настройте TLS обратный прокси (ниже) и проверьте вход + флоу приглашения в браузере.
+Затем настройте nginx ([§ ниже](#обратный-прокси-nginx-http)) и проверьте вход + флоу приглашения в браузере.
 
-### 6. Обратный прокси продакшена
+### 6. Кратко: что дальше
 
-Направьте публичные хостнеймы на порты контейнеров (по умолчанию `127.0.0.1:3000` и `:8000`):
-
-| Публичный URL | Upstream |
-|------------|----------|
-| `https://app.example.com` | `http://127.0.0.1:3000` |
-| `https://api.example.com` | `http://127.0.0.1:8000` |
-
-Убедитесь, что `PUBLIC_FRONTEND_URL` / `PUBLIC_API_URL` в `.env` совпадают с **HTTPS**-URL, которые видят пользователи в браузере.
+Docker слушает **только на localhost**: `127.0.0.1:3000` (UI) и `127.0.0.1:8000` (API). Пользователи заходят через nginx на порту 80 (позже 443). Подробные конфиги — в следующем разделе.
 
 ---
 
@@ -185,7 +193,7 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/
 5. `docker compose build && docker compose up -d`
 6. `docker compose exec api uv run python src/scripts/seed.py`
 7. `docker compose exec api uv run python src/scripts/bootstrap_users.py`
-8. Настроить TLS обратный прокси
+8. Установить nginx по [§ HTTP](#обратный-прокси-nginx-http) (TLS — позже)
 9. Дымовой тест: `/health`, вход в интерфейсе, приглашение → `setup_url` → настройка пользователя
 
 ---
@@ -295,14 +303,138 @@ PostgreSQL: создайте БД/пользователя вручную ([CONF
 
 ---
 
-## Обратный прокси (типовой случай)
+## Обратный прокси nginx (HTTP)
 
-nginx должен пересылать:
+Готовые файлы в [`deploy/nginx/`](../../deploy/nginx/):
+
+| Файл | Когда использовать |
+|------|-------------------|
+| [`football-single-host.http.conf`](../../deploy/nginx/football-single-host.http.conf) | **Один IP или домен** — UI на `/`, API на `/api/` (рекомендуется для VDS) |
+| [`football-two-hosts.http.conf`](../../deploy/nginx/football-two-hosts.http.conf) | **Два поддомена** — `app.*` и `api.*` |
+| [`install-http.sh`](../../deploy/nginx/install-http.sh) | Скрипт: подставить хост и включить сайт |
+| [`SSL-TODO.md`](../../deploy/nginx/SSL-TODO.md) | Заметки для HTTPS (certbot) — позже |
+
+### Вариант A — один хост (IP VDS, без TLS)
+
+Подходит для `APP_MODE=web_dev` на сервере. Пользователь открывает `http://10.0.0.1/` — без порта в URL.
+
+**1. `.env`** (замените IP):
+
+```env
+APP_MODE=web_dev
+PUBLIC_FRONTEND_URL=http://10.0.0.1
+PUBLIC_API_URL=http://10.0.0.1
+```
+
+**2. Пересборка фронтенда** (обязательно после смены `PUBLIC_API_URL`):
+
+```bash
+cd /opt/football_prog
+docker compose build frontend
+docker compose up -d
+```
+
+**3. Установка nginx** (Ubuntu/Debian):
+
+```bash
+sudo apt update && sudo apt install -y nginx
+cd /opt/football_prog
+sudo bash deploy/nginx/install-http.sh single 10.0.0.1
+```
+
+Скрипт копирует конфиг в `/etc/nginx/sites-available/football`, включает symlink, делает `nginx -t` и `reload`.
+
+**Ручная установка** (без скрипта):
+
+```bash
+sudo cp deploy/nginx/football-single-host.http.conf /etc/nginx/sites-available/football
+sudo sed -i 's/YOUR_PUBLIC_HOST/10.0.0.1/g' /etc/nginx/sites-available/football
+sudo ln -sf /etc/nginx/sites-available/football /etc/nginx/sites-enabled/football
+sudo rm -f /etc/nginx/sites-enabled/default   # опционально, если мешает дефолтный сайт
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**4. Проверка:**
+
+```bash
+curl -s http://10.0.0.1/health
+# → {"status":"ok"}
+
+curl -s -o /dev/null -w "%{http_code}" http://10.0.0.1/
+# → 200
+```
+
+Откройте `http://10.0.0.1/` в браузере.
+
+### Вариант B — два поддомена (HTTP)
+
+**`.env`:**
+
+```env
+PUBLIC_FRONTEND_URL=http://app.football.local
+PUBLIC_API_URL=http://api.football.local
+```
+
+На **своём ноутбуке** (если нет DNS) добавьте в `/etc/hosts`:
+
+```
+10.0.0.1 app.football.local api.football.local
+```
+
+**Установка:**
+
+```bash
+sudo bash deploy/nginx/install-http.sh two app.football.local api.football.local
+```
+
+| Публичный URL | Upstream |
+|---------------|----------|
+| `http://app.…` | `http://127.0.0.1:3000` |
+| `http://api.…` | `http://127.0.0.1:8000` |
+
+### Что проксирует nginx
+
+| Путь | Сервис |
+|------|--------|
+| `/` | Next.js |
+| `/api/` | FastAPI (`/api/v1/…`) |
+| `/static/` | логотипы команд (FastAPI) |
+| `/health` | health-check API |
+
+nginx пересылает:
 
 - заголовок `Authorization` (JWT)
-- `client_max_body_size` ≥ 2 МиБ (загрузка логотипов команд)
+- `client_max_body_size` 4 МиБ (загрузка логотипов, лимит API — 2 МиБ)
 
-Статические логотипы команд: раздаются API из `/static/teams/...` (`UPLOAD_DIR` → `data/uploads` в Docker).
+### Безопасность (рекомендуется)
+
+С nginx закройте прямой доступ к портам Docker с интернета — оставьте только `80`/`443`:
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw deny 3000/tcp
+sudo ufw deny 8000/tcp
+```
+
+Контейнеры по-прежнему слушают `0.0.0.0:3000` и `:8000` на хосте; ufw ограничивает доступ снаружи.
+
+---
+
+## TLS / HTTPS (позже)
+
+Сейчас конфиги — **только HTTP** (`listen 80`). Для продакшена:
+
+1. Настроить DNS на VDS.
+2. Установить certbot: `sudo apt install certbot python3-certbot-nginx`
+3. Выполнить (пример для двух поддоменов):
+   ```bash
+   sudo certbot --nginx -d app.example.com -d api.example.com
+   ```
+4. Обновить `.env` на `https://…`, пересобрать frontend, перезапустить API.
+5. Подробности: [`deploy/nginx/SSL-TODO.md`](../../deploy/nginx/SSL-TODO.md).
+
+Certbot добавит блоки `listen 443 ssl` и редирект с HTTP.
 
 ---
 
@@ -354,6 +486,8 @@ nginx должен пересылать:
 | Ошибка CORS | Неверный `PUBLIC_FRONTEND_URL`; перезапустите API |
 | Ссылка-приглашение → `127.0.0.1:3000` | `APP_MODE=local` или отсутствует `PUBLIC_FRONTEND_URL` на API |
 | UI загружается, вызовы API падают | Неверный `PUBLIC_API_URL` на этапе **сборки** — `docker compose build frontend` |
+| 502 Bad Gateway от nginx | Docker не запущен или неверные порты — `docker compose ps`, `curl 127.0.0.1:3000` |
+| nginx: duplicate server name | Удалите конфликтующий сайт в `sites-enabled/` |
 | Конфигурация сбрасывается после `git pull` | Редактировались закоммиченные файлы вместо `.env` |
 | Логотипы пропали после повторного развёртывания | `data/uploads` не примонтирован |
 | БД пуста после повторного развёртывания | Выполнен `docker compose down -v` (удаляет `pgdata`) |
@@ -362,4 +496,4 @@ nginx должен пересылать:
 
 ---
 
-*Последнее обновление: 2026-07-11 — пресеты APP_MODE, развёртывание через Docker Compose, постоянные тома.*
+*Последнее обновление: 2026-07-12 — готовые конфиги nginx (HTTP), install-http.sh, TLS-TODO.*
